@@ -1,0 +1,14 @@
+# Build artifacts
+archon
+archon-test
+
+# Local directories
+.archon/
+.claude/
+
+# Dependency directories
+homebrew/
+
+# OpenSpec archive
+openspec/changes/archive/
+openspec/specs/
