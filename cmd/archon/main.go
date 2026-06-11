@@ -37,6 +37,7 @@ func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 		newRollbackCmd(stdout, stderr),
 		newVersionCmd(stdout),
 		newStatusCmd(stdout, stderr),
+		newConfigCmd(stdout, stderr),
 	)
 
 	return root
@@ -44,9 +45,18 @@ func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 
 func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 	var (
-		agentFlag  string
-		forceFlag  bool
-		dryRunFlag bool
+		agentFlag        string
+		forceFlag        bool
+		dryRunFlag       bool
+		modelFlag        string
+		modelExploreFlag string
+		modelProposeFlag string
+		modelSpecFlag    string
+		modelDesignFlag  string
+		modelTasksFlag   string
+		modelApplyFlag   string
+		modelVerifyFlag  string
+		modelArchiveFlag string
 	)
 
 	cmd := &cobra.Command{
@@ -78,12 +88,34 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 				return nil
 			}
 
+			modelFlags := map[string]string{
+				"explore": modelExploreFlag,
+				"propose": modelProposeFlag,
+				"spec":    modelSpecFlag,
+				"design":  modelDesignFlag,
+				"tasks":   modelTasksFlag,
+				"apply":   modelApplyFlag,
+				"verify":  modelVerifyFlag,
+				"archive": modelArchiveFlag,
+			}
+
+			for _, v := range modelFlags {
+				if w := config.Validate(v); w != "" {
+					fmt.Fprintln(stderr, w)
+				}
+			}
+			if w := config.Validate(modelFlag); w != "" {
+				fmt.Fprintln(stderr, w)
+			}
+
 			opts := initcmd.Options{
-				HomeDir:    homeDir,
-				ProjectDir: projectDir,
-				Agent:      agentFlag,
-				Force:      forceFlag,
-				EmbeddedFS: skills.FS,
+				HomeDir:      homeDir,
+				ProjectDir:   projectDir,
+				Agent:        agentFlag,
+				Force:        forceFlag,
+				EmbeddedFS:   skills.FS,
+				ModelDefault: modelFlag,
+				ModelPhases:  modelFlags,
 			}
 
 			result, err := initcmd.Run(opts)
@@ -103,6 +135,15 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 	cmd.Flags().StringVar(&agentFlag, "agent", "", "Override agent detection (opencode, claude, agents, codex)")
 	cmd.Flags().BoolVar(&forceFlag, "force", false, "Force re-initialization even if already initialized")
 	cmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Show what would happen without making changes")
+	cmd.Flags().StringVar(&modelFlag, "model", "", "Default AI model for all SDD phases")
+	cmd.Flags().StringVar(&modelExploreFlag, "model-explore", "", "Model for the explore phase")
+	cmd.Flags().StringVar(&modelProposeFlag, "model-propose", "", "Model for the propose phase")
+	cmd.Flags().StringVar(&modelSpecFlag, "model-spec", "", "Model for the spec phase")
+	cmd.Flags().StringVar(&modelDesignFlag, "model-design", "", "Model for the design phase")
+	cmd.Flags().StringVar(&modelTasksFlag, "model-tasks", "", "Model for the tasks phase")
+	cmd.Flags().StringVar(&modelApplyFlag, "model-apply", "", "Model for the apply phase")
+	cmd.Flags().StringVar(&modelVerifyFlag, "model-verify", "", "Model for the verify phase")
+	cmd.Flags().StringVar(&modelArchiveFlag, "model-archive", "", "Model for the archive phase")
 
 	return cmd
 }

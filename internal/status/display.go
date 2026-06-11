@@ -3,6 +3,7 @@ package status
 import (
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	"github.com/archon-ai/archon/internal/config"
@@ -25,6 +26,27 @@ func Display(w io.Writer, cfg *config.Config) {
 	if cfg.MutationTesting.Enabled {
 		fmt.Fprintf(w, "    Tool:      %s\n", cfg.MutationTesting.Tool)
 		fmt.Fprintf(w, "    Threshold: %.2f\n", cfg.MutationTesting.Threshold)
+	}
+	fmt.Fprintln(w)
+
+	fmt.Fprintln(w, "  Models")
+	fmt.Fprintln(w, "  ------")
+	if cfg.Models.Default == "" && len(cfg.Models.Phases) == 0 {
+		fmt.Fprintln(w, "    (none configured)")
+	} else {
+		if cfg.Models.Default != "" {
+			fmt.Fprintf(w, "    Default:  %s\n", cfg.Models.Default)
+		}
+		if len(cfg.Models.Phases) > 0 {
+			phases := make([]string, 0, len(cfg.Models.Phases))
+			for k := range cfg.Models.Phases {
+				phases = append(phases, k)
+			}
+			sort.Strings(phases)
+			for _, phase := range phases {
+				fmt.Fprintf(w, "    %-8s %s\n", phase+":", cfg.Models.Phases[phase])
+			}
+		}
 	}
 	fmt.Fprintln(w)
 

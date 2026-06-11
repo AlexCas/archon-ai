@@ -28,6 +28,7 @@ type Config struct {
 	SkillCount      int              `yaml:"skill_count"`
 	CreatedAt       time.Time        `yaml:"created_at"`
 	MutationTesting MutationTesting  `yaml:"mutation_testing"`
+	Models          ModelConfig      `yaml:"models,omitempty"`
 	SkillInventory  []SkillInventory `yaml:"skill_inventory"`
 	HomeDir         string           `yaml:"-"`
 }

@@ -3,6 +3,7 @@ package initcmd
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"testing/fstest"
 )
@@ -269,5 +270,110 @@ func TestRun_Idempotency(t *testing.T) {
 	_, err = Run(opts)
 	if err != nil {
 		t.Fatalf("Second Run() error = %v", err)
+	}
+}
+
+func TestRun_WithModelFlags(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	homeDir := filepath.Join(tmpDir, "home")
+	projectDir := filepath.Join(tmpDir, "project")
+
+	if err := os.MkdirAll(homeDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	opencodeDir := filepath.Join(projectDir, ".opencode")
+	if err := os.MkdirAll(opencodeDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	embeddedFS := fstest.MapFS{
+		"sdd-init/SKILL.md": &fstest.MapFile{
+			Data: []byte("---\nname: sdd-init\n---\n# Init"),
+		},
+	}
+
+	opts := Options{
+		HomeDir:      homeDir,
+		ProjectDir:   projectDir,
+		EmbeddedFS:   embeddedFS,
+		ModelDefault: "claude-sonnet-4",
+		ModelPhases: map[string]string{
+			"apply": "gpt-4o",
+		},
+	}
+
+	result, err := Run(opts)
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	if result.Agent != "opencode" {
+		t.Errorf("Agent = %q, want %q", result.Agent, "opencode")
+	}
+
+	configPath := filepath.Join(projectDir, ".archon", "config.yaml")
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+
+	content := string(data)
+	if !strings.Contains(content, "claude-sonnet-4") {
+		t.Errorf("config should contain default model, got:\n%s", content)
+	}
+	if !strings.Contains(content, "gpt-4o") {
+		t.Errorf("config should contain apply phase model, got:\n%s", content)
+	}
+}
+
+func TestRun_WithoutModelFlags(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	homeDir := filepath.Join(tmpDir, "home")
+	projectDir := filepath.Join(tmpDir, "project")
+
+	if err := os.MkdirAll(homeDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	opencodeDir := filepath.Join(projectDir, ".opencode")
+	if err := os.MkdirAll(opencodeDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	embeddedFS := fstest.MapFS{
+		"sdd-init/SKILL.md": &fstest.MapFile{
+			Data: []byte("---\nname: sdd-init\n---\n# Init"),
+		},
+	}
+
+	opts := Options{
+		HomeDir:    homeDir,
+		ProjectDir: projectDir,
+		EmbeddedFS: embeddedFS,
+	}
+
+	_, err := Run(opts)
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	configPath := filepath.Join(projectDir, ".archon", "config.yaml")
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+
+	content := string(data)
+	if strings.Contains(content, "models:") {
+		t.Errorf("config should not contain models section when no flags set, got:\n%s", content)
 	}
 }
