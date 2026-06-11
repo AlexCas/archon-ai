@@ -3,6 +3,7 @@ package tui
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
@@ -253,16 +254,65 @@ func (m Model) renderStatus() string {
 
 func (m Model) saveConfig() tea.Cmd {
 	return func() tea.Msg {
-		// Apply tab states to config
-		m.modelsTab.applyToConfig(m.config)
-		m.mutationTab.applyToConfig(m.config)
-		m.agentTab.applyToConfig(m.config)
+		// Clone config before mutation so we can rollback on failure
+		cfg := m.config.Clone()
+		m.modelsTab.applyToConfig(cfg)
+		m.mutationTab.applyToConfig(cfg)
+		m.agentTab.applyToConfig(cfg)
 
-		if err := m.config.Save(); err != nil {
+		if err := cfg.Save(); err != nil {
 			return fmt.Errorf("save config: %w", err)
 		}
+
+		// Regenerate orchestrator template to reflect updated config
+		if err := regenerateTemplate(m.projectDir, cfg); err != nil {
+			return fmt.Errorf("saved config but failed to regenerate orchestrator: %w", err)
+		}
+
+		// Only update in-memory config after both save and regenerate succeed
+		m.config = cfg
+
 		return "✓ Configuration saved"
 	}
+}
+
+// regenerateTemplate re-renders the orchestrator markdown file (CLAUDE.md or
+// AGENTS.md) so it stays in sync with the current config after a save.
+func regenerateTemplate(projectDir string, cfg *config.Config) error {
+	data := initcmd.TemplateData{
+		ProjectName:    filepath.Base(projectDir),
+		Agent:          cfg.Agent,
+		HarnessVersion: cfg.Version,
+		SkillCount:     cfg.SkillCount,
+	}
+
+	var content string
+	var filename string
+
+	switch cfg.Agent {
+	case "claude":
+		var err error
+		content, err = initcmd.RenderClaudeMD(data)
+		if err != nil {
+			return fmt.Errorf("render CLAUDE.md: %w", err)
+		}
+		filename = "CLAUDE.md"
+	default:
+		var err error
+		content, err = initcmd.RenderAgentsMD(data)
+		if err != nil {
+			return fmt.Errorf("render AGENTS.md: %w", err)
+		}
+		filename = "AGENTS.md"
+	}
+
+	path := filepath.Join(projectDir, filename)
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, []byte(content), 0o644); err != nil {
+		return fmt.Errorf("write template: %w", err)
+	}
+
+	return os.Rename(tmp, path)
 }
 
 func (m Model) runAgentInit(agent string) tea.Cmd {

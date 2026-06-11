@@ -51,6 +51,24 @@ func (c *Config) Load(fsys fs.FS) error {
 	return nil
 }
 
+func (c *Config) Clone() *Config {
+	clone := &Config{
+		Version:         c.Version,
+		Agent:           c.Agent,
+		SkillCount:      c.SkillCount,
+		CreatedAt:       c.CreatedAt,
+		HomeDir:         c.HomeDir,
+		MutationTesting: c.MutationTesting,
+		Models:          ModelConfig{Default: c.Models.Default, Phases: make(map[string]string, len(c.Models.Phases))},
+		SkillInventory:  make([]SkillInventory, len(c.SkillInventory)),
+	}
+	for k, v := range c.Models.Phases {
+		clone.Models.Phases[k] = v
+	}
+	copy(clone.SkillInventory, c.SkillInventory)
+	return clone
+}
+
 func (c *Config) Save() error {
 	path := c.configPath()
 	dir := filepath.Dir(path)
