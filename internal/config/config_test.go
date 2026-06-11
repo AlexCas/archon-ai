@@ -25,6 +25,10 @@ mutation_testing:
   enabled: true
   tool: gremlins
   threshold: 0.80
+models:
+  default: claude-sonnet-4
+  phases:
+    apply: gpt-4o
 skill_inventory:
   - name: sdd-init
     version: "2.0"
@@ -41,6 +45,10 @@ skill_inventory:
 					Enabled:   true,
 					Tool:      "gremlins",
 					Threshold: 0.80,
+				},
+				Models: ModelConfig{
+					Default: "claude-sonnet-4",
+					Phases:  map[string]string{"apply": "gpt-4o"},
 				},
 				SkillInventory: []SkillInventory{
 					{Name: "sdd-init", Version: "2.0", Source: "embedded"},
@@ -112,6 +120,18 @@ agent: claude
 				}
 				if got.MutationTesting.Threshold != tt.want.MutationTesting.Threshold {
 					t.Errorf("MutationTesting.Threshold = %v, want %v", got.MutationTesting.Threshold, tt.want.MutationTesting.Threshold)
+				}
+				if got.Models.Default != tt.want.Models.Default {
+					t.Errorf("Models.Default = %v, want %v", got.Models.Default, tt.want.Models.Default)
+				}
+				if len(got.Models.Phases) != len(tt.want.Models.Phases) {
+					t.Errorf("Models.Phases length = %d, want %d", len(got.Models.Phases), len(tt.want.Models.Phases))
+				} else {
+					for k, v := range tt.want.Models.Phases {
+						if got.Models.Phases[k] != v {
+							t.Errorf("Models.Phases[%q] = %q, want %q", k, got.Models.Phases[k], v)
+						}
+					}
 				}
 			}
 		})
