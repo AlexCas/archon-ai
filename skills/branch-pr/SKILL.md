@@ -3,7 +3,7 @@ name: branch-pr
 description: "Create Gentle AI pull requests with issue-first checks. Trigger: creating, opening, or preparing PRs for review."
 license: Apache-2.0
 metadata:
-  author: gentleman-programming
+  
   version: "2.0"
 ---
 

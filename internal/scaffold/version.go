@@ -30,7 +30,7 @@ func DetectVersionGaps(embeddedFS fs.FS, installedDir string) ([]VersionInfo, er
 		}
 
 		skillName := entry.Name()
-		embeddedPath := filepath.Join(skillName, "SKILL.md")
+		embeddedPath := skillName + "/SKILL.md"
 		
 		embeddedData, err := fs.ReadFile(embeddedFS, embeddedPath)
 		if err != nil {

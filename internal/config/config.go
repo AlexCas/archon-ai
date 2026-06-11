@@ -38,8 +38,7 @@ func (c *Config) configPath() string {
 }
 
 func (c *Config) Load(fsys fs.FS) error {
-	path := filepath.Join(".archon", "config.yaml")
-	data, err := fs.ReadFile(fsys, path)
+	data, err := fs.ReadFile(fsys, ".archon/config.yaml")
 	if err != nil {
 		return fmt.Errorf("read config: %w", err)
 	}

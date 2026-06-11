@@ -3,7 +3,7 @@ name: harness-judge
 description: "Trigger: judge phase, judgment gate, post-verify review. Orchestrate judgment-day, mutation testing gate, and auto-re-apply loop."
 license: MIT
 metadata:
-  author: gentleman-programming
+  
   version: "1.0"
   scope: orchestrator-gate
 ---

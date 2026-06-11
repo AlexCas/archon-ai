@@ -3,7 +3,7 @@ name: harness-workflow
 description: "Trigger: phase transition, state check, workflow gate, next phase. Enforce SDD phase state machine and block invalid transitions."
 license: MIT
 metadata:
-  author: gentleman-programming
+  
   version: "1.0"
   scope: orchestrator-gate
 ---
