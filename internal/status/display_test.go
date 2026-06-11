@@ -83,6 +83,40 @@ func TestDisplay(t *testing.T) {
 				"Installed Skills: none",
 			},
 		},
+		{
+			name: "models configured",
+			cfg: &config.Config{
+				Version:    "1.0.0",
+				Agent:      "opencode",
+				SkillCount: 10,
+				CreatedAt:  time.Date(2026, 6, 10, 0, 0, 0, 0, time.UTC),
+				MutationTesting: config.MutationTesting{Enabled: false},
+				Models: config.ModelConfig{
+					Default: "claude-sonnet-4",
+					Phases:  map[string]string{"apply": "gpt-4o"},
+				},
+			},
+			contains: []string{
+				"Models",
+				"claude-sonnet-4",
+				"apply:",
+				"gpt-4o",
+			},
+		},
+		{
+			name: "models not configured",
+			cfg: &config.Config{
+				Version:         "1.0.0",
+				Agent:           "opencode",
+				SkillCount:      10,
+				CreatedAt:       time.Date(2026, 6, 10, 0, 0, 0, 0, time.UTC),
+				MutationTesting: config.MutationTesting{Enabled: false},
+			},
+			contains: []string{
+				"Models",
+				"(none configured)",
+			},
+		},
 	}
 
 	for _, tt := range tests {
