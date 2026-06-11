@@ -9,8 +9,10 @@ import (
 	"github.com/archon-ai/archon/internal/config"
 	"github.com/archon-ai/archon/internal/initcmd"
 	"github.com/archon-ai/archon/internal/status"
+	"github.com/archon-ai/archon/internal/tui"
 	"github.com/archon-ai/archon/internal/version"
 	"github.com/archon-ai/archon/skills"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
 
@@ -38,6 +40,7 @@ func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 		newVersionCmd(stdout),
 		newStatusCmd(stdout, stderr),
 		newConfigCmd(stdout, stderr),
+		newTuiCmd(stdout, stderr),
 	)
 
 	return root
@@ -230,6 +233,45 @@ func newStatusCmd(stdout, stderr io.Writer) *cobra.Command {
 			}
 
 			status.Display(stdout, cfg)
+			return nil
+		},
+	}
+}
+
+func newTuiCmd(stdout, stderr io.Writer) *cobra.Command {
+	return &cobra.Command{
+		Use:   "tui",
+		Short: "Interactive terminal UI for configuration",
+		Long:  "Launch a TUI to configure models, mutation testing, and agent settings.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := tui.CheckTerminal(); err != nil {
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return fmt.Errorf("tui requires a terminal")
+			}
+
+			projectDir, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("get working directory: %w", err)
+			}
+
+			cfg := &config.Config{HomeDir: projectDir}
+			projectFS := os.DirFS(projectDir)
+			if err := cfg.Load(projectFS); err != nil {
+				if os.IsNotExist(err) {
+					fmt.Fprintf(stderr, "No archon configuration found. Run 'archon init' first.\n")
+					return fmt.Errorf("not initialized")
+				}
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return err
+			}
+
+			model := tui.NewModel(cfg, projectDir)
+			p := tea.NewProgram(model, tea.WithAltScreen())
+			if _, err := p.Run(); err != nil {
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return err
+			}
+
 			return nil
 		},
 	}
