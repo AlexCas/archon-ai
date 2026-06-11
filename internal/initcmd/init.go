@@ -14,11 +14,13 @@ import (
 )
 
 type Options struct {
-	HomeDir     string
-	ProjectDir  string
-	Agent       string
-	Force       bool
-	EmbeddedFS  fs.FS
+	HomeDir      string
+	ProjectDir   string
+	Agent        string
+	Force        bool
+	EmbeddedFS   fs.FS
+	ModelDefault string
+	ModelPhases  map[string]string
 }
 
 type Result struct {
@@ -55,7 +57,7 @@ func Run(opts Options) (*Result, error) {
 		return nil, fmt.Errorf("create symlinks: %w", err)
 	}
 
-	cfg := buildConfig(agentName, extracted)
+	cfg := buildConfig(agentName, extracted, opts.ModelDefault, opts.ModelPhases)
 	cfg.HomeDir = opts.ProjectDir
 	if err := cfg.Save(); err != nil {
 		return nil, fmt.Errorf("save config: %w", err)
@@ -133,13 +135,23 @@ func createSymlinks(globalDir, projectDir string, skills []string) error {
 	return nil
 }
 
-func buildConfig(agentName string, extracted []string) *config.Config {
+func buildConfig(agentName string, extracted []string, modelDefault string, modelPhases map[string]string) *config.Config {
 	inventory := make([]config.SkillInventory, len(extracted))
 	for i, name := range extracted {
 		inventory[i] = config.SkillInventory{
 			Name:    name,
 			Version: "1.0",
 			Source:  "embedded",
+		}
+	}
+
+	var phases map[string]string
+	for k, v := range modelPhases {
+		if v != "" {
+			if phases == nil {
+				phases = make(map[string]string)
+			}
+			phases[k] = v
 		}
 	}
 
@@ -150,6 +162,10 @@ func buildConfig(agentName string, extracted []string) *config.Config {
 		CreatedAt:  time.Now().UTC(),
 		MutationTesting: config.MutationTesting{
 			Enabled: false,
+		},
+		Models: config.ModelConfig{
+			Default: modelDefault,
+			Phases:  phases,
 		},
 		SkillInventory: inventory,
 	}
