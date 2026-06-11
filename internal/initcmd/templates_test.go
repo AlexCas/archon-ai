@@ -110,3 +110,162 @@ func TestRenderAgentsMD_AllFieldsPopulated(t *testing.T) {
 		t.Error("Skill count not rendered")
 	}
 }
+
+func TestTemplates_ContainSDDSessionPreflight(t *testing.T) {
+	data := TemplateData{
+		Agent:          "opencode",
+		HarnessVersion: "1.0.0",
+		SkillCount:     10,
+	}
+
+	tests := []struct {
+		name   string
+		render func(TemplateData) (string, error)
+	}{
+		{"AGENTS.md", RenderAgentsMD},
+		{"CLAUDE.md", RenderClaudeMD},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			content, err := tt.render(data)
+			if err != nil {
+				t.Fatalf("render error = %v", err)
+			}
+
+			required := []string{
+				"## SDD Session Preflight (HARD GATE)",
+				"## Vague Request Guard (MANDATORY)",
+				"## Human Review Gate (MANDATORY)",
+				"Antes de continuar con SDD",
+				"¿Querés ajustar algo en esta fase antes de continuar?",
+			}
+
+			for _, req := range required {
+				if !strings.Contains(content, req) {
+					t.Errorf("%s missing %q", tt.name, req)
+				}
+			}
+		})
+	}
+}
+
+func TestTemplates_FiveRules(t *testing.T) {
+	data := TemplateData{
+		Agent:          "opencode",
+		HarnessVersion: "1.0.0",
+		SkillCount:     10,
+	}
+
+	tests := []struct {
+		name   string
+		render func(TemplateData) (string, error)
+	}{
+		{"AGENTS.md", RenderAgentsMD},
+		{"CLAUDE.md", RenderClaudeMD},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			content, err := tt.render(data)
+			if err != nil {
+				t.Fatalf("render error = %v", err)
+			}
+
+			// Check all 5 rules are present
+			rules := []string{
+				"1. Check harness-workflow before any phase transition",
+				"2. Delegate each phase to sdd-* sub-agent",
+				"3. After every phase that produces an editable artifact, run the Human Review Gate",
+				"4. After verify, invoke harness-judge",
+				"5. On judge fail: re-apply with feedback (max 3 retries)",
+			}
+
+			for _, rule := range rules {
+				if !strings.Contains(content, rule) {
+					t.Errorf("%s missing rule %q", tt.name, rule)
+				}
+			}
+
+			// Ensure rule 6 does NOT exist (exactly 5 rules)
+			if strings.Contains(content, "6. ") {
+				t.Errorf("%s should have exactly 5 rules, found rule 6", tt.name)
+			}
+		})
+	}
+}
+
+func TestTemplates_BacktickRendering(t *testing.T) {
+	data := TemplateData{
+		Agent:          "opencode",
+		HarnessVersion: "1.0.0",
+		SkillCount:     10,
+	}
+
+	content, err := RenderAgentsMD(data)
+	if err != nil {
+		t.Fatalf("RenderAgentsMD() error = %v", err)
+	}
+
+	// Verify backtick placeholder was replaced with actual backticks
+	backtickChecks := []string{
+		"`interactive`",
+		"`auto`",
+		"`openspec`",
+		"`engram`",
+		"`sdd-explore`",
+		"`sdd-propose`",
+		"`internal/billing`",
+	}
+
+	for _, check := range backtickChecks {
+		if !strings.Contains(content, check) {
+			t.Errorf("RenderAgentsMD() missing backtick-wrapped text %q", check)
+		}
+	}
+
+	// Verify no § placeholder remains
+	if strings.Contains(content, "§") {
+		t.Error("RenderAgentsMD() still contains § placeholder — backtick replacement failed")
+	}
+}
+
+func TestTemplates_CodeBlockRendering(t *testing.T) {
+	data := TemplateData{
+		Agent:          "opencode",
+		HarnessVersion: "1.0.0",
+		SkillCount:     10,
+	}
+
+	content, err := RenderAgentsMD(data)
+	if err != nil {
+		t.Fatalf("RenderAgentsMD() error = %v", err)
+	}
+
+	// Verify the Spanish prompt code block is properly rendered with triple backticks
+	if !strings.Contains(content, "```text") {
+		t.Error("RenderAgentsMD() missing ```text code block opening")
+	}
+}
+
+func TestTemplates_AgentsAndClaudeIdentical(t *testing.T) {
+	data := TemplateData{
+		Agent:          "test-agent",
+		HarnessVersion: "1.0.0",
+		SkillCount:     10,
+	}
+
+	agents, err := RenderAgentsMD(data)
+	if err != nil {
+		t.Fatalf("RenderAgentsMD() error = %v", err)
+	}
+
+	claude, err := RenderClaudeMD(data)
+	if err != nil {
+		t.Fatalf("RenderClaudeMD() error = %v", err)
+	}
+
+	if agents != claude {
+		t.Error("agentsTemplate and claudeTemplate are not identical — they may have diverged silently")
+	}
+}

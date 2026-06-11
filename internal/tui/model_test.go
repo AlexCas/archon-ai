@@ -1,6 +1,9 @@
 package tui
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -423,6 +426,245 @@ func TestAgentTabState_SetInitResult(t *testing.T) {
 	state.setInitResult("Error", true)
 	if !state.initError {
 		t.Error("initError should be true")
+	}
+}
+
+func TestSaveConfig_RegeneratesClaudeMD(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := &config.Config{
+		HomeDir:    tmpDir,
+		Agent:      "claude",
+		Version:    "1.0.0",
+		SkillCount: 10,
+	}
+	m := NewModel(cfg, tmpDir)
+
+	cmd := m.saveConfig()
+	result := cmd()
+
+	if err, ok := result.(error); ok {
+		t.Fatalf("saveConfig() returned error: %v", err)
+	}
+
+	// Verify CLAUDE.md was created with gate sections
+	claudeMD := filepath.Join(tmpDir, "CLAUDE.md")
+	data, err := os.ReadFile(claudeMD)
+	if err != nil {
+		t.Fatalf("CLAUDE.md not created: %v", err)
+	}
+
+	content := string(data)
+	requiredSections := []string{
+		"SDD Session Preflight",
+		"Vague Request Guard",
+		"Human Review Gate",
+		"Antes de continuar con SDD",
+	}
+	for _, section := range requiredSections {
+		if !strings.Contains(content, section) {
+			t.Errorf("CLAUDE.md missing section %q", section)
+		}
+	}
+}
+
+func TestSaveConfig_RegeneratesAgentsMD(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := &config.Config{
+		HomeDir:    tmpDir,
+		Agent:      "opencode",
+		Version:    "1.0.0",
+		SkillCount: 10,
+	}
+	m := NewModel(cfg, tmpDir)
+
+	cmd := m.saveConfig()
+	result := cmd()
+
+	if err, ok := result.(error); ok {
+		t.Fatalf("saveConfig() returned error: %v", err)
+	}
+
+	// Verify AGENTS.md was created with gate sections
+	agentsMD := filepath.Join(tmpDir, "AGENTS.md")
+	data, err := os.ReadFile(agentsMD)
+	if err != nil {
+		t.Fatalf("AGENTS.md not created: %v", err)
+	}
+
+	content := string(data)
+	if !strings.Contains(content, "SDD Session Preflight") {
+		t.Error("AGENTS.md missing SDD Session Preflight section")
+	}
+	if !strings.Contains(content, "Human Review Gate") {
+		t.Error("AGENTS.md missing Human Review Gate section")
+	}
+}
+
+func TestSaveConfig_DoesNotCreateClaudeDir(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := &config.Config{
+		HomeDir:    tmpDir,
+		Agent:      "claude",
+		Version:    "1.0.0",
+		SkillCount: 10,
+	}
+	m := NewModel(cfg, tmpDir)
+
+	cmd := m.saveConfig()
+	result := cmd()
+
+	if err, ok := result.(error); ok {
+		t.Fatalf("saveConfig() returned error: %v", err)
+	}
+
+	// Verify .claude/ directory was NOT created (regenerateTemplate writes to root)
+	claudeDir := filepath.Join(tmpDir, ".claude")
+	_, err := os.Stat(claudeDir)
+	if err == nil {
+		t.Fatal(".claude/ directory should NOT be created by regenerateTemplate")
+	}
+	if !os.IsNotExist(err) {
+		t.Fatalf("unexpected error checking .claude/: %v", err)
+	}
+}
+
+func TestSaveConfig_FailureDoesNotMutateInMemoryConfig(t *testing.T) {
+	// Use a read-only directory so Save() will fail
+	tmpDir := t.TempDir()
+	cfg := &config.Config{
+		HomeDir:    tmpDir,
+		Agent:      "opencode",
+		Version:    "0.9.0",
+		SkillCount: 5,
+	}
+	m := NewModel(cfg, tmpDir)
+	m.width = 80
+	m.height = 24
+
+	// Set some tab values that would be applied
+	m.modelsTab.inputs[modelInputDefault].SetValue("gpt-4")
+
+	// Make the directory read-only so Save fails
+	if err := os.Chmod(tmpDir, 0o555); err != nil {
+		t.Fatalf("chmod failed: %v", err)
+	}
+	defer os.Chmod(tmpDir, 0o755) // restore for cleanup
+
+	cmd := m.saveConfig()
+	result := cmd()
+
+	// Should return error
+	if _, ok := result.(error); !ok {
+		t.Fatalf("expected error, got: %v", result)
+	}
+
+	// Verify in-memory config was NOT mutated
+	if m.config.Models.Default != "" {
+		t.Errorf("in-memory config was mutated: Models.Default = %q", m.config.Models.Default)
+	}
+	if m.config.Agent != "opencode" {
+		t.Errorf("in-memory config was mutated: Agent = %q", m.config.Agent)
+	}
+}
+
+func TestSaveConfig_RegenerateFailureKeepsOriginalConfig(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := &config.Config{
+		HomeDir:    tmpDir,
+		Agent:      "opencode",
+		Version:    "0.9.0",
+		SkillCount: 5,
+	}
+	m := NewModel(cfg, tmpDir)
+	m.width = 80
+	m.height = 24
+
+	// First save succeeds
+	cmd := m.saveConfig()
+	result := cmd()
+	if err, ok := result.(error); ok {
+		t.Fatalf("first save failed: %v", err)
+	}
+
+	// Verify first save worked
+	agentsMD := filepath.Join(tmpDir, "AGENTS.md")
+	data, err := os.ReadFile(agentsMD)
+	if err != nil {
+		t.Fatalf("AGENTS.md not found: %v", err)
+	}
+	originalContent := string(data)
+
+	// Make project dir read-only so regenerateTemplate fails
+	if err := os.Chmod(tmpDir, 0o555); err != nil {
+		t.Fatalf("chmod failed: %v", err)
+	}
+	defer os.Chmod(tmpDir, 0o755)
+
+	// Try to save again (should fail at regenerateTemplate)
+	cmd = m.saveConfig()
+	result = cmd()
+	if _, ok := result.(error); !ok {
+		t.Fatalf("expected error on regenerate failure, got: %v", result)
+	}
+
+	// Verify original AGENTS.md is unchanged
+	data, err = os.ReadFile(agentsMD)
+	if err != nil {
+		t.Fatalf("AGENTS.md missing: %v", err)
+	}
+	if string(data) != originalContent {
+		t.Error("AGENTS.md was modified when regenerateTemplate failed")
+	}
+
+	// Verify in-memory config is unchanged
+	if m.config.Version != "0.9.0" {
+		t.Errorf("in-memory config was mutated: Version = %q", m.config.Version)
+	}
+}
+
+func TestSaveConfig_UpdatesExistingTemplate(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := &config.Config{
+		HomeDir:    tmpDir,
+		Agent:      "opencode",
+		Version:    "0.9.0",
+		SkillCount: 5,
+	}
+	m := NewModel(cfg, tmpDir)
+
+	// First save
+	cmd := m.saveConfig()
+	if result := cmd(); result != nil {
+		if _, ok := result.(error); ok {
+			t.Fatalf("first saveConfig() error: %v", result)
+		}
+	}
+
+	// Update config
+	cfg.Version = "1.0.0"
+	cfg.SkillCount = 20
+
+	// Second save
+	cmd = m.saveConfig()
+	if result := cmd(); result != nil {
+		if _, ok := result.(error); ok {
+			t.Fatalf("second saveConfig() error: %v", result)
+		}
+	}
+
+	// Verify template was updated with new values
+	agentsMD := filepath.Join(tmpDir, "AGENTS.md")
+	data, err := os.ReadFile(agentsMD)
+	if err != nil {
+		t.Fatalf("AGENTS.md not found: %v", err)
+	}
+
+	content := string(data)
+	if !strings.Contains(content, "1.0.0") {
+		t.Error("AGENTS.md should contain updated version 1.0.0")
+	}
+	if !strings.Contains(content, "Skills: 20") {
+		t.Error("AGENTS.md should contain updated skill count 20")
 	}
 }
 
