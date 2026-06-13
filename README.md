@@ -9,8 +9,12 @@
 ## Quick path
 
 ```bash
-# Install
-brew install alexcasdev/tap/archon
+# Install with Homebrew (macOS/Linux)
+brew install alexcas/archon-ai/archon
+
+# Or with Scoop (Windows)
+scoop bucket add archon https://github.com/AlexCas/scoop-bucket
+scoop install archon
 
 # Or with Go
 go install github.com/archon-ai/archon/cmd/archon@latest
@@ -24,11 +28,18 @@ archon status
 
 ## Install
 
-### Homebrew (recommended)
+### Homebrew (macOS/Linux)
 
 ```bash
-brew tap alexcasdev/tap
+brew tap alexcas/archon-ai
 brew install archon
+```
+
+### Scoop (Windows)
+
+```bash
+scoop bucket add archon https://github.com/AlexCas/scoop-bucket
+scoop install archon
 ```
 
 ### Go
@@ -42,6 +53,9 @@ go install github.com/archon-ai/archon/cmd/archon@latest
 ```bash
 # Homebrew
 brew upgrade archon
+
+# Scoop
+scoop update archon
 
 # Go
 go install github.com/archon-ai/archon/cmd/archon@latest
