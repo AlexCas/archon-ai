@@ -269,3 +269,71 @@ func TestTemplates_AgentsAndClaudeIdentical(t *testing.T) {
 		t.Error("agentsTemplate and claudeTemplate are not identical — they may have diverged silently")
 	}
 }
+
+func TestTemplates_LeaderPersona(t *testing.T) {
+	data := TemplateData{
+		Agent:          "opencode",
+		HarnessVersion: "1.0.0",
+		SkillCount:     10,
+	}
+
+	tests := []struct {
+		name   string
+		render func(TemplateData) (string, error)
+	}{
+		{"AGENTS.md", RenderAgentsMD},
+		{"CLAUDE.md", RenderClaudeMD},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			content, err := tt.render(data)
+			if err != nil {
+				t.Fatalf("render error = %v", err)
+			}
+
+			// Verify persona section header is present
+			if !strings.Contains(content, "## Leader Persona") {
+				t.Errorf("%s missing ## Leader Persona section", tt.name)
+			}
+
+			// Verify ordering: persona must come before Phase Order
+			personaIdx := strings.Index(content, "## Leader Persona")
+			phaseOrderIdx := strings.Index(content, "## Phase Order")
+			if personaIdx == -1 || phaseOrderIdx == -1 {
+				t.Errorf("%s missing persona or phase order section", tt.name)
+			} else if personaIdx >= phaseOrderIdx {
+				t.Errorf("%s persona section should come before Phase Order", tt.name)
+			}
+
+			// Verify all 4 domains are covered
+			requiredDomains := []string{
+				"**Scope**:",
+				"**Language**:",
+				"**Tone**:",
+				"**Behavior**:",
+			}
+			for _, domain := range requiredDomains {
+				if !strings.Contains(content, domain) {
+					t.Errorf("%s missing persona domain %q", tt.name, domain)
+				}
+			}
+
+			// Verify key rules are present
+			keyRules := []string{
+				"ALWAYS reply in the user's current language",
+				"neutral/professional Spanish",
+				"Do NOT use voseo",
+				"Warm and direct",
+				"avoid CAPS",
+				"Seek clarification",
+				"Never say",
+			}
+			for _, rule := range keyRules {
+				if !strings.Contains(content, rule) {
+					t.Errorf("%s missing key rule %q", tt.name, rule)
+				}
+			}
+		})
+	}
+}
