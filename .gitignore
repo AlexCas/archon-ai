@@ -10,6 +10,5 @@ archon-test
 # Dependency directories
 homebrew/
 
-# OpenSpec archive
-openspec/changes/archive/
-openspec/specs/
+# Note: openspec/specs/ (synced main specs) and openspec/changes/archive/
+# (archived SDD changes) are intentionally versioned — they are the audit trail.

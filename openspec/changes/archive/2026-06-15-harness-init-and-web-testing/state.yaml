@@ -1,6 +1,12 @@
-phase: verify
+phase: archive
 status: completed
 retrofit: true
+judge:
+  verdict: pass-with-warnings
+  judgment_day: "dual review, no CRITICAL findings"
+  mutation_gate: skipped (disabled)
+  playwright_gate: skipped (project is not web)
+  deferred_findings: ["#26 test coverage", "#27 doc consistency"]
 history:
   - {phase: explore, status: completed, ts: "2026-06-15T14:00:00Z"}
   - {phase: propose, status: completed, ts: "2026-06-15T15:00:00Z"}
@@ -9,3 +15,6 @@ history:
   - {phase: tasks, status: completed, ts: "2026-06-15T15:06:00Z"}
   - {phase: apply, status: completed, ts: "2026-06-15T14:50:00Z"}
   - {phase: verify, status: completed, ts: "2026-06-15T15:10:00Z"}
+  - {phase: judge, status: in_progress, ts: "2026-06-15T21:00:00Z"}
+  - {phase: judge, status: completed, ts: "2026-06-15T21:10:00Z"}
+  - {phase: archive, status: completed, ts: "2026-06-15T21:20:00Z"}
