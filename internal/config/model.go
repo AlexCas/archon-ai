@@ -17,15 +17,18 @@ var ClaudeModels = []string{
 }
 
 // OpencodeModels is the curated, ordered list of models available through the
-// Opencode Go (Zen) subscription, offered as static choices in the TUI. Adjust
-// this list as the subscription catalog changes; the free-form string option
-// remains available for anything not listed here.
+// Opencode Go subscription, offered as static choices in the TUI. Adjust this
+// list as the subscription catalog changes; the free-form string option remains
+// available for anything not listed here.
 var OpencodeModels = []string{
-	"opencode/grok-code",
-	"opencode/claude-sonnet-4-5",
-	"opencode/kimi-k2",
-	"opencode/qwen3-coder",
-	"opencode/gpt-5",
+	"deepseek-v4-flash",
+	"deepseek-v4-pro",
+	"glm-5",
+	"glm-5.1",
+	"kimi-k2.5",
+	"kimi-k2.6",
+	"qwen3.6-plus",
+	"qwen3.7-plus",
 }
 
 // StaticModels returns the full ordered list of statically-selectable models,
