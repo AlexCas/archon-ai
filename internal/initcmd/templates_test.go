@@ -172,13 +172,16 @@ func TestTemplates_FiveRules(t *testing.T) {
 				t.Fatalf("render error = %v", err)
 			}
 
-			// Check all 5 rules are present
+			// Check all orchestrator rules are present
 			rules := []string{
 				"1. Check harness-workflow before any phase transition",
 				"2. Delegate each phase to sdd-* sub-agent",
-				"3. After every phase that produces an editable artifact, run the Human Review Gate",
-				"4. After verify, invoke harness-judge",
-				"5. On judge fail: re-apply with feedback (max 3 retries)",
+				"3. Write/update SESSION_STATUS.md at the root on every phase transition",
+				"4. After every phase that produces an editable artifact, run the Human Review Gate",
+				"5. After verify, invoke harness-judge",
+				"6. When playwright.enabled, run the generated Playwright tests after verify and judge pass",
+				"7. On judge fail: re-apply with feedback (max 3 retries)",
+				"8. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution",
 			}
 
 			for _, rule := range rules {
@@ -187,9 +190,9 @@ func TestTemplates_FiveRules(t *testing.T) {
 				}
 			}
 
-			// Ensure rule 6 does NOT exist (exactly 5 rules)
-			if strings.Contains(content, "6. ") {
-				t.Errorf("%s should have exactly 5 rules, found rule 6", tt.name)
+			// Ensure there is no rule 9 (exactly 8 rules)
+			if strings.Contains(content, "9. ") {
+				t.Errorf("%s should have exactly 8 rules, found rule 9", tt.name)
 			}
 		})
 	}

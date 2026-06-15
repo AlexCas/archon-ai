@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -19,7 +20,9 @@ type Tab int
 const (
 	ModelsTab Tab = iota
 	MutationTab
+	PlaywrightTab
 	AgentTab
+	tabCount
 )
 
 type Model struct {
@@ -32,9 +35,10 @@ type Model struct {
 	statusMsg  string
 	statusErr  bool
 	// Tab states
-	modelsTab   modelsTabState
-	mutationTab mutationTabState
-	agentTab    agentTabState
+	modelsTab     modelsTabState
+	mutationTab   mutationTabState
+	playwrightTab playwrightTabState
+	agentTab      agentTabState
 }
 
 type keyMap struct {
@@ -76,12 +80,13 @@ var defaultKeys = keyMap{
 
 func NewModel(cfg *config.Config, projectDir string) Model {
 	return Model{
-		config:      cfg,
-		projectDir:  projectDir,
-		activeTab:   ModelsTab,
-		modelsTab:   newModelsTabState(cfg),
-		mutationTab: newMutationTabState(cfg.MutationTesting),
-		agentTab:    newAgentTabState(cfg.Agent),
+		config:        cfg,
+		projectDir:    projectDir,
+		activeTab:     ModelsTab,
+		modelsTab:     newModelsTabState(cfg),
+		mutationTab:   newMutationTabState(cfg.MutationTesting),
+		playwrightTab: newPlaywrightTabState(cfg.Playwright),
+		agentTab:      newAgentTabState(cfg.Agent),
 	}
 }
 
@@ -98,6 +103,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.modelsTab.setWidth(m.width)
 		m.mutationTab.setWidth(m.width)
+		m.playwrightTab.setWidth(m.width)
 		m.agentTab.setWidth(m.width)
 
 	case tea.KeyMsg:
@@ -108,11 +114,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case key.Matches(msg, defaultKeys.Tab):
-			m.activeTab = (m.activeTab + 1) % 3
+			m.activeTab = (m.activeTab + 1) % tabCount
 			return m, nil
 
 		case key.Matches(msg, defaultKeys.ShiftTab):
-			m.activeTab = (m.activeTab + 2) % 3
+			m.activeTab = (m.activeTab + tabCount - 1) % tabCount
 			return m, nil
 
 		case key.Matches(msg, defaultKeys.Save):
@@ -132,6 +138,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if cmd != nil {
 				cmds = append(cmds, cmd)
 			}
+		case PlaywrightTab:
+			cmd, _ := m.playwrightTab.update(msg)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
 		case AgentTab:
 			cmd, _ := m.agentTab.update(msg)
 			if cmd != nil {
@@ -140,8 +151,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case agentInitMsg:
-		cmd := m.runAgentInit(msg.agent)
+		cmd := m.runAgentInit(msg.agent, msg.overwrite)
 		cmds = append(cmds, cmd)
+
+	case templateExistsMsg:
+		// init found an existing orchestrator file; ask before replacing it.
+		m.agentTab.askOverwrite(msg.agent, msg.path)
+		return m, tea.Batch(cmds...)
+
+	case agentInitDoneMsg:
+		// Adopt the freshly written config and rebuild tab states from it.
+		msg.cfg.HomeDir = m.projectDir
+		m.config = msg.cfg
+		m.modelsTab = newModelsTabState(msg.cfg)
+		m.mutationTab = newMutationTabState(msg.cfg.MutationTesting)
+		m.playwrightTab = newPlaywrightTabState(msg.cfg.Playwright)
+		m.agentTab = newAgentTabState(msg.cfg.Agent)
+		if m.width > 0 {
+			m.modelsTab.setWidth(m.width)
+			m.mutationTab.setWidth(m.width)
+			m.playwrightTab.setWidth(m.width)
+			m.agentTab.setWidth(m.width)
+		}
+		m.statusMsg = msg.summary
+		m.statusErr = false
+		return m, tea.Batch(cmds...)
 
 	case string:
 		// Status messages
@@ -198,7 +232,7 @@ func (m Model) renderTabs() string {
 		BorderForeground(lipgloss.Color("63")).
 		Bold(true)
 
-	tabs := []string{"Models", "Mutation Testing", "Agent"}
+	tabs := []string{"Models", "Mutation Testing", "Playwright", "Agent"}
 	var rendered []string
 
 	for i, name := range tabs {
@@ -223,6 +257,8 @@ func (m Model) renderTabContent() string {
 		return style.Render(m.modelsTab.view(m.width, m.height))
 	case MutationTab:
 		return style.Render(m.mutationTab.view(m.width, m.height))
+	case PlaywrightTab:
+		return style.Render(m.playwrightTab.view(m.width, m.height))
 	case AgentTab:
 		return style.Render(m.agentTab.view(m.width, m.height))
 	default:
@@ -258,6 +294,7 @@ func (m Model) saveConfig() tea.Cmd {
 		cfg := m.config.Clone()
 		m.modelsTab.applyToConfig(cfg)
 		m.mutationTab.applyToConfig(cfg)
+		m.playwrightTab.applyToConfig(cfg)
 		m.agentTab.applyToConfig(cfg)
 
 		if err := cfg.Save(); err != nil {
@@ -315,33 +352,64 @@ func regenerateTemplate(projectDir string, cfg *config.Config) error {
 	return os.Rename(tmp, path)
 }
 
-func (m Model) runAgentInit(agent string) tea.Cmd {
+func (m Model) runAgentInit(agent string, overwrite bool) tea.Cmd {
+	projectDir := m.projectDir
 	return func() tea.Msg {
 		homeDir, err := os.UserHomeDir()
 		if err != nil {
-			m.agentTab.setInitResult(fmt.Sprintf("Error: %v", err), true)
 			return fmt.Errorf("get home directory: %w", err)
 		}
 
 		opts := initcmd.Options{
-			HomeDir:    homeDir,
-			ProjectDir: m.projectDir,
-			Agent:      agent,
-			Force:      true,
-			EmbeddedFS: skills.FS,
+			HomeDir:           homeDir,
+			ProjectDir:        projectDir,
+			Agent:             agent,
+			Force:             true,
+			EmbeddedFS:        skills.FS,
+			OverwriteTemplate: overwrite,
 		}
 
 		result, err := initcmd.Run(opts)
+		if errors.Is(err, initcmd.ErrTemplateExists) {
+			// Surface a confirmation request instead of failing.
+			return templateExistsMsg{
+				agent: agent,
+				path:  templateFileName(agent),
+			}
+		}
 		if err != nil {
-			m.agentTab.setInitResult(fmt.Sprintf("Init failed: %v", err), true)
 			return fmt.Errorf("agent init: %w", err)
 		}
 
-		m.agentTab.setInitResult(
-			fmt.Sprintf("✓ Agent initialized: %s (%d skills)", result.Agent, result.ExtractedCount),
-			false)
-		return fmt.Sprintf("Agent %s initialized successfully", result.Agent)
+		// Reload the freshly written config so a later save does not clobber it.
+		reloaded := &config.Config{HomeDir: projectDir}
+		if err := reloaded.Load(os.DirFS(projectDir)); err != nil {
+			return fmt.Errorf("init succeeded but reloading config failed: %w", err)
+		}
+
+		return agentInitDoneMsg{
+			cfg:     reloaded,
+			summary: fmt.Sprintf("✓ Agent initialized: %s (%d skills)", result.Agent, result.ExtractedCount),
+		}
 	}
+}
+
+type agentInitDoneMsg struct {
+	cfg     *config.Config
+	summary string
+}
+
+// templateFileName returns the orchestrator filename for an agent, for display.
+func templateFileName(agent string) string {
+	if agent == "claude" {
+		return "CLAUDE.md"
+	}
+	return "AGENTS.md"
+}
+
+type templateExistsMsg struct {
+	agent string
+	path  string
 }
 
 // CheckTerminal verifies the current process is running in a terminal.

@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"github.com/archon-ai/archon/internal/config"
 	"github.com/archon-ai/archon/internal/initcmd"
@@ -51,6 +53,7 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 		agentFlag        string
 		forceFlag        bool
 		dryRunFlag       bool
+		playwrightFlag   bool
 		modelFlag        string
 		modelExploreFlag string
 		modelProposeFlag string
@@ -112,16 +115,28 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 			}
 
 			opts := initcmd.Options{
-				HomeDir:      homeDir,
-				ProjectDir:   projectDir,
-				Agent:        agentFlag,
-				Force:        forceFlag,
-				EmbeddedFS:   skills.FS,
-				ModelDefault: modelFlag,
-				ModelPhases:  modelFlags,
+				HomeDir:           homeDir,
+				ProjectDir:        projectDir,
+				Agent:             agentFlag,
+				Force:             forceFlag,
+				EmbeddedFS:        skills.FS,
+				ModelDefault:      modelFlag,
+				ModelPhases:       modelFlags,
+				Playwright:        playwrightFlag,
+				OverwriteTemplate: forceFlag,
 			}
 
 			result, err := initcmd.Run(opts)
+			if errors.Is(err, initcmd.ErrTemplateExists) {
+				// An orchestrator file already exists. Ask before replacing it;
+				// if the user declines, do not initialize at all.
+				if !confirmOverwrite(cmd.InOrStdin(), stdout, err) {
+					fmt.Fprintln(stdout, "Init cancelled — existing orchestrator file kept unchanged.")
+					return nil
+				}
+				opts.OverwriteTemplate = true
+				result, err = initcmd.Run(opts)
+			}
 			if err != nil {
 				fmt.Fprintf(stderr, "Error: %v\n", err)
 				return err
@@ -136,8 +151,9 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&agentFlag, "agent", "", "Override agent detection (opencode, claude, agents, codex)")
-	cmd.Flags().BoolVar(&forceFlag, "force", false, "Force re-initialization even if already initialized")
+	cmd.Flags().BoolVar(&forceFlag, "force", false, "Force re-initialization, replacing an existing orchestrator file without prompting")
 	cmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Show what would happen without making changes")
+	cmd.Flags().BoolVar(&playwrightFlag, "playwright", false, "Enable Playwright E2E test generation and execution for web projects")
 	cmd.Flags().StringVar(&modelFlag, "model", "", "Default AI model for all SDD phases")
 	cmd.Flags().StringVar(&modelExploreFlag, "model-explore", "", "Model for the explore phase")
 	cmd.Flags().StringVar(&modelProposeFlag, "model-propose", "", "Model for the propose phase")
@@ -149,6 +165,18 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 	cmd.Flags().StringVar(&modelArchiveFlag, "model-archive", "", "Model for the archive phase")
 
 	return cmd
+}
+
+// confirmOverwrite asks the user whether to replace an existing orchestrator
+// file. It returns true only on an explicit affirmative answer.
+func confirmOverwrite(in io.Reader, stdout io.Writer, cause error) bool {
+	fmt.Fprintf(stdout, "An orchestrator file already exists (%v).\n", cause)
+	fmt.Fprint(stdout, "Replace it? [y/N]: ")
+
+	reader := bufio.NewReader(in)
+	line, _ := reader.ReadString('\n')
+	answer := strings.ToLower(strings.TrimSpace(line))
+	return answer == "y" || answer == "yes"
 }
 
 func newRollbackCmd(stdout, stderr io.Writer) *cobra.Command {
@@ -257,12 +285,15 @@ func newTuiCmd(stdout, stderr io.Writer) *cobra.Command {
 			cfg := &config.Config{HomeDir: projectDir}
 			projectFS := os.DirFS(projectDir)
 			if err := cfg.Load(projectFS); err != nil {
-				if os.IsNotExist(err) {
-					fmt.Fprintf(stderr, "No archon configuration found. Run 'archon init' first.\n")
-					return fmt.Errorf("not initialized")
+				if errors.Is(err, os.ErrNotExist) {
+					// Not initialized yet: launch the TUI with a default config
+					// so the user can pick an agent and init from the Agent tab.
+					fmt.Fprintln(stdout, "No archon configuration found — open the Agent tab to initialize.")
+					cfg = &config.Config{HomeDir: projectDir}
+				} else {
+					fmt.Fprintf(stderr, "Error: %v\n", err)
+					return err
 				}
-				fmt.Fprintf(stderr, "Error: %v\n", err)
-				return err
 			}
 
 			model := tui.NewModel(cfg, projectDir)

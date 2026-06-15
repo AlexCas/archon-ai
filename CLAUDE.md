@@ -48,7 +48,16 @@ D. Revisión
    D1 400 líneas (recomendado): frenar si la estimación supera 400 líneas cambiadas.
    D2 800 líneas: más permisivo; útil para cambios medianos.
    D3 Otro: preguntar el número después.
+
+E. Pruebas web (Playwright)
+   E1 No (recomendado para proyectos no web): no generar ni ejecutar pruebas Playwright.
+   E2 Sí: generar pruebas Playwright desde los escenarios Gherkin y ejecutarlas tras verify y jueces.
 ```
+
+**Project type & web testing (group E):**
+- El tipo de proyecto (web / no web) se determina en `sdd-explore`. El grupo E mapea a `playwright.enabled` en `.archon/config.yaml`.
+- Para un proyecto NUEVO o en blanco donde explore no puede determinar el tipo, PREGUNTAR el grupo E junto con el ritmo (grupo A) en el preflight.
+- Con `playwright.enabled`, el harness genera pruebas Playwright desde los `.feature` Gherkin y las ejecuta después de verify y jueces.
 
 **Hard gate rules:**
 - `openspec/config.yaml`, existing SDD artifacts, or previous `sdd-init` results do NOT satisfy this preflight.
@@ -99,19 +108,38 @@ After EVERY phase that produces an editable artifact (propose, spec, design, tas
 Fases that require this gate: propose, spec, design, tasks.
 Apply and verify are execution phases, but the orchestrator must still show the planned scope before running apply.
 
+## Session Status (SESSION_STATUS.md) — MANDATORY
+
+On EVERY phase transition, write/update `SESSION_STATUS.md` at the repository root capturing the live session state (active change, current phase + status, preflight choices including the web/Playwright decision, phase history with timestamps, key artifact paths, open questions, next step). This is the fast resume point if the agent is closed mid-session.
+
+- Update it at the start and end of each phase.
+- On resume, READ it FIRST to restore context.
+- During `archive`, MOVE it into the archived change folder and remove it from the root.
+- Follow the `session-status-contract` shared module for the exact format.
+
+## Commit Attribution (HARD RULE)
+
+When committing on the user's behalf through the harness or any sub-agent:
+- Commits are authored SOLELY by the user's git account.
+- NEVER add `Co-Authored-By` trailers, "Generated with" lines, agent/assistant names, or any other co-author or tool attribution to commit messages or PR bodies.
+
 ## Rules
 1. Check harness-workflow before any phase transition
 2. Delegate each phase to sdd-* sub-agent
-3. After every phase that produces an editable artifact, run the Human Review Gate
-4. After verify, invoke harness-judge
-5. On judge fail: re-apply with feedback (max 3 retries)
+3. Write/update SESSION_STATUS.md at the root on every phase transition
+4. After every phase that produces an editable artifact, run the Human Review Gate
+5. After verify, invoke harness-judge
+6. When playwright.enabled, run the generated Playwright tests after verify and judge pass
+7. On judge fail: re-apply with feedback (max 3 retries)
+8. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution
 
 ## Configuration
 - Skills: 24 (embedded via archon init)
 - Config: .archon/config.yaml
 - Agent: claude
-- Harness Version: 0.1.0
+- Harness Version: 0.2.0
 
 ## State Management
-State tracked in: openspec/changes/{change-name}/state.yaml
+Phase state tracked in: openspec/changes/{change-name}/state.yaml
+Session state tracked in: SESSION_STATUS.md (repo root, archived with the change)
 Transitions validated by harness-workflow skill

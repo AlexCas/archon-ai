@@ -29,6 +29,19 @@ func Display(w io.Writer, cfg *config.Config) {
 	}
 	fmt.Fprintln(w)
 
+	fmt.Fprintln(w, "  Playwright (Web E2E)")
+	fmt.Fprintln(w, "  --------------------")
+	fmt.Fprintf(w, "    Enabled:   %t\n", cfg.Playwright.Enabled)
+	if cfg.Playwright.Enabled {
+		if cfg.Playwright.TestDir != "" {
+			fmt.Fprintf(w, "    Test Dir:  %s\n", cfg.Playwright.TestDir)
+		}
+		if cfg.Playwright.BaseURL != "" {
+			fmt.Fprintf(w, "    Base URL:  %s\n", cfg.Playwright.BaseURL)
+		}
+	}
+	fmt.Fprintln(w)
+
 	fmt.Fprintln(w, "  Models")
 	fmt.Fprintln(w, "  ------")
 	if cfg.Models.Default == "" && len(cfg.Models.Phases) == 0 {

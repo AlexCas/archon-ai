@@ -30,6 +30,7 @@ Use it for:
 | Tell a story | A reviewer should understand why each commit exists from its diff and message. |
 | Future PR-ready | Each commit should be a candidate chained PR when the change grows. |
 | SDD workload guard | If SDD tasks forecast a >400-line change, group commits into chained PR slices before implementation. |
+| User-only authorship | Commits are authored solely by the user's git account. NEVER add `Co-Authored-By` trailers, "Generated with" lines, or any agent/tool attribution to commit messages or PR bodies. |
 
 ## Work Unit Checklist
 

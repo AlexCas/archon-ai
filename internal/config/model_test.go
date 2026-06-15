@@ -8,10 +8,10 @@ func TestValidate(t *testing.T) {
 		model      string
 		wantWarn   bool
 	}{
-		{name: "known model gpt-4o", model: "gpt-4o", wantWarn: false},
-		{name: "known model claude-sonnet-4", model: "claude-sonnet-4", wantWarn: false},
-		{name: "known model gemini-2.5-pro", model: "gemini-2.5-pro", wantWarn: false},
-		{name: "known model o4-mini", model: "o4-mini", wantWarn: false},
+		{name: "known claude model opus", model: "claude-opus-4-8", wantWarn: false},
+		{name: "known claude model sonnet", model: "claude-sonnet-4-6", wantWarn: false},
+		{name: "known claude model haiku", model: "claude-haiku-4-5", wantWarn: false},
+		{name: "known opencode model", model: "glm-5", wantWarn: false},
 		{name: "unknown model", model: "future-model-v2", wantWarn: true},
 		{name: "empty string", model: "", wantWarn: false},
 	}

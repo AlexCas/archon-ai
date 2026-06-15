@@ -159,6 +159,25 @@ FOR EACH TASK:
 └── Note any issues or deviations
 ```
 
+### Step 4b: Generate Playwright Specs from Gherkin (web projects only)
+
+**Only if `.archon/config.yaml` → `playwright.enabled: true`:**
+
+For a web project, derive Playwright E2E specs from the Gherkin `.feature` files
+produced by `sdd-spec`:
+
+1. Read each `{domain}.feature` under the change's `specs/{domain}/`.
+2. For every scenario tagged `@web` (or all scenarios if the project treats every
+   flow as web), generate/update a Playwright spec in `playwright.test_dir`
+   (default `e2e/`), e.g. `e2e/{domain}.spec.ts`.
+3. Map Gherkin steps to Playwright actions/assertions against `playwright.base_url`.
+   Keep the scenario name identical so failures trace back to the `.feature`.
+4. Do NOT execute the suite here — generation only. Execution happens in the judge
+   phase (`harness-judge` Playwright gate), after verify and judgment-day.
+
+Treat the generated specs as part of this work unit's diff (commit them with the
+behavior they cover). If `playwright.enabled: false`, skip this step entirely.
+
 ### Step 5: Mark Tasks Complete
 
 Update `tasks.md` — change `- [ ]` to `- [x]` for completed tasks:
@@ -249,6 +268,8 @@ If none, say "None."}
 - When applying a chained/stacked PR slice, keep the batch autonomous: one deliverable scope, verification included, and clear rollback boundary
 - When applying `size:exception`, state it explicitly in apply-progress and the return summary
 - NEVER implement tasks that weren't assigned to you
+- When `playwright.enabled` and the project is web, GENERATE Playwright specs from the Gherkin `.feature` files (Step 4b); never execute them here
+- **Commit attribution**: if you create commits, they are authored SOLELY by the user's git account. NEVER add `Co-Authored-By` trailers, "Generated with" lines, or any agent/tool attribution to commit messages or PR bodies.
 - Skill loading is handled in Step 1 — follow any loaded skills strictly when writing code
 - Apply any `rules.apply` from `openspec/config.yaml`
 - If Strict TDD Mode is active (Step 3), load `strict-tdd.md` and follow its cycle INSTEAD of Step 4

@@ -84,6 +84,28 @@ INVESTIGATE:
 └── Identify dependencies and coupling
 ```
 
+### Step 3b: Determine Project Type (Web Detection)
+
+Decide whether this project is a **web project**, because that drives Playwright
+E2E generation later in the flow. Look for signals:
+
+- A web framework or UI layer (e.g. `package.json` with react/vue/svelte/next/angular,
+  a `templates/`/`views/` layer, server-rendered routes, a SPA build, etc.).
+- A dev server, browser-facing routes, or existing E2E tooling (`playwright`,
+  `cypress`, `selenium`, `chromedp`).
+
+Report one of: `web`, `not-web`, or `unknown`.
+
+- If signals clearly indicate a web UI → `web`.
+- If the project is clearly a library/CLI/backend-only with no browser surface → `not-web`.
+- If the project is **NEW or blank** and the type cannot be determined from code →
+  `unknown`. In this case the orchestrator MUST ASK the user (preflight group E,
+  alongside the rhythm) whether to enable Playwright web testing. State this
+  explicitly in your output so the orchestrator knows to ask.
+
+This determination informs `playwright.enabled` in `.archon/config.yaml`. Never
+enable Playwright for a `not-web` project.
+
 ### Step 4: Analyze Options
 
 If there are multiple approaches, compare them:
@@ -108,6 +130,10 @@ Return EXACTLY this format to the orchestrator (and write the same content to `e
 
 ```markdown
 ## Exploration: {topic}
+
+### Project Type
+**Web testing**: {web | not-web | unknown}
+{If `unknown`: "NEW/blank project — orchestrator must ask preflight group E (Playwright) before proceeding."}
 
 ### Current State
 {How the system works today relevant to this topic}

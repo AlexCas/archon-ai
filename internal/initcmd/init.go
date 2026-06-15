@@ -1,6 +1,7 @@
 package initcmd
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -21,7 +22,18 @@ type Options struct {
 	EmbeddedFS   fs.FS
 	ModelDefault string
 	ModelPhases  map[string]string
+	// Playwright enables generation and execution of Playwright E2E tests.
+	Playwright bool
+	// OverwriteTemplate, when true, replaces an existing orchestrator file
+	// (CLAUDE.md / AGENTS.md) without prompting. When false and the file
+	// already exists, Run aborts with ErrTemplateExists so the caller can
+	// ask the user whether to replace it.
+	OverwriteTemplate bool
 }
+
+// ErrTemplateExists is returned by Run when the orchestrator template file
+// (CLAUDE.md or AGENTS.md) already exists and OverwriteTemplate is false.
+var ErrTemplateExists = errors.New("orchestrator file already exists")
 
 type Result struct {
 	Agent          string
@@ -46,6 +58,21 @@ func Run(opts Options) (*Result, error) {
 		return nil, fmt.Errorf("detect agent: %w", err)
 	}
 
+	// Guard an existing orchestrator file BEFORE doing any work so that a
+	// declined overwrite leaves the project completely untouched.
+	templatePath := templateFilePath(opts.ProjectDir, agentName)
+	if !opts.OverwriteTemplate {
+		if _, statErr := os.Stat(templatePath); statErr == nil {
+			return nil, fmt.Errorf("%w: %s", ErrTemplateExists, templatePath)
+		}
+	}
+
+	// Ensure the agent directory exists. init no longer depends on the folder
+	// having been created beforehand — selecting an agent creates its folder.
+	if err := ensureAgentDir(opts.ProjectDir, agentName); err != nil {
+		return nil, fmt.Errorf("create agent dir: %w", err)
+	}
+
 	globalSkillsDir := filepath.Join(opts.HomeDir, ".config", "opencode", "skills")
 	extracted, err := scaffold.Extract(opts.EmbeddedFS, globalSkillsDir)
 	if err != nil {
@@ -57,7 +84,7 @@ func Run(opts Options) (*Result, error) {
 		return nil, fmt.Errorf("create symlinks: %w", err)
 	}
 
-	cfg := buildConfig(agentName, extracted, opts.ModelDefault, opts.ModelPhases)
+	cfg := buildConfig(agentName, extracted, opts.ModelDefault, opts.ModelPhases, opts.Playwright)
 	cfg.HomeDir = opts.ProjectDir
 	if err := cfg.Save(); err != nil {
 		return nil, fmt.Errorf("save config: %w", err)
@@ -86,29 +113,59 @@ func Run(opts Options) (*Result, error) {
 }
 
 func detectAgent(opts Options) (string, error) {
+	// An explicit agent selection always wins and does NOT require the folder
+	// to already exist — init will create it.
+	if opts.Agent != "" {
+		if !knownAgent(opts.Agent) {
+			return "", fmt.Errorf("unknown agent %q (valid: opencode, claude, agents, codex)", opts.Agent)
+		}
+		return opts.Agent, nil
+	}
+
 	projectFS := os.DirFS(opts.ProjectDir)
 	result, err := agent.Detect(projectFS)
 	if err != nil {
-		if opts.Agent != "" {
-			return opts.Agent, nil
-		}
-		return "", err
-	}
-
-	if opts.Agent != "" {
-		for _, d := range result.Dirs {
-			if d == opts.Agent {
-				return opts.Agent, nil
-			}
-		}
-		return "", fmt.Errorf("specified agent %q not found in project", opts.Agent)
-	}
-
-	if len(result.Dirs) == 1 {
-		return result.Agent, nil
+		return "", fmt.Errorf("%w; pass --agent to select one (opencode, claude, agents, codex)", err)
 	}
 
 	return result.Agent, nil
+}
+
+func knownAgent(name string) bool {
+	switch name {
+	case "opencode", "claude", "agents", "codex":
+		return true
+	default:
+		return false
+	}
+}
+
+// agentBaseDir maps an agent name to its top-level directory inside the project.
+func agentBaseDir(projectDir, agentName string) string {
+	switch agentName {
+	case "claude":
+		return filepath.Join(projectDir, ".claude")
+	case "agents":
+		return filepath.Join(projectDir, ".agents")
+	case "codex":
+		return filepath.Join(projectDir, ".codex")
+	default:
+		return filepath.Join(projectDir, ".opencode")
+	}
+}
+
+// ensureAgentDir creates the agent's top-level directory if it does not exist.
+func ensureAgentDir(projectDir, agentName string) error {
+	return os.MkdirAll(agentBaseDir(projectDir, agentName), 0o755)
+}
+
+// templateFilePath returns the orchestrator file path for the given agent:
+// CLAUDE.md for the claude agent, AGENTS.md otherwise.
+func templateFilePath(projectDir, agentName string) string {
+	if agentName == "claude" {
+		return filepath.Join(projectDir, "CLAUDE.md")
+	}
+	return filepath.Join(projectDir, "AGENTS.md")
 }
 
 func resolveProjectSkillsDir(projectDir, agentName string) string {
@@ -135,7 +192,7 @@ func createSymlinks(globalDir, projectDir string, skills []string) error {
 	return nil
 }
 
-func buildConfig(agentName string, extracted []string, modelDefault string, modelPhases map[string]string) *config.Config {
+func buildConfig(agentName string, extracted []string, modelDefault string, modelPhases map[string]string, playwright bool) *config.Config {
 	inventory := make([]config.SkillInventory, len(extracted))
 	for i, name := range extracted {
 		inventory[i] = config.SkillInventory{
@@ -162,6 +219,9 @@ func buildConfig(agentName string, extracted []string, modelDefault string, mode
 		CreatedAt:  time.Now().UTC(),
 		MutationTesting: config.MutationTesting{
 			Enabled: false,
+		},
+		Playwright: config.Playwright{
+			Enabled: playwright,
 		},
 		Models: config.ModelConfig{
 			Default: modelDefault,
@@ -196,18 +256,15 @@ func writeTemplate(projectDir, agentName string, skillCount int) error {
 	}
 
 	var content string
-	var filename string
 
 	switch agentName {
 	case "claude":
 		content, _ = RenderClaudeMD(data)
-		filename = "CLAUDE.md"
 	default:
 		content, _ = RenderAgentsMD(data)
-		filename = "AGENTS.md"
 	}
 
-	path := filepath.Join(projectDir, filename)
+	path := templateFilePath(projectDir, agentName)
 	tmp := path + ".tmp"
 	if err := os.WriteFile(tmp, []byte(content), 0o644); err != nil {
 		return fmt.Errorf("write template: %w", err)
