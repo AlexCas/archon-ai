@@ -138,7 +138,7 @@ func TestTemplates_ContainSDDSessionPreflight(t *testing.T) {
 				"## Vague Request Guard (MANDATORY)",
 				"## Human Review Gate (MANDATORY)",
 				"Antes de continuar con SDD",
-				"¿Querés ajustar algo en esta fase antes de continuar?",
+				"¿Quieres ajustar algo en esta fase antes de continuar?",
 			}
 
 			for _, req := range required {
