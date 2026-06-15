@@ -1,5 +1,6 @@
 # Build artifacts
 archon
+archon.exe
 archon-test
 
 # Local directories
