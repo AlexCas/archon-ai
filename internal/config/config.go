@@ -16,6 +16,16 @@ type MutationTesting struct {
 	Threshold float64 `yaml:"threshold,omitempty"`
 }
 
+// Playwright controls generation and execution of Playwright end-to-end tests
+// derived from Gherkin scenarios. When enabled, the harness generates Playwright
+// specs from the feature files during the apply phase and runs them after the
+// verify and judge phases.
+type Playwright struct {
+	Enabled bool   `yaml:"enabled"`
+	TestDir string `yaml:"test_dir,omitempty"`
+	BaseURL string `yaml:"base_url,omitempty"`
+}
+
 type SkillInventory struct {
 	Name    string `yaml:"name"`
 	Version string `yaml:"version"`
@@ -28,6 +38,7 @@ type Config struct {
 	SkillCount      int              `yaml:"skill_count"`
 	CreatedAt       time.Time        `yaml:"created_at"`
 	MutationTesting MutationTesting  `yaml:"mutation_testing"`
+	Playwright      Playwright       `yaml:"playwright"`
 	Models          ModelConfig      `yaml:"models,omitempty"`
 	SkillInventory  []SkillInventory `yaml:"skill_inventory"`
 	HomeDir         string           `yaml:"-"`
@@ -58,6 +69,7 @@ func (c *Config) Clone() *Config {
 		CreatedAt:       c.CreatedAt,
 		HomeDir:         c.HomeDir,
 		MutationTesting: c.MutationTesting,
+		Playwright:      c.Playwright,
 		Models:          ModelConfig{Default: c.Models.Default, Phases: make(map[string]string, len(c.Models.Phases))},
 		SkillInventory:  make([]SkillInventory, len(c.SkillInventory)),
 	}

@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/archon-ai/archon/internal/config"
@@ -46,8 +47,10 @@ func newConfigSetCmd(stdout, stderr io.Writer) *cobra.Command {
 				return fmt.Errorf("load config: %w", err)
 			}
 
-			if w := config.Validate(value); w != "" {
-				fmt.Fprintln(stderr, w)
+			if strings.HasPrefix(key, "models.") {
+				if w := config.Validate(value); w != "" {
+					fmt.Fprintln(stderr, w)
+				}
 			}
 
 			if err := setConfigValue(cfg, key, value); err != nil {
@@ -138,10 +141,38 @@ func newConfigListCmd(stdout, stderr io.Writer) *cobra.Command {
 	}
 }
 
+func parseBool(key, value string) (bool, error) {
+	b, err := strconv.ParseBool(value)
+	if err != nil {
+		return false, fmt.Errorf("invalid boolean for %q: %q (use true/false)", key, value)
+	}
+	return b, nil
+}
+
 func setConfigValue(cfg *config.Config, key, value string) error {
 	switch key {
 	case "models.default":
 		cfg.Models.Default = value
+		return nil
+	case "playwright.enabled":
+		b, err := parseBool(key, value)
+		if err != nil {
+			return err
+		}
+		cfg.Playwright.Enabled = b
+		return nil
+	case "playwright.test_dir":
+		cfg.Playwright.TestDir = value
+		return nil
+	case "playwright.base_url":
+		cfg.Playwright.BaseURL = value
+		return nil
+	case "mutation_testing.enabled":
+		b, err := parseBool(key, value)
+		if err != nil {
+			return err
+		}
+		cfg.MutationTesting.Enabled = b
 		return nil
 	default:
 		if strings.HasPrefix(key, "models.phases.") {
@@ -155,7 +186,7 @@ func setConfigValue(cfg *config.Config, key, value string) error {
 			cfg.Models.Phases[phase] = value
 			return nil
 		}
-		return fmt.Errorf("unknown config key %q (supported: models.default, models.phases.<phase>)", key)
+		return fmt.Errorf("unknown config key %q (supported: models.default, models.phases.<phase>, playwright.enabled, playwright.test_dir, playwright.base_url, mutation_testing.enabled)", key)
 	}
 }
 
@@ -163,6 +194,14 @@ func getConfigValue(cfg *config.Config, key string) (string, error) {
 	switch key {
 	case "models.default":
 		return cfg.Models.Default, nil
+	case "playwright.enabled":
+		return strconv.FormatBool(cfg.Playwright.Enabled), nil
+	case "playwright.test_dir":
+		return cfg.Playwright.TestDir, nil
+	case "playwright.base_url":
+		return cfg.Playwright.BaseURL, nil
+	case "mutation_testing.enabled":
+		return strconv.FormatBool(cfg.MutationTesting.Enabled), nil
 	default:
 		if strings.HasPrefix(key, "models.phases.") {
 			phase := strings.TrimPrefix(key, "models.phases.")
@@ -171,6 +210,6 @@ func getConfigValue(cfg *config.Config, key string) (string, error) {
 			}
 			return cfg.Models.Phases[phase], nil
 		}
-		return "", fmt.Errorf("unknown config key %q (supported: models.default, models.phases.<phase>)", key)
+		return "", fmt.Errorf("unknown config key %q (supported: models.default, models.phases.<phase>, playwright.enabled, playwright.test_dir, playwright.base_url, mutation_testing.enabled)", key)
 	}
 }
