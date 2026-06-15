@@ -41,22 +41,22 @@ Base boundaries: stacked-to-main → both base master in order; feature-branch-c
 
 ## Phase 3: Command + status (PR 2)
 
-- [ ] 3.1 `internal/initcmd/update.go`: `UpdateOptions`/`UpdateResult`, `Update(opts)`; `config.Load` fail → "run init first", no writes.
-- [ ] 3.2 `Update`: `ClassifyGaps` (none→"up to date", no writes); copy-mode `Lstat` non-symlink → WARN no re-link; print machine-wide scope.
-- [ ] 3.3 `Update`: `--check` prints report, no writes; else `refreshSkills`; `--prune` `RemoveAll` orphans (global + project link).
-- [ ] 3.4 `Update`: `cfg.Clone()`, patch only `Version`/`SkillCount`/`SkillInventory`, set `HomeDir`, `Save`; never `writeTemplate`.
-- [ ] 3.5 Wire `newUpdateCmd` (`--check`/`--prune`/`--agent`) in `cmd/archon/main.go`.
-- [ ] 3.6 `status.DisplayWithUpdate(w,cfg,n)`; `Display` delegates `0`; `newStatusCmd` computes `ClassifyGaps`, appends hint (silent on error).
+- [x] 3.1 `internal/initcmd/update.go`: `UpdateOptions`/`UpdateResult`, `Update(opts)`; `config.Load` fail → "run init first", no writes.
+- [x] 3.2 `Update`: `ClassifyGaps` (none→"up to date", no writes); copy-mode `Lstat` non-symlink → WARN no re-link; print machine-wide scope.
+- [x] 3.3 `Update`: `--check` prints report, no writes; else `refreshSkills`; `--prune` `RemoveAll` orphans (global + project link).
+- [x] 3.4 `Update`: `cfg.Clone()`, patch only `Version`/`SkillCount`/`SkillInventory`, set `HomeDir`, `Save`; never `writeTemplate`.
+- [x] 3.5 Wire `newUpdateCmd` (`--check`/`--prune`/`--agent`) in `cmd/archon/main.go`.
+- [x] 3.6 `status.DisplayWithUpdate(w,cfg,n)`; `Display` delegates `0`; `newStatusCmd` computes `ClassifyGaps`, appends hint (silent on error).
 
 ## Phase 4: Testing
 
 - [x] 4.1 `scaffold/version_test.go`: `SkillVersion` present/missing; table `ClassifyGaps` (added/changed/orphaned/`"1.0"`-unknown). Backs "Missing frontmatter version is handled".
 - [x] 4.2 `initcmd` golden test: `Run` still writes template+config+rollback (regression); `refreshSkills` versions ≠ "1.0". Backs "Init records real frontmatter versions".
-- [ ] 4.3 `update_test.go`: missing config → error+no writes ("Update before init reports an actionable error"); no-gap → no writes ("No gaps reports already up to date"); Clone preserves models/playwright/judge/created_at ("Update refreshes skills without touching template or user config").
-- [ ] 4.4 `update_test.go`: `--check` no writes ("Check reports the diff without writing"); `--prune` removes orphan ("Prune removes orphaned skills"); no-prune keeps it ("Orphans are kept without prune").
-- [ ] 4.5 `cmd/archon` test: `update --check` no fs mutation; copy-mode warning ("Copy-mode install warns without re-linking").
+- [x] 4.3 `update_test.go`: missing config → error+no writes ("Update before init reports an actionable error"); no-gap → no writes ("No gaps reports already up to date"); Clone preserves models/playwright/judge/created_at ("Update refreshes skills without touching template or user config").
+- [x] 4.4 `update_test.go`: `--check` no writes ("Check reports the diff without writing"); `--prune` removes orphan ("Prune removes orphaned skills"); no-prune keeps it ("Orphans are kept without prune").
+- [x] 4.5 `cmd/archon` test: `update --check` no fs mutation; copy-mode warning ("Copy-mode install warns without re-linking").
 
 ## Phase 5: Docs/cleanup
 
-- [ ] 5.1 README: document `archon update` (`--check`/`--prune`/`--agent`, machine-wide scope).
-- [ ] 5.2 Fix stale "21 embedded skills" dry-run text in `cmd/archon/main.go` if present.
+- [x] 5.1 README: document `archon update` (`--check`/`--prune`/`--agent`, machine-wide scope).
+- [x] 5.2 Fix stale "21 embedded skills" dry-run text in `cmd/archon/main.go` if present.
