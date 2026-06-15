@@ -13,11 +13,15 @@ var availableAgents = []string{"opencode", "claude", "codex", "agents"}
 
 // agentTabState holds the state for the Agent configuration tab.
 type agentTabState struct {
-	selectedAgent   string
-	focusedIndex    int
-	confirmingInit  bool
-	initResult      string
-	initError       bool
+	selectedAgent  string
+	focusedIndex   int
+	confirmingInit bool
+	// confirmingOverwrite is set when init reported an existing orchestrator
+	// file; the user must explicitly approve replacing it.
+	confirmingOverwrite bool
+	overwritePath       string
+	initResult          string
+	initError           bool
 }
 
 func newAgentTabState(currentAgent string) agentTabState {
@@ -30,6 +34,29 @@ func newAgentTabState(currentAgent string) agentTabState {
 func (a *agentTabState) update(msg tea.Msg) (tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		if a.confirmingOverwrite {
+			switch msg.Type {
+			case tea.KeyRunes:
+				if len(msg.Runes) == 1 {
+					switch msg.Runes[0] {
+					case 'y', 'Y':
+						return a.triggerOverwriteInit(), true
+					case 'n', 'N':
+						a.confirmingOverwrite = false
+						a.setInitResult("Init cancelled — existing file kept unchanged.", false)
+						return nil, true
+					}
+				}
+			case tea.KeyEnter:
+				return a.triggerOverwriteInit(), true
+			case tea.KeyEsc:
+				a.confirmingOverwrite = false
+				a.setInitResult("Init cancelled — existing file kept unchanged.", false)
+				return nil, true
+			}
+			return nil, true
+		}
+
 		if a.confirmingInit {
 			switch msg.Type {
 			case tea.KeyRunes:
@@ -86,12 +113,30 @@ func (a *agentTabState) triggerInit() tea.Cmd {
 
 	return func() tea.Msg {
 		// Return a message to trigger init in the main model
-		return agentInitMsg{agent: agent}
+		return agentInitMsg{agent: agent, overwrite: false}
 	}
 }
 
+func (a *agentTabState) triggerOverwriteInit() tea.Cmd {
+	agent := a.selectedAgent
+	a.confirmingOverwrite = false
+
+	return func() tea.Msg {
+		return agentInitMsg{agent: agent, overwrite: true}
+	}
+}
+
+// askOverwrite puts the tab into the overwrite-confirmation state.
+func (a *agentTabState) askOverwrite(agent, path string) {
+	a.selectedAgent = agent
+	a.overwritePath = path
+	a.confirmingOverwrite = true
+	a.confirmingInit = false
+}
+
 type agentInitMsg struct {
-	agent string
+	agent     string
+	overwrite bool
 }
 
 func (a *agentTabState) view(width, height int) string {
@@ -104,6 +149,10 @@ func (a *agentTabState) view(width, height int) string {
 
 	b.WriteString(titleStyle.Render("Agent Configuration"))
 	b.WriteString("\n\n")
+
+	if a.confirmingOverwrite {
+		return a.renderOverwriteDialog()
+	}
 
 	if a.confirmingInit {
 		return a.renderConfirmDialog()
@@ -176,6 +225,20 @@ func (a *agentTabState) renderConfirmDialog() string {
 			"Proceed? [y/N]", a.selectedAgent)))
 
 	return b.String()
+}
+
+func (a *agentTabState) renderOverwriteDialog() string {
+	boxStyle := lipgloss.NewStyle().
+		Border(lipgloss.DoubleBorder()).
+		BorderForeground(lipgloss.Color("196")).
+		Padding(1, 2).
+		Width(54)
+
+	return boxStyle.Render(
+		fmt.Sprintf("⚠ %s already exists\n\n"+
+			"Running init for %s would replace the existing\n"+
+			"orchestrator file. If you decline, init will NOT run.\n\n"+
+			"Replace it? [y/N]", a.overwritePath, a.selectedAgent))
 }
 
 func (a *agentTabState) applyToConfig(cfg *config.Config) {

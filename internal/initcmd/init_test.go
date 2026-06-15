@@ -1,6 +1,7 @@
 package initcmd
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -256,10 +257,13 @@ func TestRun_Idempotency(t *testing.T) {
 		},
 	}
 
+	// OverwriteTemplate mirrors a confirmed/forced re-init: re-running must
+	// remain idempotent once the user has authorized replacing the file.
 	opts := Options{
-		HomeDir:    homeDir,
-		ProjectDir: projectDir,
-		EmbeddedFS: embeddedFS,
+		HomeDir:           homeDir,
+		ProjectDir:        projectDir,
+		EmbeddedFS:        embeddedFS,
+		OverwriteTemplate: true,
 	}
 
 	_, err := Run(opts)
@@ -270,6 +274,98 @@ func TestRun_Idempotency(t *testing.T) {
 	_, err = Run(opts)
 	if err != nil {
 		t.Fatalf("Second Run() error = %v", err)
+	}
+}
+
+func TestRun_AbortsOnExistingTemplate(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	homeDir := filepath.Join(tmpDir, "home")
+	projectDir := filepath.Join(tmpDir, "project")
+
+	if err := os.MkdirAll(homeDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(projectDir, ".claude"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	// Pre-existing CLAUDE.md with hand-written content.
+	claudeMD := filepath.Join(projectDir, "CLAUDE.md")
+	if err := os.WriteFile(claudeMD, []byte("# my custom orchestrator\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	embeddedFS := fstest.MapFS{
+		"sdd-init/SKILL.md": &fstest.MapFile{Data: []byte("---\nname: sdd-init\n---\n# Init")},
+	}
+
+	opts := Options{
+		HomeDir:    homeDir,
+		ProjectDir: projectDir,
+		Agent:      "claude",
+		EmbeddedFS: embeddedFS,
+	}
+
+	_, err := Run(opts)
+	if !errors.Is(err, ErrTemplateExists) {
+		t.Fatalf("Run() error = %v, want ErrTemplateExists", err)
+	}
+
+	// The original file must be untouched and no .archon dir created.
+	data, _ := os.ReadFile(claudeMD)
+	if string(data) != "# my custom orchestrator\n" {
+		t.Errorf("CLAUDE.md was modified: %q", string(data))
+	}
+	if _, err := os.Stat(filepath.Join(projectDir, ".archon")); err == nil {
+		t.Errorf(".archon dir should not be created when init is aborted")
+	}
+
+	// With OverwriteTemplate, init proceeds and replaces the file.
+	opts.OverwriteTemplate = true
+	if _, err := Run(opts); err != nil {
+		t.Fatalf("Run() with overwrite error = %v", err)
+	}
+	data, _ = os.ReadFile(claudeMD)
+	if string(data) == "# my custom orchestrator\n" {
+		t.Errorf("CLAUDE.md should have been replaced")
+	}
+}
+
+func TestRun_CreatesAgentDirWhenMissing(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	homeDir := filepath.Join(tmpDir, "home")
+	projectDir := filepath.Join(tmpDir, "project")
+
+	if err := os.MkdirAll(homeDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	embeddedFS := fstest.MapFS{
+		"sdd-init/SKILL.md": &fstest.MapFile{Data: []byte("---\nname: sdd-init\n---\n# Init")},
+	}
+
+	// No agent folder exists; selecting claude must create .claude.
+	opts := Options{
+		HomeDir:    homeDir,
+		ProjectDir: projectDir,
+		Agent:      "claude",
+		EmbeddedFS: embeddedFS,
+	}
+
+	result, err := Run(opts)
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if result.Agent != "claude" {
+		t.Errorf("Agent = %q, want claude", result.Agent)
+	}
+	if _, err := os.Stat(filepath.Join(projectDir, ".claude")); err != nil {
+		t.Errorf(".claude dir was not created: %v", err)
 	}
 }
 

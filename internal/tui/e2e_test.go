@@ -114,16 +114,17 @@ func TestEdgeCases_UnknownModelWarning(t *testing.T) {
 func TestEdgeCases_QuickTabSwitching(t *testing.T) {
 	m := NewModel(&config.Config{}, "")
 
-	// Switch through all tabs multiple times
-	for i := 0; i < 9; i++ {
+	// Switch through all tabs an exact number of full cycles.
+	cycles := int(tabCount) * 3
+	for i := 0; i < cycles; i++ {
 		msg := tea.KeyMsg{Type: tea.KeyTab}
 		newModel, _ := m.Update(msg)
 		m = newModel.(Model)
 	}
 
-	// Should end up on ModelsTab after 9 tabs (3 tabs * 3 cycles = 9)
+	// A whole number of full cycles must land back on ModelsTab.
 	if m.activeTab != ModelsTab {
-		t.Errorf("activeTab after 9 tabs = %d, want %d", m.activeTab, ModelsTab)
+		t.Errorf("activeTab after %d tabs = %d, want %d", cycles, m.activeTab, ModelsTab)
 	}
 }
 

@@ -81,6 +81,14 @@ func (m *modelsTabState) update(msg tea.Msg) (tea.Cmd, bool) {
 
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+n":
+			m.cycleStaticModel(1)
+			return nil, true
+		case "ctrl+p":
+			m.cycleStaticModel(-1)
+			return nil, true
+		}
 		switch msg.Type {
 		case tea.KeyUp:
 			m.focusPrev()
@@ -112,6 +120,29 @@ func (m *modelsTabState) update(msg tea.Msg) (tea.Cmd, bool) {
 	}
 
 	return cmd, true
+}
+
+// cycleStaticModel sets the focused input to the next/previous model in the
+// static catalog (Claude + Opencode Go). An empty entry leads the catalog so
+// users can cycle back to "no value" and still type a free-form model name.
+func (m *modelsTabState) cycleStaticModel(dir int) {
+	catalog := append([]string{""}, config.StaticModels()...)
+	current := m.inputs[m.focusedInput].Value()
+
+	idx := 0
+	for i, name := range catalog {
+		if name == current {
+			idx = i
+			break
+		}
+	}
+
+	idx = (idx + dir + len(catalog)) % len(catalog)
+	m.inputs[m.focusedInput].SetValue(catalog[idx])
+	m.autoFillLocks[m.focusedInput] = true
+	if m.focusedInput == modelInputDefault {
+		m.updateAutoFill()
+	}
 }
 
 func (m *modelsTabState) focusNext() {
@@ -148,6 +179,11 @@ func (m *modelsTabState) view(width, height int) string {
 		MarginBottom(1)
 
 	b.WriteString(titleStyle.Render("Model Configuration"))
+	b.WriteString("\n")
+	hintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	b.WriteString(hintStyle.Render("ctrl+n/ctrl+p: cycle static models  ·  or type any model name"))
+	b.WriteString("\n")
+	b.WriteString(hintStyle.Render("Static: " + strings.Join(config.StaticModels(), ", ")))
 	b.WriteString("\n\n")
 
 	// Default model
