@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"testing/fstest"
 )
 
 func TestExtractVersion(t *testing.T) {
@@ -87,10 +88,10 @@ metadata:
 
 func TestDetectVersionGaps(t *testing.T) {
 	tests := []struct {
-		name      string
-		setup     func(t *testing.T) (embedded map[string]string, installed map[string]string)
-		wantGaps  int
-		wantErr   bool
+		name     string
+		setup    func(t *testing.T) (embedded map[string]string, installed map[string]string)
+		wantGaps int
+		wantErr  bool
 	}{
 		{
 			name: "no gaps when versions match",
@@ -113,7 +114,9 @@ metadata:
 			wantErr:  false,
 		},
 		{
-			name: "gap when version mismatch",
+			// Installed "1.0" is the legacy placeholder and is treated as
+			// unknown (decision D4), so it does NOT count as a mismatch.
+			name: "no gap when installed version is the unknown 1.0 placeholder",
 			setup: func(t *testing.T) (map[string]string, map[string]string) {
 				embedded := map[string]string{
 					"sdd-init/SKILL.md": `---
@@ -125,6 +128,26 @@ metadata:
 					"sdd-init/SKILL.md": `---
 metadata:
   version: "1.0"
+---`,
+				}
+				return embedded, installed
+			},
+			wantGaps: 0,
+			wantErr:  false,
+		},
+		{
+			name: "gap when known installed version differs",
+			setup: func(t *testing.T) (map[string]string, map[string]string) {
+				embedded := map[string]string{
+					"sdd-init/SKILL.md": `---
+metadata:
+  version: "2.0"
+---`,
+				}
+				installed := map[string]string{
+					"sdd-init/SKILL.md": `---
+metadata:
+  version: "1.5"
 ---`,
 				}
 				return embedded, installed
@@ -189,4 +212,180 @@ metadata:
 			}
 		})
 	}
+}
+
+func TestSkillVersion(t *testing.T) {
+	embeddedFS := fstest.MapFS{
+		"sdd-init/SKILL.md": &fstest.MapFile{Data: []byte(`---
+name: sdd-init
+metadata:
+  version: "2.0"
+---
+# Init`)},
+		"sdd-noversion/SKILL.md": &fstest.MapFile{Data: []byte(`---
+name: sdd-noversion
+---
+# No version`)},
+	}
+
+	tests := []struct {
+		name  string
+		skill string
+		want  string
+	}{
+		{name: "version present", skill: "sdd-init", want: "2.0"},
+		{name: "version missing in frontmatter", skill: "sdd-noversion", want: ""},
+		{name: "skill absent", skill: "does-not-exist", want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := SkillVersion(embeddedFS, tt.skill); got != tt.want {
+				t.Errorf("SkillVersion(%q) = %q, want %q", tt.skill, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestClassifyGaps(t *testing.T) {
+	tests := []struct {
+		name         string
+		embedded     map[string]string
+		installed    map[string]string
+		wantAdded    []string
+		wantChanged  []string
+		wantOrphaned []string
+	}{
+		{
+			name: "added when embedded skill is not installed",
+			embedded: map[string]string{
+				"sdd-init/SKILL.md": "---\nmetadata:\n  version: \"2.0\"\n---",
+			},
+			installed:    map[string]string{},
+			wantAdded:    []string{"sdd-init"},
+			wantChanged:  nil,
+			wantOrphaned: nil,
+		},
+		{
+			name: "changed when known installed version differs",
+			embedded: map[string]string{
+				"sdd-init/SKILL.md": "---\nmetadata:\n  version: \"2.0\"\n---",
+			},
+			installed: map[string]string{
+				"sdd-init/SKILL.md": "---\nmetadata:\n  version: \"1.5\"\n---",
+			},
+			wantAdded:    nil,
+			wantChanged:  []string{"sdd-init"},
+			wantOrphaned: nil,
+		},
+		{
+			name: "no change when installed version is unknown 1.0 placeholder",
+			embedded: map[string]string{
+				"sdd-init/SKILL.md": "---\nmetadata:\n  version: \"2.0\"\n---",
+			},
+			installed: map[string]string{
+				"sdd-init/SKILL.md": "---\nmetadata:\n  version: \"1.0\"\n---",
+			},
+			wantAdded:    nil,
+			wantChanged:  nil,
+			wantOrphaned: nil,
+		},
+		{
+			name: "no change when installed version is empty (unknown)",
+			embedded: map[string]string{
+				"sdd-init/SKILL.md": "---\nmetadata:\n  version: \"2.0\"\n---",
+			},
+			installed: map[string]string{
+				"sdd-init/SKILL.md": "---\nname: sdd-init\n---",
+			},
+			wantAdded:    nil,
+			wantChanged:  nil,
+			wantOrphaned: nil,
+		},
+		{
+			name: "orphaned when installed skill is no longer embedded",
+			embedded: map[string]string{
+				"sdd-init/SKILL.md": "---\nmetadata:\n  version: \"2.0\"\n---",
+			},
+			installed: map[string]string{
+				"sdd-init/SKILL.md":    "---\nmetadata:\n  version: \"2.0\"\n---",
+				"sdd-retired/SKILL.md": "---\nmetadata:\n  version: \"1.0\"\n---",
+			},
+			wantAdded:    nil,
+			wantChanged:  nil,
+			wantOrphaned: []string{"sdd-retired"},
+		},
+		{
+			name: "mixed added changed and orphaned",
+			embedded: map[string]string{
+				"sdd-init/SKILL.md":    "---\nmetadata:\n  version: \"2.0\"\n---",
+				"sdd-propose/SKILL.md": "---\nmetadata:\n  version: \"3.0\"\n---",
+			},
+			installed: map[string]string{
+				"sdd-init/SKILL.md":    "---\nmetadata:\n  version: \"1.5\"\n---",
+				"sdd-retired/SKILL.md": "---\nmetadata:\n  version: \"1.0\"\n---",
+			},
+			wantAdded:    []string{"sdd-propose"},
+			wantChanged:  []string{"sdd-init"},
+			wantOrphaned: []string{"sdd-retired"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+
+			embeddedFS := make(fstest.MapFS)
+			for path, content := range tt.embedded {
+				embeddedFS[path] = &fstest.MapFile{Data: []byte(content)}
+			}
+
+			installedDir := filepath.Join(tmpDir, "installed")
+			if err := os.MkdirAll(installedDir, 0o755); err != nil {
+				t.Fatalf("MkdirAll() error = %v", err)
+			}
+			for path, content := range tt.installed {
+				fullPath := filepath.Join(installedDir, path)
+				if err := os.MkdirAll(filepath.Dir(fullPath), 0o755); err != nil {
+					t.Fatalf("MkdirAll() error = %v", err)
+				}
+				if err := os.WriteFile(fullPath, []byte(content), 0o644); err != nil {
+					t.Fatalf("WriteFile() error = %v", err)
+				}
+			}
+
+			report, err := ClassifyGaps(embeddedFS, installedDir)
+			if err != nil {
+				t.Fatalf("ClassifyGaps() error = %v", err)
+			}
+
+			assertSkillNames(t, "Added", report.Added, tt.wantAdded)
+			assertSkillNames(t, "Changed", report.Changed, tt.wantChanged)
+			assertSkillNames(t, "Orphaned", report.Orphaned, tt.wantOrphaned)
+		})
+	}
+}
+
+func assertSkillNames(t *testing.T, bucket string, got []SkillChange, want []string) {
+	t.Helper()
+	if len(got) != len(want) {
+		t.Fatalf("%s = %d entries (%v), want %d (%v)", bucket, len(got), names(got), len(want), want)
+	}
+	gotSet := make(map[string]struct{}, len(got))
+	for _, c := range got {
+		gotSet[c.Name] = struct{}{}
+	}
+	for _, name := range want {
+		if _, ok := gotSet[name]; !ok {
+			t.Errorf("%s missing expected skill %q (got %v)", bucket, name, names(got))
+		}
+	}
+}
+
+func names(changes []SkillChange) []string {
+	out := make([]string, len(changes))
+	for i, c := range changes {
+		out[i] = c.Name
+	}
+	return out
 }

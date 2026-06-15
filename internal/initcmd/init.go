@@ -73,18 +73,15 @@ func Run(opts Options) (*Result, error) {
 		return nil, fmt.Errorf("create agent dir: %w", err)
 	}
 
-	globalSkillsDir := filepath.Join(opts.HomeDir, ".config", "opencode", "skills")
-	extracted, err := scaffold.Extract(opts.EmbeddedFS, globalSkillsDir)
+	res, err := refreshSkills(opts.HomeDir, opts.ProjectDir, agentName, opts.EmbeddedFS)
 	if err != nil {
-		return nil, fmt.Errorf("extract skills: %w", err)
+		return nil, err
 	}
+	globalSkillsDir := res.GlobalSkillsDir
+	projectSkillsDir := res.ProjectSkillsDir
+	extracted := res.Extracted
 
-	projectSkillsDir := resolveProjectSkillsDir(opts.ProjectDir, agentName)
-	if err := createSymlinks(globalSkillsDir, projectSkillsDir, extracted); err != nil {
-		return nil, fmt.Errorf("create symlinks: %w", err)
-	}
-
-	cfg := buildConfig(agentName, extracted, opts.ModelDefault, opts.ModelPhases, opts.Playwright)
+	cfg := buildConfig(agentName, extracted, res.Inventory, opts.ModelDefault, opts.ModelPhases, opts.Playwright)
 	cfg.HomeDir = opts.ProjectDir
 	if err := cfg.Save(); err != nil {
 		return nil, fmt.Errorf("save config: %w", err)
@@ -192,16 +189,7 @@ func createSymlinks(globalDir, projectDir string, skills []string) error {
 	return nil
 }
 
-func buildConfig(agentName string, extracted []string, modelDefault string, modelPhases map[string]string, playwright bool) *config.Config {
-	inventory := make([]config.SkillInventory, len(extracted))
-	for i, name := range extracted {
-		inventory[i] = config.SkillInventory{
-			Name:    name,
-			Version: "1.0",
-			Source:  "embedded",
-		}
-	}
-
+func buildConfig(agentName string, extracted []string, inventory []config.SkillInventory, modelDefault string, modelPhases map[string]string, playwright bool) *config.Config {
 	var phases map[string]string
 	for k, v := range modelPhases {
 		if v != "" {
