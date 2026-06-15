@@ -19,6 +19,7 @@ type Tab int
 
 const (
 	ModelsTab Tab = iota
+	JudgeTab
 	MutationTab
 	PlaywrightTab
 	AgentTab
@@ -36,6 +37,7 @@ type Model struct {
 	statusErr  bool
 	// Tab states
 	modelsTab     modelsTabState
+	judgeTab      judgeTabState
 	mutationTab   mutationTabState
 	playwrightTab playwrightTabState
 	agentTab      agentTabState
@@ -84,6 +86,7 @@ func NewModel(cfg *config.Config, projectDir string) Model {
 		projectDir:    projectDir,
 		activeTab:     ModelsTab,
 		modelsTab:     newModelsTabState(cfg),
+		judgeTab:      newJudgeTabState(cfg.Judge),
 		mutationTab:   newMutationTabState(cfg.MutationTesting),
 		playwrightTab: newPlaywrightTabState(cfg.Playwright),
 		agentTab:      newAgentTabState(cfg.Agent),
@@ -102,6 +105,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.modelsTab.setWidth(m.width)
+		m.judgeTab.setWidth(m.width)
 		m.mutationTab.setWidth(m.width)
 		m.playwrightTab.setWidth(m.width)
 		m.agentTab.setWidth(m.width)
@@ -130,6 +134,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch m.activeTab {
 		case ModelsTab:
 			cmd, _ := m.modelsTab.update(msg)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
+		case JudgeTab:
+			cmd, _ := m.judgeTab.update(msg)
 			if cmd != nil {
 				cmds = append(cmds, cmd)
 			}
@@ -164,11 +173,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		msg.cfg.HomeDir = m.projectDir
 		m.config = msg.cfg
 		m.modelsTab = newModelsTabState(msg.cfg)
+		m.judgeTab = newJudgeTabState(msg.cfg.Judge)
 		m.mutationTab = newMutationTabState(msg.cfg.MutationTesting)
 		m.playwrightTab = newPlaywrightTabState(msg.cfg.Playwright)
 		m.agentTab = newAgentTabState(msg.cfg.Agent)
 		if m.width > 0 {
 			m.modelsTab.setWidth(m.width)
+			m.judgeTab.setWidth(m.width)
 			m.mutationTab.setWidth(m.width)
 			m.playwrightTab.setWidth(m.width)
 			m.agentTab.setWidth(m.width)
@@ -232,7 +243,7 @@ func (m Model) renderTabs() string {
 		BorderForeground(lipgloss.Color("63")).
 		Bold(true)
 
-	tabs := []string{"Models", "Mutation Testing", "Playwright", "Agent"}
+	tabs := []string{"Models", "Judge", "Mutation Testing", "Playwright", "Agent"}
 	var rendered []string
 
 	for i, name := range tabs {
@@ -255,6 +266,8 @@ func (m Model) renderTabContent() string {
 	switch m.activeTab {
 	case ModelsTab:
 		return style.Render(m.modelsTab.view(m.width, m.height))
+	case JudgeTab:
+		return style.Render(m.judgeTab.view(m.width, m.height))
 	case MutationTab:
 		return style.Render(m.mutationTab.view(m.width, m.height))
 	case PlaywrightTab:
@@ -293,6 +306,7 @@ func (m Model) saveConfig() tea.Cmd {
 		// Clone config before mutation so we can rollback on failure
 		cfg := m.config.Clone()
 		m.modelsTab.applyToConfig(cfg)
+		m.judgeTab.applyToConfig(cfg)
 		m.mutationTab.applyToConfig(cfg)
 		m.playwrightTab.applyToConfig(cfg)
 		m.agentTab.applyToConfig(cfg)

@@ -220,6 +220,9 @@ func buildConfig(agentName string, extracted []string, modelDefault string, mode
 		MutationTesting: config.MutationTesting{
 			Enabled: false,
 		},
+		Judge: config.Judge{
+			Enabled: true,
+		},
 		Playwright: config.Playwright{
 			Enabled: playwright,
 		},

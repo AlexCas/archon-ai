@@ -16,24 +16,49 @@ Orchestrate the judge phase: invoke `judgment-day` for dual adversarial review, 
 
 Load when the orchestrator reaches the `judge` phase after `sdd-verify` passes. This skill wraps existing skills — it does NOT reimplement review or apply logic.
 
+The FIRST action on activation is to read the judge flag (Step 0). If the judge phase is disabled, this skill returns `skipped` immediately and the orchestrator advances to `archive`.
+
 ## Hard Rules
 
+- The judge phase is configurable. ALWAYS read `.archon/config.yaml` → `judge.enabled` BEFORE doing anything else. Default: `true` (run when the section is absent). When `judge.enabled: false`, SKIP the entire judge phase — do NOT invoke `judgment-day`, mutation testing, or Playwright — and return `skipped` so the orchestrator advances from verify straight to archive.
 - ALWAYS invoke `judgment-day` skill for dual review. Do NOT perform review inline.
 - ALWAYS invoke `sdd-apply` for re-fixes. Do NOT apply fixes inline.
 - ALWAYS invoke `sdd-verify` after each re-apply before re-judging.
 - Mutation testing is OPT-IN. Read `.archon/config.yaml` → `mutation_testing.enabled`. Default: `false`. Skip entirely when disabled.
-- Playwright E2E is OPT-IN and runs only for web projects. Read `.archon/config.yaml` → `playwright.enabled`. Default: `false`. Skip entirely when disabled. These tests run AFTER verify and after `judgment-day` passes.
+- Playwright E2E is OPT-IN and runs only for web projects. ALWAYS read `.archon/config.yaml` → `playwright.enabled` to decide whether to run it. Default: `false`. Skip entirely when disabled. These tests run AFTER verify and after `judgment-day` passes.
 - Maximum 3 retry cycles. The 4th failure returns `blocked` with `max_retries_exceeded: true`.
 - NEVER skip the re-verify step between re-apply and re-judge.
 - Accumulate all issues across retry cycles in the feedback block.
 
 ## Execution Steps
 
-### Step 1: Read Configuration
+### Step 0: Judge Flag Gate (HARD GATE)
 
-Read `.archon/config.yaml` for mutation testing settings:
+Read `.archon/config.yaml` → `judge.enabled` BEFORE any other action:
 
 ```yaml
+judge:
+  enabled: true
+```
+
+- `judge.enabled: true` (or the `judge` section is absent → default `true`): proceed to Step 1.
+- `judge.enabled: false`: STOP. Do NOT invoke `judgment-day` or any gate. Return the report below with **Verdict: `skipped`**, leave `state.yaml` for the orchestrator to advance to `archive`, and exit.
+
+```markdown
+## Judge Phase Report
+
+**Change**: {change-name}
+**Verdict**: skipped
+**Reason**: judge phase disabled via `.archon/config.yaml` → `judge.enabled: false`
+```
+
+### Step 1: Read Configuration
+
+Read `.archon/config.yaml` for the judge flag and the gate settings:
+
+```yaml
+judge:
+  enabled: true
 mutation_testing:
   enabled: false
   tool: gremlins
@@ -44,7 +69,8 @@ playwright:
   base_url: http://localhost:3000
 ```
 
-If the file or either section is missing, default that gate to `enabled: false`.
+- `judge.enabled` controls whether the whole phase runs (see Step 0). Default: `true`.
+- If the file or either gate section is missing, default that gate to `enabled: false`.
 
 ### Step 2: Invoke Judgment-Day
 
@@ -211,7 +237,7 @@ If blocked:
 | `judgment-day` skill unavailable | `blocked` — report: `judgment-day skill not found` |
 | `sdd-apply` fails during re-apply | Count as retry attempt; include failure in next feedback |
 | `sdd-verify` fails after re-apply | Include verify failures in feedback; count as retry attempt |
-| `.archon/config.yaml` missing | Default to `mutation_testing.enabled: false`; warn in report |
+| `.archon/config.yaml` missing | Default to `judge.enabled: true`, `mutation_testing.enabled: false`, `playwright.enabled: false`; warn in report |
 | Mutation tool not installed | `blocked` — report: `{tool} not found in PATH — install or disable mutation_testing` |
 | Playwright not installed | `blocked` — report: `playwright not found — install (npx playwright install) or disable playwright` |
 | App/dev server unreachable at base_url | `blocked` — report: `cannot reach {base_url} — start the app or set playwright.base_url` |
@@ -219,6 +245,7 @@ If blocked:
 
 ## Rules
 
+- The judge phase only runs when `.archon/config.yaml` → `judge.enabled` is `true` (default). When `false`, the phase is skipped entirely (Step 0). The flag is toggled from the TUI's "Judge" tab.
 - This skill does NOT implement dual review logic — delegate to `judgment-day`.
 - This skill does NOT implement fix logic — delegate to `sdd-apply`.
 - This skill does NOT implement verification logic — delegate to `sdd-verify`.

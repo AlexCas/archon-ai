@@ -86,8 +86,8 @@ func TestModel_Update_TabNavigation(t *testing.T) {
 	newModel, _ := m.Update(msg)
 	model := newModel.(Model)
 
-	if model.activeTab != MutationTab {
-		t.Errorf("activeTab after Tab = %d, want %d", model.activeTab, MutationTab)
+	if model.activeTab != JudgeTab {
+		t.Errorf("activeTab after Tab = %d, want %d", model.activeTab, JudgeTab)
 	}
 
 	// Test Shift+Tab key
