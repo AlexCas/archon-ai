@@ -113,7 +113,7 @@ After EVERY phase that produces an editable artifact (propose, spec, design, tas
    - Executive summary (what was done)
    - Key artifacts (paths, decisions, file changes)
    - Risks or open questions
-3. **ASK** explicitly: "¿Querés ajustar algo en esta fase antes de continuar?"
+3. **ASK** explicitly: "¿Quieres ajustar algo en esta fase antes de continuar?"
    - If the user wants changes: collect feedback, re-run the SAME phase with corrections, and repeat the gate.
    - If the user approves: continue to the next phase.
    - If the user is silent or unclear: wait — do NOT assume approval.
