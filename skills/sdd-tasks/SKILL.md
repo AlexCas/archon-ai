@@ -192,7 +192,9 @@ Phase 3: Integration / Wiring
 
 Phase 4: Testing
   └─ Unit tests, integration tests, e2e tests
-  └─ Verify against spec scenarios
+  └─ Verify against Gherkin scenarios in the .feature files
+  └─ Web + playwright.enabled: a task to generate Playwright specs from the
+     @web Gherkin scenarios (execution happens in the judge phase)
 
 Phase 5: Cleanup (if needed)
   └─ Documentation, remove dead code, polish
@@ -244,7 +246,8 @@ Return to the orchestrator:
 
 - ALWAYS reference concrete file paths in tasks
 - Tasks MUST be ordered by dependency — Phase 1 tasks shouldn't depend on Phase 2
-- Testing tasks should reference specific scenarios from the specs
+- Testing tasks should reference specific Gherkin scenarios from the `.feature` files
+- For web projects with `playwright.enabled`, include an explicit task to generate Playwright specs from the `@web` Gherkin scenarios (execution is handled later by the judge phase)
 - Each task should be completable in ONE session (if a task feels too big, split it)
 - Use hierarchical numbering: 1.1, 1.2, 2.1, 2.2, etc.
 - NEVER include vague tasks like "implement feature" or "add tests"

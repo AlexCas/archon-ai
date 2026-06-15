@@ -86,10 +86,51 @@ openspec/changes/{change-name}/
 ├── proposal.md              ← (already exists)
 └── specs/
     └── {domain}/
-        └── spec.md          ← Delta spec
+        ├── spec.md          ← Delta spec (requirements + Gherkin scenarios)
+        └── {domain}.feature ← Formal Gherkin feature file (executable use cases)
 ```
 
-**IF mode is `engram` or `none`:** Do NOT create any `openspec/` directories or files. Compose the spec content in memory — you will persist it in Step 5.
+**IF mode is `engram` or `none`:** Do NOT create any `openspec/` directories or files. Compose the spec content (including the Gherkin feature) in memory — you will persist it in Step 5.
+
+#### Gherkin Feature Files (MANDATORY)
+
+Every domain MUST also produce a formal Gherkin `.feature` file. Test/use cases
+are authored in **formal Gherkin**, not loose bullet lists — this is the contract
+the verify phase tests against, and (for web projects) the source the harness uses
+to generate Playwright specs.
+
+Rules for `.feature` files:
+- One `.feature` per domain, named `{domain}.feature`, placed beside `spec.md`.
+- Start with a `Feature:` line and a short description. Use `Background:` for shared
+  preconditions, `Scenario:` for examples, and `Scenario Outline:` + `Examples:` for
+  data-driven cases.
+- Steps use the real Gherkin keywords `Given`, `When`, `Then`, `And`, `But` —
+  capitalized as keywords, NOT in all-caps prose, NOT as Markdown bullets.
+- Tag scenarios for traceability and selective execution, e.g. `@happy`, `@edge`,
+  `@error`, and `@web` for browser-facing flows that Playwright will exercise.
+- Every requirement in `spec.md` MUST map to at least one scenario in the
+  `.feature` file. Keep the scenario names identical in both files.
+
+Example `{domain}.feature`:
+
+```gherkin
+Feature: Session expiration
+  Inactive sessions expire so that stale credentials cannot be reused.
+
+  Background:
+    Given an authenticated user with an active session
+
+  @happy
+  Scenario: Session stays valid within the timeout window
+    When the user makes a request 5 minutes after login
+    Then the request succeeds
+
+  @edge @error
+  Scenario: Session expires after the inactivity timeout
+    When the user makes a request 31 minutes after login
+    Then the response is 401 Unauthorized
+    And the session token is invalidated
+```
 
 #### MODIFIED Requirements Workflow (CRITICAL — read before writing deltas)
 
@@ -124,16 +165,22 @@ The system {MUST/SHALL/SHOULD} {do something specific}.
 
 #### Scenario: {Happy path scenario}
 
-- GIVEN {precondition}
-- WHEN {action}
-- THEN {expected outcome}
-- AND {additional outcome, if any}
+```gherkin
+Scenario: {Happy path scenario}
+  Given {precondition}
+  When {action}
+  Then {expected outcome}
+  And {additional outcome, if any}
+```
 
 #### Scenario: {Edge case scenario}
 
-- GIVEN {precondition}
-- WHEN {action}
-- THEN {expected outcome}
+```gherkin
+Scenario: {Edge case scenario}
+  Given {precondition}
+  When {action}
+  Then {expected outcome}
+```
 
 ## MODIFIED Requirements
 
@@ -144,15 +191,21 @@ The system {MUST/SHALL/SHOULD} {do something specific}.
 
 #### Scenario: {Unchanged scenario — keep if still valid}
 
-- GIVEN {precondition}
-- WHEN {action}
-- THEN {outcome}
+```gherkin
+Scenario: {Unchanged scenario — keep if still valid}
+  Given {precondition}
+  When {action}
+  Then {outcome}
+```
 
 #### Scenario: {Updated or new scenario}
 
-- GIVEN {updated precondition}
-- WHEN {updated action}
-- THEN {updated outcome}
+```gherkin
+Scenario: {Updated or new scenario}
+  Given {updated precondition}
+  When {updated action}
+  Then {updated outcome}
+```
 
 ## REMOVED Requirements
 
@@ -188,9 +241,12 @@ The system {MUST/SHALL/SHOULD} {behavior}.
 
 #### Scenario: {Name}
 
-- GIVEN {precondition}
-- WHEN {action}
-- THEN {outcome}
+```gherkin
+Scenario: {Name}
+  Given {precondition}
+  When {action}
+  Then {outcome}
+```
 ```
 
 ### Step 5: Persist Artifact
@@ -202,6 +258,11 @@ Follow **Section C** from `skills/_shared/sdd-phase-common.md`.
 - topic_key: `sdd/{change-name}/spec`
 - type: `architecture`
 
+The persisted `spec` artifact MUST include the Gherkin feature content. In
+`openspec`/`hybrid` mode also write the `{domain}.feature` files to disk (Step 4).
+In `engram`/`none` mode, embed each domain's feature block inside the artifact under
+a clearly labelled `## Feature ({domain})` section.
+
 ### Step 6: Return Summary
 
 Return to the orchestrator:
@@ -212,9 +273,9 @@ Return to the orchestrator:
 **Change**: {change-name}
 
 ### Specs Written
-| Domain | Type | Requirements | Scenarios |
-|--------|------|-------------|-----------|
-| {domain} | Delta/New | {N added, M modified, K removed} | {total scenarios} |
+| Domain | Type | Requirements | Scenarios | Feature file |
+|--------|------|-------------|-----------|--------------|
+| {domain} | Delta/New | {N added, M modified, K removed} | {total scenarios} | {domain}.feature |
 
 ### Coverage
 - Happy paths: {covered/missing}
@@ -227,7 +288,9 @@ Ready for design (sdd-design). If design already exists, ready for tasks (sdd-ta
 
 ## Rules
 
-- ALWAYS use Given/When/Then format for scenarios
+- ALWAYS author scenarios in FORMAL Gherkin (`Feature:`, `Scenario:`, `Given/When/Then/And/But`, optional `Background:`, `Scenario Outline:` + `Examples:`) — not all-caps prose or Markdown bullets
+- ALWAYS produce a `{domain}.feature` file per domain alongside `spec.md`, with every requirement mapped to at least one scenario and matching scenario names
+- Tag scenarios (`@happy`, `@edge`, `@error`, `@web`) so verify and Playwright generation can select them
 - ALWAYS use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY) for requirement strength
 - Read the proposal's **Capabilities section** first — it tells you exactly which spec files to create
 - If existing specs exist, write DELTA specs (ADDED/MODIFIED/REMOVED sections)

@@ -1,0 +1,11 @@
+phase: verify
+status: completed
+retrofit: true
+history:
+  - {phase: explore, status: completed, ts: "2026-06-15T14:00:00Z"}
+  - {phase: propose, status: completed, ts: "2026-06-15T15:00:00Z"}
+  - {phase: spec, status: completed, ts: "2026-06-15T15:02:00Z"}
+  - {phase: design, status: completed, ts: "2026-06-15T15:04:00Z"}
+  - {phase: tasks, status: completed, ts: "2026-06-15T15:06:00Z"}
+  - {phase: apply, status: completed, ts: "2026-06-15T14:50:00Z"}
+  - {phase: verify, status: completed, ts: "2026-06-15T15:10:00Z"}

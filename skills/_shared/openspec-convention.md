@@ -16,10 +16,14 @@ openspec/
         ├── proposal.md      <- from sdd-propose
         ├── specs/           <- from sdd-spec
         │   └── {domain}/
-        │       └── spec.md  <- Delta spec
+        │       ├── spec.md        <- Delta spec
+        │       └── {domain}.feature <- Formal Gherkin feature
         ├── design.md        <- from sdd-design
         ├── tasks.md         <- from sdd-tasks (updated by sdd-apply)
         └── verify-report.md <- from sdd-verify
+
+# SESSION_STATUS.md lives at the REPO ROOT during a session and is MOVED into the
+# archived change folder by sdd-archive (see session-status-contract).
 ```
 
 ## Artifact File Paths
@@ -30,7 +34,8 @@ openspec/
 | sdd-init | Creates | `openspec/config.yaml`, `openspec/specs/`, `openspec/changes/`, `openspec/changes/archive/` |
 | sdd-explore | Creates (optional) | `openspec/changes/{change-name}/exploration.md` |
 | sdd-propose | Creates | `openspec/changes/{change-name}/proposal.md` |
-| sdd-spec | Creates | `openspec/changes/{change-name}/specs/{domain}/spec.md` |
+| sdd-spec | Creates | `openspec/changes/{change-name}/specs/{domain}/spec.md` + `{domain}.feature` (Gherkin) |
+| sdd-apply | Generates (web) | Playwright specs in `playwright.test_dir` from `@web` Gherkin scenarios |
 | sdd-design | Creates | `openspec/changes/{change-name}/design.md` |
 | sdd-tasks | Creates | `openspec/changes/{change-name}/tasks.md` |
 | sdd-apply | Updates | `openspec/changes/{change-name}/tasks.md` (marks `[x]`) |
@@ -89,7 +94,7 @@ rules:
   proposal:
     - Include rollback plan for risky changes
   specs:
-    - Use Given/When/Then for scenarios
+    - Author scenarios in formal Gherkin (.feature files) — Feature/Scenario/Given/When/Then
     - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
   design:
     - Include sequence diagrams for complex flows

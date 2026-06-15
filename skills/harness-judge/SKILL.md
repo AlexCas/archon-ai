@@ -10,7 +10,7 @@ metadata:
 
 ## Purpose
 
-Orchestrate the judge phase: invoke `judgment-day` for dual adversarial review, optionally run mutation testing as a quality gate, and automatically re-run `sdd-apply` with structured feedback on failure (up to 3 retries).
+Orchestrate the judge phase: invoke `judgment-day` for dual adversarial review, optionally run mutation testing and Playwright E2E tests as quality gates, and automatically re-run `sdd-apply` with structured feedback on failure (up to 3 retries).
 
 ## Activation Contract
 
@@ -22,6 +22,7 @@ Load when the orchestrator reaches the `judge` phase after `sdd-verify` passes. 
 - ALWAYS invoke `sdd-apply` for re-fixes. Do NOT apply fixes inline.
 - ALWAYS invoke `sdd-verify` after each re-apply before re-judging.
 - Mutation testing is OPT-IN. Read `.archon/config.yaml` → `mutation_testing.enabled`. Default: `false`. Skip entirely when disabled.
+- Playwright E2E is OPT-IN and runs only for web projects. Read `.archon/config.yaml` → `playwright.enabled`. Default: `false`. Skip entirely when disabled. These tests run AFTER verify and after `judgment-day` passes.
 - Maximum 3 retry cycles. The 4th failure returns `blocked` with `max_retries_exceeded: true`.
 - NEVER skip the re-verify step between re-apply and re-judge.
 - Accumulate all issues across retry cycles in the feedback block.
@@ -37,9 +38,13 @@ mutation_testing:
   enabled: false
   tool: gremlins
   threshold: 0.80
+playwright:
+  enabled: false
+  test_dir: e2e
+  base_url: http://localhost:3000
 ```
 
-If the file or section is missing, default to `enabled: false`.
+If the file or either section is missing, default that gate to `enabled: false`.
 
 ### Step 2: Invoke Judgment-Day
 
@@ -61,16 +66,36 @@ Capture the verdict:
 4. If score < threshold → gate fails, collect surviving mutants as issues
 5. If score >= threshold → gate passes
 
-**If `mutation_testing.enabled: false`:** Skip this step entirely. Only `judgment-day` verdict determines the result.
+**If `mutation_testing.enabled: false`:** Skip this step entirely.
+
+### Step 3b: Playwright E2E Gate (conditional)
+
+**Only if `playwright.enabled: true` AND `judgment-day` passed:**
+
+These are the web end-to-end tests generated from the Gherkin `.feature` files
+(generated during `sdd-apply`). They run AFTER verify and AFTER judgment-day, per
+the harness flow.
+
+1. Ensure the app/dev server is reachable at `playwright.base_url` (start it if the
+   project provides a documented command; otherwise report it as a blocker).
+2. Run the Playwright suite in `playwright.test_dir`, e.g. `npx playwright test --reporter=json`.
+3. Parse results. Any failing scenario → gate fails; collect failures (scenario name,
+   `.feature` source, error) as issues.
+4. All scenarios pass → gate passes.
+
+**If `playwright.enabled: false`:** Skip this step entirely.
 
 ### Step 4: Evaluate Result
 
-| judgment-day | mutation gate | result |
-|---|---|---|
-| pass | pass (or skipped) | `pass` → advance to archive |
-| pass | fail | `fail` → enter re-apply loop |
-| fail | pass (or skipped) | `fail` → enter re-apply loop |
-| fail | fail | `fail` → enter re-apply loop |
+A gate that is disabled or skipped counts as `pass` for that column. Overall `pass`
+requires judgment-day to pass AND every enabled gate to pass.
+
+| judgment-day | mutation gate | playwright gate | result |
+|---|---|---|---|
+| pass | pass (or skipped) | pass (or skipped) | `pass` → advance to archive |
+| pass | fail | any | `fail` → enter re-apply loop |
+| pass | pass (or skipped) | fail | `fail` → enter re-apply loop |
+| fail | any | any | `fail` → enter re-apply loop |
 
 ### Step 5: On Pass
 
@@ -158,6 +183,10 @@ Return `## Judge Phase Report`:
 - Status: {passed | failed | skipped}
 - Score: {actual} / {threshold} (if run)
 
+### Playwright Gate
+- Status: {passed | failed | skipped}
+- Scenarios: {passed}/{total} (if run)
+
 ### Accumulated Issues
 {running total across all retry cycles}
 
@@ -184,6 +213,8 @@ If blocked:
 | `sdd-verify` fails after re-apply | Include verify failures in feedback; count as retry attempt |
 | `.archon/config.yaml` missing | Default to `mutation_testing.enabled: false`; warn in report |
 | Mutation tool not installed | `blocked` — report: `{tool} not found in PATH — install or disable mutation_testing` |
+| Playwright not installed | `blocked` — report: `playwright not found — install (npx playwright install) or disable playwright` |
+| App/dev server unreachable at base_url | `blocked` — report: `cannot reach {base_url} — start the app or set playwright.base_url` |
 | `state.yaml` missing or corrupt | `blocked` — report: `state.yaml not found — run harness-workflow first` |
 
 ## Rules
@@ -193,5 +224,6 @@ If blocked:
 - This skill does NOT implement verification logic — delegate to `sdd-verify`.
 - The orchestrator does NOT pause between retries — the loop is fully automatic.
 - After max retries, the orchestrator MUST surface accumulated issues to the user.
-- Mutation testing runs ONLY after `judgment-day` passes (both gates must pass for overall pass).
+- Mutation testing and the Playwright E2E gate run ONLY after `judgment-day` passes. Overall `pass` requires judgment-day AND every enabled gate to pass.
+- The Playwright gate executes the specs generated from Gherkin `.feature` files; it never authors product code.
 - Each retry cycle counts as ONE attempt regardless of how many sub-steps (apply → verify → judge) it contains.

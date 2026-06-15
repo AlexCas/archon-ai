@@ -93,6 +93,19 @@ Write updated `state.yaml`:
 - Set `status` to `in_progress` (unless resuming, keep `in_progress`)
 - Append history entry: `{phase: requested, status: in_progress, ts: <now>}`
 
+### Step 3b: Update SESSION_STATUS.md (MANDATORY on every transition)
+
+In the SAME transition, write/update `SESSION_STATUS.md` at the repository ROOT,
+following the `session-status-contract` shared module. Update it BOTH when a phase
+starts (`in_progress`) and when it completes (`completed`). This file is the
+session-level resume point if the agent is closed mid-work.
+
+- Record: active change, current phase + status, preflight choices (including the
+  web/Playwright decision), phase history with timestamps, key artifact paths,
+  open questions, and the next recommended step.
+- Use atomic write (temp file + rename).
+- Do NOT skip this step — even in `auto` mode.
+
 ### Step 4: Report
 
 Return structured response:
@@ -130,3 +143,5 @@ If blocked, append:
 - The `judge` phase is handled by `harness-judge`, not by an `sdd-*` skill.
 - NEVER allow concurrent phase execution — one phase at a time per change.
 - Timestamps MUST use ISO 8601 format (UTC).
+- On session resume, READ `SESSION_STATUS.md` (repo root) FIRST to restore context before evaluating any transition. See `session-status-contract`.
+- `SESSION_STATUS.md` is updated on every transition and is MOVED into the archived change folder during `sdd-archive`.

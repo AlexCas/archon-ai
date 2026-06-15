@@ -140,12 +140,32 @@ openspec/changes/{change-name}/
 
 Use today's date in ISO format (e.g., `2026-02-16`).
 
+### Step 3c: Archive SESSION_STATUS.md
+
+The session-level resume file lives at the repository ROOT during work. Finalize it
+as part of the change's audit trail (see `session-status-contract`):
+
+**IF mode is `openspec` or `hybrid`:** MOVE `SESSION_STATUS.md` from the repo root
+into the archived change folder, then ensure it no longer exists at the root:
+
+```
+SESSION_STATUS.md  → openspec/changes/archive/YYYY-MM-DD-{change-name}/SESSION_STATUS.md
+```
+
+**IF mode is `engram`:** Store the final `SESSION_STATUS.md` contents as the
+`sdd/{change-name}/session-status` observation, then delete the root file.
+
+**IF mode is `none`:** Delete the root file (no persisted audit trail).
+
+If `SESSION_STATUS.md` is absent at the root (e.g., already archived), note it and continue.
+
 ### Step 4: Verify Archive
 
 **IF mode is `openspec` or `hybrid`:** Confirm:
 - [ ] Main specs updated correctly
 - [ ] Change folder moved to archive
-- [ ] Archive contains all artifacts (proposal, specs, design, tasks)
+- [ ] Archive contains all artifacts (proposal, specs, design, tasks, SESSION_STATUS.md)
+- [ ] `SESSION_STATUS.md` no longer exists at the repo root
 - [ ] Archived `tasks.md` has no unchecked implementation tasks, unless the orchestrator explicitly approved archive-time stale-checkbox reconciliation backed by apply-progress/verify-report proof
 - [ ] Active changes directory no longer has this change
 
@@ -179,9 +199,10 @@ Return to the orchestrator:
 
 ### Archive Contents
 - proposal.md ✅
-- specs/ ✅
+- specs/ ✅ (includes Gherkin `.feature` files)
 - design.md ✅
 - tasks.md ✅ ({N}/{N} tasks complete)
+- SESSION_STATUS.md ✅ (moved from root)
 
 ### Source of Truth Updated
 The following specs now reflect the new behavior:
