@@ -22,9 +22,16 @@ go install github.com/archon-ai/archon/cmd/archon@latest
 # Initialize in your project
 archon init
 
+# Configure everything interactively (recommended)
+archon tui
+
 # Verify
 archon status
 ```
+
+> **Tip:** `archon tui` is the easiest way to configure the harness — models,
+> mutation testing, Playwright, and the agent — and it can even initialize a
+> blank project for you. See [`tui` — Interactive Configuration](#tui--interactive-configuration-recommended).
 
 ## Install
 
@@ -78,42 +85,75 @@ archon init
 ```
 
 What it does:
-1. Detects your AI agent (Claude, OpenCode, etc.)
+1. Detects your AI agent (Claude, OpenCode, etc.) — and **creates the agent folder if it doesn't exist yet**, so you can bootstrap a blank project
 2. Extracts 24 embedded skills into `~/.config/<agent>/skills/`
 3. Creates `.archon/config.yaml` with harness metadata
 4. Writes `CLAUDE.md` or `AGENTS.md` with orchestrator instructions
 5. Creates `openspec/` directory structure
 
+If a `CLAUDE.md`/`AGENTS.md` already exists, init **asks before replacing it** and aborts if you decline (use `--force` to replace without prompting).
+
 **Flags:**
 
 ```bash
-archon init --agent claude      # Override auto-detection
-archon init --force            # Re-initialize even if already done
-archon init --dry-run          # Show what would happen without doing it
-archon init --model claude-sonnet-4  # Default AI model for all SDD phases
+archon init --agent claude          # Override auto-detection (creates the folder if missing)
+archon init --playwright            # Enable Playwright web E2E generation + execution
+archon init --force                 # Replace an existing orchestrator file without prompting
+archon init --dry-run               # Show what would happen without doing it
+archon init --model claude-sonnet-4-6  # Default AI model for all SDD phases
 ```
 
-### `tui` — Interactive Configuration
+> Prefer the interactive route? `archon tui` exposes all of these settings
+> (and can run `init` for you) — see below.
+
+### `tui` — Interactive Configuration (recommended)
 
 ```bash
 archon tui
 ```
 
-Launch a terminal UI to configure:
-- **Models tab**: Set AI models per SDD phase (explore, propose, spec, design, tasks, apply, verify, archive)
-- **Mutation Testing tab**: Toggle mutation testing and set threshold
-- **Agent tab**: Switch agent and re-run initialization
+The fastest way to configure the harness — no hand-editing YAML. `archon tui` can
+even **initialize a project from scratch**: if no `.archon/config.yaml` exists yet,
+open the **Agent** tab and pick your agent; it creates the agent folder, `.archon/`,
+and the orchestrator file for you.
 
-**Key bindings:**
+Move between tabs with `Tab` / `Shift+Tab`, edit a tab, then press `Ctrl+S` to save.
+Saving also regenerates `CLAUDE.md`/`AGENTS.md` so the orchestrator instructions stay
+in sync with your config.
+
+#### Sections
+
+**🧠 Models** — Set the default AI model and an optional override per SDD phase
+(explore, propose, spec, design, tasks, apply, verify, archive).
+- Cycle the built-in catalog with `Ctrl+N` / `Ctrl+P`:
+  - **Claude:** `claude-opus-4-8`, `claude-sonnet-4-6`, `claude-haiku-4-5`
+  - **Opencode Go:** `deepseek-v4-flash`, `deepseek-v4-pro`, `glm-5`, `glm-5.1`, `kimi-k2.5`, `kimi-k2.6`, `qwen3.6-plus`, `qwen3.7-plus`
+- Or type any model name freely — unknown models are accepted with a warning.
+- Empty phase fields inherit the default model.
+
+**🧬 Mutation Testing** — Toggle mutation testing on/off and set the kill-rate
+threshold with the slider. When enabled, the **judge** phase runs mutation testing
+as a quality gate (must meet the threshold to pass).
+
+**🎭 Playwright** — Toggle Playwright web E2E testing, and set the test directory and
+base URL. When enabled on a web project, the harness generates Playwright specs from
+your Gherkin scenarios and runs them after the **verify** and **judge** phases.
+
+**🤖 Agent** — Choose the AI agent (`opencode`, `claude`, `codex`, `agents`) and
+run/re-run initialization. Selecting an agent creates its folder if missing; if an
+orchestrator file already exists, the TUI asks before replacing it.
+
+#### Key bindings
 
 | Key | Action |
 |-----|--------|
-| `Tab` | Next tab |
-| `Shift+Tab` | Previous tab |
-| `Ctrl+S` | Save |
+| `Tab` / `Shift+Tab` | Next / previous section |
+| `↑` / `↓` | Move between fields |
+| `←` / `→` | Adjust the slider (Mutation Testing) |
+| `Enter` / `Space` | Toggle a switch / confirm |
+| `Ctrl+N` / `Ctrl+P` | Cycle the model catalog (Models) |
+| `Ctrl+S` | Save (regenerates the orchestrator file) |
 | `Ctrl+Q` | Quit |
-
-When you save, the TUI automatically regenerates the orchestrator instructions (`CLAUDE.md` or `AGENTS.md`) so they stay in sync with your config.
 
 ### `rollback` — Clean Removal
 
@@ -149,33 +189,41 @@ If your project has a test runner (`go test`, `pytest`, `jest`, etc.), the harne
 
 ## Configuration
 
-`.archon/config.yaml` (auto-generated):
+Edit it the easy way with [`archon tui`](#tui--interactive-configuration-recommended),
+or by hand. `.archon/config.yaml` (auto-generated):
 
 ```yaml
-harness_version: "0.1.0"
+harness_version: "0.3.0"
 agent: claude
 skill_count: 24
 created_at: "2026-06-11T00:00:00Z"
 mutation_testing:
   enabled: false
   threshold: 0.80
+playwright:
+  enabled: false        # generate + run Playwright E2E from Gherkin (web projects)
+  test_dir: e2e
+  base_url: http://localhost:3000
 models:
-  default: "claude-sonnet-4"
+  default: "claude-sonnet-4-6"
   phases:
-    explore: "claude-sonnet-4"
-    propose: "claude-sonnet-4"
-    spec: "claude-sonnet-4"
-    design: "claude-sonnet-4"
-    tasks: "claude-sonnet-4"
-    apply: "claude-sonnet-4"
-    verify: "claude-sonnet-4"
-    archive: "claude-sonnet-4"
+    explore: "claude-sonnet-4-6"
+    propose: "claude-sonnet-4-6"
+    spec: "claude-sonnet-4-6"
+    design: "claude-sonnet-4-6"
+    tasks: "claude-sonnet-4-6"
+    apply: "claude-sonnet-4-6"
+    verify: "claude-sonnet-4-6"
+    archive: "claude-sonnet-4-6"
 skill_inventory:
   - name: sdd-init
     version: "1.0"
     source: embedded
   # ... 23 more
 ```
+
+You can also set individual values from the CLI, e.g.
+`archon config set playwright.enabled true` or `archon config set models.default claude-opus-4-8`.
 
 ## Architecture
 
