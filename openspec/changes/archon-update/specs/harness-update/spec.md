@@ -43,6 +43,15 @@ Scenario: Update classifies the version gap
   And the classification is reported to the user
 ```
 
+#### Scenario: Content change with unchanged version is detected
+
+```gherkin
+Scenario: Content change with unchanged version is detected
+  Given an installed skill whose SKILL.md content differs from the embedded one but the version string is identical
+  When the user runs "archon update --check"
+  Then the skill is reported as changed
+```
+
 #### Scenario: No gaps reports already up to date
 
 ```gherkin

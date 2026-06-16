@@ -1,4 +1,4 @@
-phase: verify
+phase: judge
 status: completed
 history:
   - {phase: explore, status: in_progress, ts: "2026-06-15T22:01:05Z"}
@@ -15,6 +15,8 @@ history:
   - {phase: apply, status: completed, ts: "2026-06-15T22:45:00Z"}
   - {phase: verify, status: in_progress, ts: "2026-06-15T22:46:00Z"}
   - {phase: verify, status: completed, ts: "2026-06-15T22:52:00Z"}
+  - {phase: judge, status: in_progress, ts: "2026-06-15T22:56:00Z"}
+  - {phase: judge, status: completed, ts: "2026-06-15T23:10:00Z"}
 apply:
   chain_strategy: feature-branch-chain
   tracker_branch: feature/archon-update
