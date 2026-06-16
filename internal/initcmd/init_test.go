@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+
+	"github.com/archon-ai/archon/internal/config"
 )
 
 func TestRun(t *testing.T) {
@@ -471,5 +473,126 @@ func TestRun_WithoutModelFlags(t *testing.T) {
 	content := string(data)
 	if strings.Contains(content, "models:") {
 		t.Errorf("config should not contain models section when no flags set, got:\n%s", content)
+	}
+}
+
+// TestRun_StillWritesTemplateConfigRollback guards against the refreshSkills
+// refactor regressing init's contract: Run must still write the orchestrator
+// template, config, and rollback manifest after the skill-side work moved into
+// refreshSkills.
+func TestRun_StillWritesTemplateConfigRollback(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	homeDir := filepath.Join(tmpDir, "home")
+	projectDir := filepath.Join(tmpDir, "project")
+
+	if err := os.MkdirAll(homeDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(projectDir, ".claude"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	embeddedFS := fstest.MapFS{
+		"sdd-init/SKILL.md": &fstest.MapFile{
+			Data: []byte("---\nname: sdd-init\nmetadata:\n  version: \"2.0\"\n---\n# Init"),
+		},
+		"sdd-propose/SKILL.md": &fstest.MapFile{
+			Data: []byte("---\nname: sdd-propose\nmetadata:\n  version: \"3.0\"\n---\n# Propose"),
+		},
+	}
+
+	opts := Options{
+		HomeDir:    homeDir,
+		ProjectDir: projectDir,
+		Agent:      "claude",
+		EmbeddedFS: embeddedFS,
+	}
+
+	if _, err := Run(opts); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	// Template, config, and rollback manifest must all exist.
+	for _, p := range []string{
+		filepath.Join(projectDir, "CLAUDE.md"),
+		filepath.Join(projectDir, ".archon", "config.yaml"),
+		filepath.Join(projectDir, ".archon", "rollback.json"),
+	} {
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("expected %s to exist after Run: %v", p, err)
+		}
+	}
+}
+
+// TestRun_RecordsRealFrontmatterVersions backs the harness-init spec
+// "Init records real frontmatter versions": the inventory must carry each
+// skill's real metadata.version, never the legacy hardcoded "1.0".
+func TestRun_RecordsRealFrontmatterVersions(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	homeDir := filepath.Join(tmpDir, "home")
+	projectDir := filepath.Join(tmpDir, "project")
+
+	if err := os.MkdirAll(homeDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.MkdirAll(filepath.Join(projectDir, ".claude"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	embeddedFS := fstest.MapFS{
+		"sdd-init/SKILL.md": &fstest.MapFile{
+			Data: []byte("---\nname: sdd-init\nmetadata:\n  version: \"2.0\"\n---\n# Init"),
+		},
+		"sdd-propose/SKILL.md": &fstest.MapFile{
+			Data: []byte("---\nname: sdd-propose\nmetadata:\n  version: \"3.0\"\n---\n# Propose"),
+		},
+		// A skill with no metadata.version must still be recorded, with an
+		// empty version, without aborting init (spec @edge).
+		"sdd-noversion/SKILL.md": &fstest.MapFile{
+			Data: []byte("---\nname: sdd-noversion\n---\n# No version"),
+		},
+	}
+
+	opts := Options{
+		HomeDir:    homeDir,
+		ProjectDir: projectDir,
+		Agent:      "claude",
+		EmbeddedFS: embeddedFS,
+	}
+
+	if _, err := Run(opts); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	var cfg config.Config
+	if err := cfg.Load(os.DirFS(projectDir)); err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if len(cfg.SkillInventory) != 3 {
+		t.Fatalf("SkillInventory has %d entries, want 3 (incl. the versionless skill)", len(cfg.SkillInventory))
+	}
+
+	versions := make(map[string]string, len(cfg.SkillInventory))
+	for _, inv := range cfg.SkillInventory {
+		if inv.Version == "1.0" {
+			t.Errorf("inventory entry %q uses the hardcoded legacy version %q", inv.Name, inv.Version)
+		}
+		if inv.Source != "embedded" {
+			t.Errorf("inventory entry %q source = %q, want embedded", inv.Name, inv.Source)
+		}
+		versions[inv.Name] = inv.Version
+	}
+
+	if versions["sdd-init"] != "2.0" {
+		t.Errorf("sdd-init version = %q, want 2.0", versions["sdd-init"])
+	}
+	if versions["sdd-propose"] != "3.0" {
+		t.Errorf("sdd-propose version = %q, want 3.0", versions["sdd-propose"])
+	}
+	if versions["sdd-noversion"] != "" {
+		t.Errorf("sdd-noversion version = %q, want empty string", versions["sdd-noversion"])
 	}
 }
