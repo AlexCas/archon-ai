@@ -246,10 +246,18 @@ func newUpdateCmd(stdout, stderr io.Writer) *cobra.Command {
 			}
 
 			rep := result.GapReport
-			if checkFlag {
+			switch {
+			case checkFlag:
 				fmt.Fprintln(stdout, "Update check — no changes will be made.")
-			} else {
+			case result.CopyMode:
+				// In copy-mode the machine-wide skills were re-extracted, but this
+				// project keeps its own real copy: it was NOT re-linked, its config
+				// was NOT changed, and only `archon init` here can refresh it.
+				fmt.Fprintln(stdout, "Machine-wide skills refreshed from the embedded set; this project keeps its own copy and was NOT updated (config unchanged).")
+			case result.Wrote:
 				fmt.Fprintln(stdout, "Skills refreshed from the embedded set.")
+			default:
+				fmt.Fprintln(stdout, "No changes were written.")
 			}
 			fmt.Fprintf(stdout, "  Added:    %d\n", len(rep.Added))
 			fmt.Fprintf(stdout, "  Changed:  %d\n", len(rep.Changed))

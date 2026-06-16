@@ -114,21 +114,47 @@ metadata:
 			wantErr:  false,
 		},
 		{
-			// Installed "1.0" is the legacy placeholder and is treated as
-			// unknown (decision D4), so it does NOT count as a mismatch.
-			name: "no gap when installed version is the unknown 1.0 placeholder",
+			// FIX 3 / decision D4: same version "1.0" but DIFFERENT content is a
+			// real content update and MUST be reported as a gap. Version-only
+			// diffing would have silently missed this.
+			name: "gap when version is identical 1.0 but content differs",
 			setup: func(t *testing.T) (map[string]string, map[string]string) {
 				embedded := map[string]string{
 					"sdd-init/SKILL.md": `---
 metadata:
-  version: "2.0"
----`,
+  version: "1.0"
+---
+# New body`,
 				}
 				installed := map[string]string{
 					"sdd-init/SKILL.md": `---
 metadata:
   version: "1.0"
----`,
+---
+# Old body`,
+				}
+				return embedded, installed
+			},
+			wantGaps: 1,
+			wantErr:  false,
+		},
+		{
+			// Same version AND identical content → no gap.
+			name: "no gap when version and content are identical",
+			setup: func(t *testing.T) (map[string]string, map[string]string) {
+				embedded := map[string]string{
+					"sdd-init/SKILL.md": `---
+metadata:
+  version: "2.0"
+---
+# Body`,
+				}
+				installed := map[string]string{
+					"sdd-init/SKILL.md": `---
+metadata:
+  version: "2.0"
+---
+# Body`,
 				}
 				return embedded, installed
 			},
@@ -136,7 +162,7 @@ metadata:
 			wantErr:  false,
 		},
 		{
-			name: "gap when known installed version differs",
+			name: "gap when version and content differ",
 			setup: func(t *testing.T) (map[string]string, map[string]string) {
 				embedded := map[string]string{
 					"sdd-init/SKILL.md": `---
@@ -267,7 +293,7 @@ func TestClassifyGaps(t *testing.T) {
 			wantOrphaned: nil,
 		},
 		{
-			name: "changed when known installed version differs",
+			name: "changed when version and content differ",
 			embedded: map[string]string{
 				"sdd-init/SKILL.md": "---\nmetadata:\n  version: \"2.0\"\n---",
 			},
@@ -279,27 +305,47 @@ func TestClassifyGaps(t *testing.T) {
 			wantOrphaned: nil,
 		},
 		{
-			name: "no change when installed version is unknown 1.0 placeholder",
+			// FIX 3 / decision D4: content is the source of truth. Same version
+			// string "1.0" but DIFFERENT body content must be reported Changed,
+			// because version-only diffing would silently miss content updates
+			// for the many skills that genuinely ship version "1.0".
+			// Covers harness-update scenario:
+			//   "Content change with unchanged version is detected".
+			name: "changed when version is identical 1.0 but content differs",
 			embedded: map[string]string{
-				"sdd-init/SKILL.md": "---\nmetadata:\n  version: \"2.0\"\n---",
+				"sdd-init/SKILL.md": "---\nmetadata:\n  version: \"1.0\"\n---\n# New body",
 			},
 			installed: map[string]string{
-				"sdd-init/SKILL.md": "---\nmetadata:\n  version: \"1.0\"\n---",
+				"sdd-init/SKILL.md": "---\nmetadata:\n  version: \"1.0\"\n---\n# Old body",
+			},
+			wantAdded:    nil,
+			wantChanged:  []string{"sdd-init"},
+			wantOrphaned: nil,
+		},
+		{
+			// Same version AND identical content → not changed.
+			name: "no change when version and content are identical",
+			embedded: map[string]string{
+				"sdd-init/SKILL.md": "---\nmetadata:\n  version: \"1.0\"\n---\n# Same body",
+			},
+			installed: map[string]string{
+				"sdd-init/SKILL.md": "---\nmetadata:\n  version: \"1.0\"\n---\n# Same body",
 			},
 			wantAdded:    nil,
 			wantChanged:  nil,
 			wantOrphaned: nil,
 		},
 		{
-			name: "no change when installed version is empty (unknown)",
+			// Different version + different content → Changed.
+			name: "changed when both version and content differ",
 			embedded: map[string]string{
-				"sdd-init/SKILL.md": "---\nmetadata:\n  version: \"2.0\"\n---",
+				"sdd-init/SKILL.md": "---\nmetadata:\n  version: \"2.0\"\n---\n# New body",
 			},
 			installed: map[string]string{
-				"sdd-init/SKILL.md": "---\nname: sdd-init\n---",
+				"sdd-init/SKILL.md": "---\nmetadata:\n  version: \"1.0\"\n---\n# Old body",
 			},
 			wantAdded:    nil,
-			wantChanged:  nil,
+			wantChanged:  []string{"sdd-init"},
 			wantOrphaned: nil,
 		},
 		{

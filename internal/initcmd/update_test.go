@@ -193,6 +193,70 @@ func TestUpdate_PruneRemovesOrphanedSkills(t *testing.T) {
 	}
 }
 
+// Scenario: "Prune removes orphaned skills" under copy-mode. The project owns a
+// real (non-symlink) copy of its skills, so --prune MUST remove the global
+// orphan but MUST NOT delete the project's real orphan directory.
+func TestUpdate_PruneCopyModeKeepsProjectRealDir(t *testing.T) {
+	embeddedFS := updateEmbeddedFS()
+	homeDir, projectDir := setupInitializedProject(t, embeddedFS)
+
+	// Make the project copy-mode: replace at least one symlinked skill with a
+	// real directory containing a SKILL.md so detectCopyMode trips.
+	projectSkillsDir := filepath.Join(projectDir, ".claude", "skills")
+	realSkill := filepath.Join(projectSkillsDir, "sdd-init")
+	if err := os.RemoveAll(realSkill); err != nil {
+		t.Fatalf("RemoveAll() error = %v", err)
+	}
+	if err := os.MkdirAll(realSkill, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(realSkill, "SKILL.md"), []byte("---\nname: sdd-init\n---\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	// Plant the orphan in BOTH the global dir and the project dir as a real copy.
+	orphanGlobal := filepath.Join(homeDir, ".config", "opencode", "skills", "old-skill")
+	if err := os.MkdirAll(orphanGlobal, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(orphanGlobal, "SKILL.md"), []byte("---\nname: old-skill\n---\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	orphanProject := filepath.Join(projectSkillsDir, "old-skill")
+	if err := os.MkdirAll(orphanProject, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(orphanProject, "SKILL.md"), []byte("---\nname: old-skill\n---\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	result, err := Update(UpdateOptions{
+		HomeDir:    homeDir,
+		ProjectDir: projectDir,
+		Prune:      true,
+		EmbeddedFS: embeddedFS,
+	})
+	if err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+	if !result.CopyMode {
+		t.Fatal("CopyMode = false, want true for a project with real skill directories")
+	}
+	if len(result.Pruned) != 1 || result.Pruned[0] != "old-skill" {
+		t.Errorf("Pruned = %v, want [old-skill]", result.Pruned)
+	}
+
+	// The global orphan MUST be removed.
+	if _, statErr := os.Stat(orphanGlobal); statErr == nil {
+		t.Error("global orphan should have been removed under --prune")
+	}
+	// The project's real orphan copy MUST remain intact (copy-mode promised not
+	// to touch the project).
+	if _, statErr := os.Stat(orphanProject); statErr != nil {
+		t.Errorf("project's real orphan dir should be intact in copy-mode, stat error = %v", statErr)
+	}
+}
+
 // Scenario: "Orphans are kept without prune".
 func TestUpdate_OrphansKeptWithoutPrune(t *testing.T) {
 	embeddedFS := updateEmbeddedFS()

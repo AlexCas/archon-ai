@@ -275,6 +275,16 @@ func TestUpdateCommand_CopyModeWarning(t *testing.T) {
 		t.Errorf("stderr = %q, want copy-mode warning", stderr.String())
 	}
 
+	// In copy-mode the CLI must NOT claim this project was refreshed; it should
+	// be honest that the project keeps its own copy and was not updated.
+	out := stdout.String()
+	if strings.Contains(out, "Skills refreshed from the embedded set.") {
+		t.Errorf("stdout = %q, must not claim the project was refreshed in copy-mode", out)
+	}
+	if !strings.Contains(out, "keeps its own copy") {
+		t.Errorf("stdout = %q, want honest copy-mode outcome", out)
+	}
+
 	// The real directory must remain a real directory (not re-linked).
 	info, err := os.Lstat(link)
 	if err != nil {

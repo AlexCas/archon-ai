@@ -149,9 +149,17 @@ func Update(opts UpdateOptions) (*UpdateResult, error) {
 			if err := os.RemoveAll(globalPath); err != nil {
 				return nil, fmt.Errorf("prune orphan %s: %w", orphan.Name, err)
 			}
-			projectPath := filepath.Join(projectSkillsDir, orphan.Name)
-			if err := os.RemoveAll(projectPath); err != nil {
-				return nil, fmt.Errorf("prune orphan link %s: %w", orphan.Name, err)
+			// In copy-mode the project owns a real (non-symlink) copy of its
+			// skills, and update promised not to touch it. Removing the project
+			// path here would delete that real orphan copy, so we only prune the
+			// global orphan and leave the project alone. In the normal (symlink)
+			// case we also remove the project link so it stops pointing at a
+			// pruned global skill.
+			if !result.CopyMode {
+				projectPath := filepath.Join(projectSkillsDir, orphan.Name)
+				if err := os.RemoveAll(projectPath); err != nil {
+					return nil, fmt.Errorf("prune orphan link %s: %w", orphan.Name, err)
+				}
 			}
 			result.Pruned = append(result.Pruned, orphan.Name)
 		}
