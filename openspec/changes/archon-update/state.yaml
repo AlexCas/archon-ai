@@ -1,0 +1,21 @@
+phase: apply
+status: in_progress
+history:
+  - {phase: explore, status: in_progress, ts: "2026-06-15T22:01:05Z"}
+  - {phase: explore, status: completed, ts: "2026-06-15T22:04:00Z"}
+  - {phase: propose, status: in_progress, ts: "2026-06-15T22:06:00Z"}
+  - {phase: propose, status: completed, ts: "2026-06-15T22:09:00Z"}
+  - {phase: spec, status: in_progress, ts: "2026-06-15T22:11:00Z"}
+  - {phase: spec, status: completed, ts: "2026-06-15T22:14:00Z"}
+  - {phase: design, status: in_progress, ts: "2026-06-15T22:16:00Z"}
+  - {phase: design, status: completed, ts: "2026-06-15T22:19:00Z"}
+  - {phase: tasks, status: in_progress, ts: "2026-06-15T22:21:00Z"}
+  - {phase: tasks, status: completed, ts: "2026-06-15T22:25:00Z"}
+  - {phase: apply, status: in_progress, ts: "2026-06-15T22:30:00Z"}
+apply:
+  chain_strategy: feature-branch-chain
+  tracker_branch: feature/archon-update
+  current_work_unit: PR1-foundation
+  current_branch: feat/archon-update-foundation
+  pr1_base: feature/archon-update
+  pr2_base: feat/archon-update-foundation
