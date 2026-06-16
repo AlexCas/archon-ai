@@ -16,6 +16,14 @@ type MutationTesting struct {
 	Threshold float64 `yaml:"threshold,omitempty"`
 }
 
+// Judge controls the judge phase: dual adversarial review via judgment-day plus
+// any enabled quality gates (mutation testing, Playwright E2E). When disabled,
+// the orchestrator skips the entire judge phase and advances from verify
+// straight to archive. Defaults to enabled when the section is absent.
+type Judge struct {
+	Enabled bool `yaml:"enabled"`
+}
+
 // Playwright controls generation and execution of Playwright end-to-end tests
 // derived from Gherkin scenarios. When enabled, the harness generates Playwright
 // specs from the feature files during the apply phase and runs them after the
@@ -38,6 +46,7 @@ type Config struct {
 	SkillCount      int              `yaml:"skill_count"`
 	CreatedAt       time.Time        `yaml:"created_at"`
 	MutationTesting MutationTesting  `yaml:"mutation_testing"`
+	Judge           Judge            `yaml:"judge"`
 	Playwright      Playwright       `yaml:"playwright"`
 	Models          ModelConfig      `yaml:"models,omitempty"`
 	SkillInventory  []SkillInventory `yaml:"skill_inventory"`
@@ -54,6 +63,11 @@ func (c *Config) Load(fsys fs.FS) error {
 		return fmt.Errorf("read config: %w", err)
 	}
 
+	// The judge phase runs by default; an absent judge section means "enabled".
+	// Pre-seed the default so unmarshal only overrides it when the YAML sets it
+	// explicitly (e.g. `judge: {enabled: false}`).
+	c.Judge.Enabled = true
+
 	if err := yaml.Unmarshal(data, c); err != nil {
 		return fmt.Errorf("unmarshal config: %w", err)
 	}
@@ -69,6 +83,7 @@ func (c *Config) Clone() *Config {
 		CreatedAt:       c.CreatedAt,
 		HomeDir:         c.HomeDir,
 		MutationTesting: c.MutationTesting,
+		Judge:           c.Judge,
 		Playwright:      c.Playwright,
 		Models:          ModelConfig{Default: c.Models.Default, Phases: make(map[string]string, len(c.Models.Phases))},
 		SkillInventory:  make([]SkillInventory, len(c.SkillInventory)),
