@@ -61,6 +61,14 @@ func (c *Config) Load(fsys fs.FS) error {
 	return nil
 }
 
+// Clone returns a deep copy of the Config: maps and slices are copied so the
+// clone shares no mutable state with the original. It is a hand-rolled,
+// field-by-field copy.
+//
+// IMPORTANT: every new Config field MUST be added here. A field that is added to
+// the struct but not copied below is silently dropped on every `archon update`
+// (which clones the loaded config before patching it). The round-trip test in
+// config_test.go (TestConfig_CloneRoundtrip) fails loudly if a field is missed.
 func (c *Config) Clone() *Config {
 	clone := &Config{
 		Version:         c.Version,

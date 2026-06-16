@@ -21,6 +21,12 @@ Feature: Safe version-aware skill update
     Then each skill is classified as added, changed, or orphaned
     And the classification is reported to the user
 
+  @happy
+  Scenario: Content change with unchanged version is detected
+    Given an installed skill whose SKILL.md content differs from the embedded one but the version string is identical
+    When the user runs "archon update --check"
+    Then the skill is reported as changed
+
   @edge
   Scenario: No gaps reports already up to date
     Given installed skills matching the embedded set

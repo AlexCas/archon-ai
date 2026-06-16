@@ -73,6 +73,7 @@ go install github.com/archon-ai/archon/cmd/archon@latest
 | Command | Purpose |
 |---------|---------|
 | `archon init` | Scaffold SDD skills, orchestrator instructions, and config in the current project |
+| `archon update` | Refresh installed skills from the embedded set without touching your config or orchestrator file |
 | `archon status` | Show current harness status (agent, version, skills) |
 | `archon tui` | Interactive terminal UI for configuration |
 | `archon rollback` | Remove all files created by `archon init` |
@@ -105,6 +106,38 @@ archon init --model claude-sonnet-4-6  # Default AI model for all SDD phases
 
 > Prefer the interactive route? `archon tui` exposes all of these settings
 > (and can run `init` for you) — see below.
+
+### `update` — Refresh Skills
+
+```bash
+archon update
+```
+
+Upgrades the installed skills to the version embedded in your current `archon` binary,
+**without** rewriting `CLAUDE.md`/`AGENTS.md` or resetting your config. It compares the
+embedded skills against what's installed and classifies each as **added**, **changed**,
+or **orphaned** (installed but no longer shipped). Your `models`, `playwright`,
+`mutation_testing`, `judge`, `created_at`, and `agent` settings are preserved — only
+`harness_version`, `skill_count`, and `skill_inventory` are updated. When there's no
+gap, it reports "already up to date" and writes nothing.
+
+> **Machine-wide scope:** skills live in a shared directory
+> (`~/.config/opencode/skills/`) that projects symlink into. Refreshing it affects
+> **every** project linked to that directory. `archon update` always prints the scope so
+> you know what's impacted.
+
+**Flags:**
+
+```bash
+archon update --check    # Report the diff (added/changed/orphaned) without writing anything
+archon update --prune    # Also remove orphaned skills (kept by default)
+archon update --agent claude  # Override the agent recorded in config
+```
+
+If a project's skills were installed as **real directories** instead of symlinks
+(copy-mode, e.g. on systems without symlink support), `archon update` refreshes the
+shared directory but **does not** re-link that project. It emits a warning telling you to
+re-run `archon init` in that project to refresh its own copy.
 
 ### `tui` — Interactive Configuration (recommended)
 

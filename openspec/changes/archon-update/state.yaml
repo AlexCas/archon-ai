@@ -1,5 +1,5 @@
-phase: apply
-status: in_progress
+phase: judge
+status: completed
 history:
   - {phase: explore, status: in_progress, ts: "2026-06-15T22:01:05Z"}
   - {phase: explore, status: completed, ts: "2026-06-15T22:04:00Z"}
@@ -12,10 +12,17 @@ history:
   - {phase: tasks, status: in_progress, ts: "2026-06-15T22:21:00Z"}
   - {phase: tasks, status: completed, ts: "2026-06-15T22:25:00Z"}
   - {phase: apply, status: in_progress, ts: "2026-06-15T22:30:00Z"}
+  - {phase: apply, status: completed, ts: "2026-06-15T22:45:00Z"}
+  - {phase: verify, status: in_progress, ts: "2026-06-15T22:46:00Z"}
+  - {phase: verify, status: completed, ts: "2026-06-15T22:52:00Z"}
+  - {phase: judge, status: in_progress, ts: "2026-06-15T22:56:00Z"}
+  - {phase: judge, status: completed, ts: "2026-06-15T23:10:00Z"}
 apply:
   chain_strategy: feature-branch-chain
   tracker_branch: feature/archon-update
-  current_work_unit: PR1-foundation
-  current_branch: feat/archon-update-foundation
+  current_work_unit: PR2-command
+  current_branch: feat/archon-update-command
   pr1_base: feature/archon-update
+  pr1_branch: feat/archon-update-foundation
   pr2_base: feat/archon-update-foundation
+  pr1_status: committed (2 commits, local, not pushed)

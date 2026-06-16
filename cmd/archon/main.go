@@ -5,11 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/archon-ai/archon/internal/config"
 	"github.com/archon-ai/archon/internal/initcmd"
+	"github.com/archon-ai/archon/internal/scaffold"
 	"github.com/archon-ai/archon/internal/status"
 	"github.com/archon-ai/archon/internal/tui"
 	"github.com/archon-ai/archon/internal/version"
@@ -38,6 +41,7 @@ func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 
 	root.AddCommand(
 		newInitCmd(stdout, stderr),
+		newUpdateCmd(stdout, stderr),
 		newRollbackCmd(stdout, stderr),
 		newVersionCmd(stdout),
 		newStatusCmd(stdout, stderr),
@@ -46,6 +50,26 @@ func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 	)
 
 	return root
+}
+
+// embeddedSkillCount counts the embedded skill directories (those carrying a
+// SKILL.md), so dry-run output and hints reflect the real shipped set rather
+// than a hardcoded number.
+func embeddedSkillCount() int {
+	entries, err := fs.ReadDir(skills.FS, ".")
+	if err != nil {
+		return 0
+	}
+	count := 0
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		if _, err := fs.Stat(skills.FS, entry.Name()+"/SKILL.md"); err == nil {
+			count++
+		}
+	}
+	return count
 }
 
 func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
@@ -90,7 +114,7 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 					fmt.Fprintln(stdout, "  Agent:       (auto-detect)")
 				}
 				fmt.Fprintf(stdout, "  Force:       %t\n", forceFlag)
-				fmt.Fprintln(stdout, "  Skills:      21 embedded skills would be extracted")
+				fmt.Fprintf(stdout, "  Skills:      %d embedded skills would be extracted\n", embeddedSkillCount())
 				return nil
 			}
 
@@ -179,6 +203,99 @@ func confirmOverwrite(in io.Reader, stdout io.Writer, cause error) bool {
 	return answer == "y" || answer == "yes"
 }
 
+func newUpdateCmd(stdout, stderr io.Writer) *cobra.Command {
+	var (
+		checkFlag bool
+		pruneFlag bool
+		agentFlag string
+	)
+
+	cmd := &cobra.Command{
+		Use:   "update",
+		Short: "Refresh installed skills from the embedded set",
+		Long: "Refresh installed skills from the embedded set without rewriting the orchestrator " +
+			"template or resetting user config. Skills live in a machine-wide directory, so a refresh " +
+			"affects every project symlinked to it.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			projectDir, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("get working directory: %w", err)
+			}
+
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				return fmt.Errorf("get home directory: %w", err)
+			}
+
+			result, err := initcmd.Update(initcmd.UpdateOptions{
+				HomeDir:    homeDir,
+				ProjectDir: projectDir,
+				Agent:      agentFlag,
+				Check:      checkFlag,
+				Prune:      pruneFlag,
+				EmbeddedFS: skills.FS,
+			})
+			if err != nil {
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return err
+			}
+
+			if result.UpToDate {
+				fmt.Fprintln(stdout, "Skills are already up to date — nothing to do.")
+				return nil
+			}
+
+			rep := result.GapReport
+			switch {
+			case checkFlag:
+				fmt.Fprintln(stdout, "Update check — no changes will be made.")
+			case result.CopyMode:
+				// In copy-mode the machine-wide skills were re-extracted, but this
+				// project keeps its own real copy: it was NOT re-linked, its config
+				// was NOT changed, and only `archon init` here can refresh it.
+				fmt.Fprintln(stdout, "Machine-wide skills refreshed from the embedded set; this project keeps its own copy and was NOT updated (config unchanged).")
+			case result.Wrote:
+				fmt.Fprintln(stdout, "Skills refreshed from the embedded set.")
+			default:
+				fmt.Fprintln(stdout, "No changes were written.")
+			}
+			fmt.Fprintf(stdout, "  Added:    %d\n", len(rep.Added))
+			fmt.Fprintf(stdout, "  Changed:  %d\n", len(rep.Changed))
+			fmt.Fprintf(stdout, "  Orphaned: %d\n", len(rep.Orphaned))
+			printSkillNames(stdout, "Added", rep.Added)
+			printSkillNames(stdout, "Changed", rep.Changed)
+			printSkillNames(stdout, "Orphaned", rep.Orphaned)
+
+			if len(rep.Orphaned) > 0 && !pruneFlag && !checkFlag {
+				fmt.Fprintln(stdout, "  Orphaned skills were kept. Re-run with --prune to remove them.")
+			}
+			if len(result.Pruned) > 0 {
+				fmt.Fprintf(stdout, "  Pruned:   %d orphaned skill(s) removed\n", len(result.Pruned))
+			}
+
+			fmt.Fprintf(stdout, "\nScope: skills are machine-wide (%s) — this refresh affects all symlinked projects.\n", result.GlobalSkillsDir)
+
+			if result.CopyMode {
+				fmt.Fprintf(stderr, "Warning: %s\n", result.CopyModeWarning)
+			}
+
+			return nil
+		},
+	}
+
+	cmd.Flags().BoolVar(&checkFlag, "check", false, "Report the diff (added/changed/orphaned) without writing anything")
+	cmd.Flags().BoolVar(&pruneFlag, "prune", false, "Remove orphaned skills (installed but no longer embedded)")
+	cmd.Flags().StringVar(&agentFlag, "agent", "", "Override the agent recorded in config (opencode, claude, agents, codex)")
+
+	return cmd
+}
+
+func printSkillNames(w io.Writer, label string, changes []scaffold.SkillChange) {
+	for _, c := range changes {
+		fmt.Fprintf(w, "    %-9s %s\n", label+":", c.Name)
+	}
+}
+
 func newRollbackCmd(stdout, stderr io.Writer) *cobra.Command {
 	var dryRunFlag bool
 
@@ -260,7 +377,18 @@ func newStatusCmd(stdout, stderr io.Writer) *cobra.Command {
 				return err
 			}
 
-			status.Display(stdout, cfg)
+			// Compute the update hint count. The status command must never fail
+			// because of the hint, so any detection error degrades to 0.
+			n := 0
+			homeDir, err := os.UserHomeDir()
+			if err == nil {
+				globalSkillsDir := filepath.Join(homeDir, ".config", "opencode", "skills")
+				if report, err := scaffold.ClassifyGaps(skills.FS, globalSkillsDir); err == nil {
+					n = len(report.Added) + len(report.Changed)
+				}
+			}
+
+			status.DisplayWithUpdate(stdout, cfg, n)
 			return nil
 		},
 	}

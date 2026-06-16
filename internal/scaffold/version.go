@@ -2,6 +2,7 @@ package scaffold
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -27,24 +28,14 @@ type SkillChange struct {
 
 // GapReport classifies every skill into one of three buckets:
 //   - Added:    embedded skill with no installed SKILL.md.
-//   - Changed:  both present and the embedded version differs from a *known*
-//     installed version (see ClassifyGaps for the unknown-version rule).
+//   - Changed:  both present and the embedded SKILL.md content differs from the
+//     installed one (see ClassifyGaps for the content-based rule).
 //   - Orphaned: installed skill directory with a SKILL.md but no embedded
 //     counterpart (no longer shipped).
 type GapReport struct {
 	Added    []SkillChange
 	Changed  []SkillChange
 	Orphaned []SkillChange
-}
-
-// isUnknownVersion reports whether an installed version string should be treated
-// as unknown for diffing. Legacy configs/skills literally stored "1.0" as a
-// placeholder and many skills carry no metadata.version at all; trusting those
-// values would mark "everything changed". Per design decision D4 we diff against
-// real embedded frontmatter and treat "1.0"/empty installed versions as unknown,
-// only reporting Changed when the embedded version differs from a known one.
-func isUnknownVersion(v string) bool {
-	return v == "" || v == "1.0"
 }
 
 // ClassifyGaps walks both the embedded skill set and the installed directory and
@@ -70,7 +61,7 @@ func ClassifyGaps(embeddedFS fs.FS, installedDir string) (GapReport, error) {
 
 		embeddedData, err := fs.ReadFile(embeddedFS, embeddedPath)
 		if err != nil {
-			// Directories without a SKILL.md (e.g. _shared) are not skills.
+			// A directory without a SKILL.md is not a skill, so skip it.
 			if errors.Is(err, fs.ErrNotExist) {
 				continue
 			}
@@ -95,10 +86,13 @@ func ClassifyGaps(embeddedFS fs.FS, installedDir string) (GapReport, error) {
 
 		installedVer := extractVersion(string(installedData))
 
-		// Only report a change when the installed version is a known value and
-		// it differs from the embedded version. Unknown installed versions
-		// ("1.0"/empty) are not treated as a mismatch to avoid false positives.
-		if !isUnknownVersion(installedVer) && installedVer != embeddedVer {
+		// Content is the source of truth for "changed" (decision D4). Many
+		// embedded skills genuinely ship version "1.0", so a version-only diff
+		// would silently miss content updates whenever the version string is
+		// unchanged. We therefore compare the SKILL.md bytes directly and report
+		// Changed when they differ, regardless of version equality. The version
+		// strings are still recorded on SkillChange for reporting.
+		if !bytes.Equal(embeddedData, installedData) {
 			report.Changed = append(report.Changed, SkillChange{
 				Name:         skillName,
 				EmbeddedVer:  embeddedVer,

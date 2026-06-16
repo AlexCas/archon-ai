@@ -166,6 +166,135 @@ func TestRollbackCommand_DryRun(t *testing.T) {
 	}
 }
 
+// initForUpdate runs `init` in a temp project rooted at cwd with HOME pointed at
+// an isolated home, so the global skills dir is also isolated. It returns the
+// project dir (== cwd) and the home dir.
+func initForUpdate(t *testing.T) (projectDir, homeDir string) {
+	t.Helper()
+	origDir, _ := os.Getwd()
+	tmpDir := t.TempDir()
+	os.Chdir(tmpDir)
+	t.Cleanup(func() { os.Chdir(origDir) })
+
+	homeDir = filepath.Join(tmpDir, "home")
+	if err := os.MkdirAll(homeDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	t.Setenv("HOME", homeDir)
+
+	if err := os.MkdirAll(filepath.Join(tmpDir, ".claude"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	root := newRootCmd(&stdout, &stderr)
+	root.SetArgs([]string{"init", "--agent", "claude"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("init Execute() error = %v, stderr = %s", err, stderr.String())
+	}
+
+	return tmpDir, homeDir
+}
+
+// TestUpdateCommand_CheckNoMutation asserts `update --check` performs no
+// filesystem mutation. Backs "Check reports the diff without writing".
+func TestUpdateCommand_CheckNoMutation(t *testing.T) {
+	projectDir, homeDir := initForUpdate(t)
+
+	globalSkillsDir := filepath.Join(homeDir, ".config", "opencode", "skills")
+	// Remove one installed skill so it shows up as "added" (a real gap).
+	removed := filepath.Join(globalSkillsDir, "sdd-apply")
+	if err := os.RemoveAll(removed); err != nil {
+		t.Fatalf("RemoveAll() error = %v", err)
+	}
+
+	configPath := filepath.Join(projectDir, ".archon", "config.yaml")
+	cfgBefore, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	root := newRootCmd(&stdout, &stderr)
+	root.SetArgs([]string{"update", "--check"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("update --check Execute() error = %v, stderr = %s", err, stderr.String())
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "no changes will be made") {
+		t.Errorf("update --check output = %q, want dry-run notice", output)
+	}
+	if !strings.Contains(output, "machine-wide") {
+		t.Errorf("update --check output = %q, want machine-wide scope note", output)
+	}
+
+	// --check must not re-extract the removed skill.
+	if _, statErr := os.Stat(removed); statErr == nil {
+		t.Error("update --check re-extracted a skill; it must not write")
+	}
+	cfgAfter, _ := os.ReadFile(configPath)
+	if string(cfgBefore) != string(cfgAfter) {
+		t.Error("update --check modified config; it must not write")
+	}
+}
+
+// TestUpdateCommand_CopyModeWarning asserts that a copy-mode project (real
+// directory instead of symlink) gets a warning and is not re-linked.
+// Backs "Copy-mode install warns without re-linking".
+func TestUpdateCommand_CopyModeWarning(t *testing.T) {
+	projectDir, homeDir := initForUpdate(t)
+
+	globalSkillsDir := filepath.Join(homeDir, ".config", "opencode", "skills")
+	// Create a gap so update does not short-circuit on "up to date".
+	if err := os.RemoveAll(filepath.Join(globalSkillsDir, "sdd-init")); err != nil {
+		t.Fatalf("RemoveAll() error = %v", err)
+	}
+
+	// Force copy-mode: replace a project symlink with a real directory.
+	projectSkillsDir := filepath.Join(projectDir, ".claude", "skills")
+	link := filepath.Join(projectSkillsDir, "sdd-apply")
+	if err := os.RemoveAll(link); err != nil {
+		t.Fatalf("RemoveAll() error = %v", err)
+	}
+	if err := os.MkdirAll(link, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(link, "SKILL.md"), []byte("---\nname: sdd-apply\n---\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	root := newRootCmd(&stdout, &stderr)
+	root.SetArgs([]string{"update"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("update Execute() error = %v, stderr = %s", err, stderr.String())
+	}
+
+	if !strings.Contains(stderr.String(), "copy-mode") {
+		t.Errorf("stderr = %q, want copy-mode warning", stderr.String())
+	}
+
+	// In copy-mode the CLI must NOT claim this project was refreshed; it should
+	// be honest that the project keeps its own copy and was not updated.
+	out := stdout.String()
+	if strings.Contains(out, "Skills refreshed from the embedded set.") {
+		t.Errorf("stdout = %q, must not claim the project was refreshed in copy-mode", out)
+	}
+	if !strings.Contains(out, "keeps its own copy") {
+		t.Errorf("stdout = %q, want honest copy-mode outcome", out)
+	}
+
+	// The real directory must remain a real directory (not re-linked).
+	info, err := os.Lstat(link)
+	if err != nil {
+		t.Fatalf("Lstat() error = %v", err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		t.Error("copy-mode project skill was re-linked; it must not be")
+	}
+}
+
 func TestInitCommand_WithAgentFlag(t *testing.T) {
 	var stdout, stderr bytes.Buffer
 
