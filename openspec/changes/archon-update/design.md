@@ -38,8 +38,9 @@ Promote `extractVersion` (`version.go:73`) to an exported `scaffold.ExtractVersi
 (reuse, do not duplicate). Add `scaffold.SkillVersion(embeddedFS, name) string` that
 reads `name/SKILL.md` and returns `ExtractVersion(...)`, or `""` if absent. The
 inventory builder maps each extracted skill to `{Name, Version: SkillVersion(...),
-Source: "embedded"}`. Missing version → empty string, never abort (spec edge). Legacy
-configs literally storing `"1.0"` are treated as *unknown* in the diff (see §3, D4).
+Source: "embedded"}`. Missing version → empty string, never abort (spec edge). Version
+strings are recorded for reporting, but change detection is content-based, not
+version-based (see §3, D4): the stored version is not used to decide what changed.
 
 ## 3. Extended gap detection (added / changed / orphaned)
 
@@ -53,8 +54,11 @@ func ClassifyGaps(embeddedFS fs.FS, installedDir string) (GapReport, error)
 ```
 
 - **Added**: embedded skill with no installed `SKILL.md`.
-- **Changed**: both present and versions differ; an installed `"1.0"` (or empty) is
-  treated as unknown and only counts as changed when embedded differs from it.
+- **Changed**: both present and the embedded `SKILL.md` content differs from the
+  installed one. Content (not the version string) is the source of truth: many
+  skills genuinely ship `version: "1.0"`, so a version-only diff would silently
+  miss content updates whenever the version string is unchanged (see D4). The
+  version strings are still recorded on `SkillChange` for reporting.
 - **Orphaned**: installed dir entry with `SKILL.md` but no embedded counterpart.
 
 `DetectVersionGaps` is kept (delegates to `ClassifyGaps` → Added+Changed) so existing
@@ -124,7 +128,7 @@ testable; `Display` delegates with `0`.
 | D1 | Shared-routine boundary | (a) move template too (b) skills-only | **(b)** — `refreshSkills` covers extract+link+inventory; template/openspec/rollback stay in `Run`. Keeps update from ever touching CLAUDE.md. |
 | D2 | Where update lives | (a) new `internal/updatecmd` (b) `internal/initcmd` | **(b)** — reuses `refreshSkills`, `resolveProjectSkillsDir`, `detectAgent`; avoids exporting internals. |
 | D3 | Prune safety (shared global dir) | (a) prune by default (b) opt-in + scope warning | **(b)** — `--prune` only; always print machine-wide scope so users know other symlinked projects are affected. |
-| D4 | Legacy `"1.0"` reconciliation | (a) trust stored version (b) treat `"1.0"`/empty as unknown | **(b)** — diff against embedded frontmatter, not the fake stored value; avoids "everything changed" noise. |
+| D4 | Same-version content changes | (a) version-string diff only (b) content-based change detection | **(b)** — compare `SKILL.md` bytes directly and report Changed when they differ, regardless of version equality. 12 of 24 embedded skills ship `version: "1.0"`, so the original "1.0"/empty = unknown → skip rule silently missed content updates when the version string was unchanged. Content is the source of truth; version strings are still recorded for reporting. (Refined after judgment-day: replaces the earlier "treat 1.0/empty as unknown and skip" rule, which produced false negatives, not just avoided false positives.) |
 | D5 | Gap detection extension | (a) overload `DetectVersionGaps` (b) add `ClassifyGaps`, keep old as delegate | **(b)** — orphan detection needs the installed-dir walk; preserves existing callers/tests. |
 
 ## Open questions

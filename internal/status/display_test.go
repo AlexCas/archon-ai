@@ -134,6 +134,47 @@ func TestDisplay(t *testing.T) {
 	}
 }
 
+func TestDisplayWithUpdate(t *testing.T) {
+	cfg := &config.Config{
+		Version:         "1.0.0",
+		Agent:           "claude",
+		SkillCount:      10,
+		CreatedAt:       time.Date(2026, 6, 10, 0, 0, 0, 0, time.UTC),
+		MutationTesting: config.MutationTesting{Enabled: false},
+	}
+
+	t.Run("hint shown when n > 0", func(t *testing.T) {
+		var buf bytes.Buffer
+		DisplayWithUpdate(&buf, cfg, 3)
+		got := buf.String()
+		if !strings.Contains(got, "Update available") {
+			t.Errorf("output missing update hint:\n%s", got)
+		}
+		if !strings.Contains(got, "archon update") {
+			t.Errorf("output missing 'archon update':\n%s", got)
+		}
+		if !strings.Contains(got, "3 skill(s)") {
+			t.Errorf("output missing skill count:\n%s", got)
+		}
+	})
+
+	t.Run("hint hidden when n == 0", func(t *testing.T) {
+		var buf bytes.Buffer
+		DisplayWithUpdate(&buf, cfg, 0)
+		if strings.Contains(buf.String(), "Update available") {
+			t.Errorf("hint should be hidden when n == 0:\n%s", buf.String())
+		}
+	})
+
+	t.Run("Display delegates with 0", func(t *testing.T) {
+		var buf bytes.Buffer
+		Display(&buf, cfg)
+		if strings.Contains(buf.String(), "Update available") {
+			t.Errorf("Display must not render the hint:\n%s", buf.String())
+		}
+	})
+}
+
 func TestFormat(t *testing.T) {
 	cfg := &config.Config{
 		Version:    "1.0.0",

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"reflect"
 	"testing"
 	"testing/fstest"
 	"time"
@@ -170,6 +171,62 @@ func TestConfig_Save(t *testing.T) {
 	mapFS := fstest.MapFS{}
 	if err := loaded.Load(mapFS); err != nil {
 		t.Logf("Note: Load from MapFS after Save requires actual file system")
+	}
+}
+
+// TestConfig_CloneRoundtrip builds a fully-populated Config with every field set
+// to a non-zero value, clones it, and asserts the clone is a deep-equal but
+// independent copy. It fails loudly if a new Config field is added without being
+// copied in Clone (the clone would then differ from the original via DeepEqual).
+func TestConfig_CloneRoundtrip(t *testing.T) {
+	original := &Config{
+		Version:    "1.2.3",
+		Agent:      "claude",
+		SkillCount: 24,
+		CreatedAt:  time.Date(2026, 6, 15, 12, 0, 0, 0, time.UTC),
+		MutationTesting: MutationTesting{
+			Enabled:   true,
+			Tool:      "gremlins",
+			Threshold: 0.85,
+		},
+		Playwright: Playwright{
+			Enabled: true,
+			TestDir: "e2e",
+			BaseURL: "http://localhost:3000",
+		},
+		Models: ModelConfig{
+			Default: "claude-opus-4-8",
+			Phases:  map[string]string{"apply": "claude-sonnet-4-6", "verify": "claude-haiku-4-5"},
+		},
+		SkillInventory: []SkillInventory{
+			{Name: "sdd-init", Version: "2.0", Source: "embedded"},
+		},
+		HomeDir: "/tmp/project",
+	}
+
+	clone := original.Clone()
+
+	// Deep equality: every field must be copied. A field added to Config but not
+	// to Clone would show up here as a difference.
+	if !reflect.DeepEqual(clone, original) {
+		t.Fatalf("Clone() is not deep-equal to original.\n got: %+v\nwant: %+v", clone, original)
+	}
+
+	// Distinct pointer.
+	if clone == original {
+		t.Fatal("Clone() returned the same pointer as the original")
+	}
+
+	// Independent maps: mutating the clone must not affect the original.
+	clone.Models.Phases["apply"] = "MUTATED"
+	if original.Models.Phases["apply"] == "MUTATED" {
+		t.Error("mutating clone.Models.Phases affected the original (shared map)")
+	}
+
+	// Independent slices: mutating the clone must not affect the original.
+	clone.SkillInventory[0].Version = "MUTATED"
+	if original.SkillInventory[0].Version == "MUTATED" {
+		t.Error("mutating clone.SkillInventory affected the original (shared slice)")
 	}
 }
 

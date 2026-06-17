@@ -10,6 +10,14 @@ import (
 )
 
 func Display(w io.Writer, cfg *config.Config) {
+	DisplayWithUpdate(w, cfg, 0)
+}
+
+// DisplayWithUpdate renders the harness status and, when n > 0, appends a single
+// line hinting that an update is available. n is the number of skills the
+// embedded set adds or changes relative to what is installed. The hint is purely
+// advisory; the count is computed by the caller and a zero value renders nothing.
+func DisplayWithUpdate(w io.Writer, cfg *config.Config, n int) {
 	fmt.Fprintln(w, "Archon Harness Status")
 	fmt.Fprintln(w, "=====================")
 	fmt.Fprintln(w)
@@ -73,6 +81,11 @@ func Display(w io.Writer, cfg *config.Config) {
 		fmt.Fprintln(w, "  Installed Skills: none")
 	}
 	fmt.Fprintln(w)
+
+	if n > 0 {
+		fmt.Fprintf(w, "  Update available — run 'archon update' (%d skill(s))\n", n)
+		fmt.Fprintln(w)
+	}
 }
 
 func Format(cfg *config.Config) string {
