@@ -54,6 +54,11 @@ func TestNormalizeModel(t *testing.T) {
 		{name: "opencode glm", in: "glm-5", wantID: "", wantOK: false},
 		{name: "opencode kimi", in: "kimi-k2.5", wantID: "", wantOK: false},
 		{name: "gpt", in: "gpt-4", wantID: "", wantOK: false},
+		{name: "substring not whole token", in: "octopus", wantID: "", wantOK: false},
+		{name: "family embedded in word rejected", in: "supushaiku", wantID: "", wantOK: false},
+		{name: "multi family resolves by priority", in: "sonnet-opus", wantID: "opus", wantOK: true},
+		{name: "priority is position independent", in: "opus-sonnet", wantID: "opus", wantOK: true},
+		{name: "separatorless glued form does not resolve", in: "opus4", wantID: "", wantOK: false},
 		{name: "empty", in: "", wantID: "", wantOK: false},
 	}
 

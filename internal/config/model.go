@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"strings"
+	"unicode"
 )
 
 type ModelConfig struct {
@@ -87,19 +88,25 @@ type PhaseModel struct {
 // tolerant of extra version digits, and idempotent for values already in
 // canonical/accepted form. ok is false when no known Claude model resolves
 // (e.g. typos like "Opues 4.8", or non-Claude Opencode models like "glm-5").
+//
+// A family matches only as a whole token: the value is split on non-alphanumeric
+// boundaries, so "claude-opus-4-8", "opus 4.8" and "opus" all resolve to "opus",
+// while a word that merely contains a family substring (e.g. "octopus") does
+// not. When a value names more than one family the fixed priority order
+// opus→sonnet→haiku wins, keeping resolution deterministic.
 func NormalizeModel(s string) (id string, ok bool) {
 	s = strings.ToLower(strings.TrimSpace(s))
 	if s == "" {
 		return "", false
 	}
+	tokens := strings.FieldsFunc(s, func(r rune) bool {
+		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
+	})
 	for _, fam := range claudeFamilies {
-		if s == fam {
-			return fam, true
-		}
-	}
-	for _, fam := range claudeFamilies {
-		if strings.Contains(s, fam) {
-			return fam, true
+		for _, tok := range tokens {
+			if tok == fam {
+				return fam, true
+			}
 		}
 	}
 	return "", false
