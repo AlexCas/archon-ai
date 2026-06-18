@@ -1,0 +1,74 @@
+name: Bump Homebrew formula
+
+# Keeps the Homebrew tap (AlexCas/homebrew-archon-ai) in sync with each release.
+# Triggers when a GitHub release is published, or manually via workflow_dispatch.
+#
+# Requires a repo secret named HOMEBREW_TAP_TOKEN: a Personal Access Token with
+# write access to AlexCas/homebrew-archon-ai (fine-grained -> Contents: Read and write,
+# or a classic PAT with the `repo` scope). The default GITHUB_TOKEN cannot push to
+# another repository, so this secret is mandatory.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to bump (e.g. v0.5.0)"
+        required: true
+
+jobs:
+  bump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve tag and version
+        id: tag
+        run: |
+          TAG="${{ github.event.release.tag_name || github.event.inputs.tag }}"
+          if [ -z "$TAG" ]; then
+            echo "::error::No tag resolved" && exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Compute source tarball sha256
+        id: sha
+        run: |
+          URL="https://github.com/${{ github.repository }}/archive/refs/tags/${{ steps.tag.outputs.tag }}.tar.gz"
+          SHA=$(curl -fsSL "$URL" | sha256sum | cut -d' ' -f1)
+          if [ -z "$SHA" ]; then
+            echo "::error::Failed to compute sha256 for $URL" && exit 1
+          fi
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout tap repository
+        uses: actions/checkout@v4
+        with:
+          repository: AlexCas/homebrew-archon-ai
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - name: Update formula
+        run: |
+          FORMULA="tap/Formula/archon.rb"
+          sed -i \
+            -e "s|^  url .*|  url \"${{ steps.sha.outputs.url }}\"|" \
+            -e "s|^  sha256 .*|  sha256 \"${{ steps.sha.outputs.sha }}\"|" \
+            -e "s|^  version .*|  version \"${{ steps.tag.outputs.version }}\"|" \
+            "$FORMULA"
+          echo "----- updated formula -----"
+          cat "$FORMULA"
+
+      - name: Commit and push
+        run: |
+          cd tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "Formula already up to date, nothing to push."
+            exit 0
+          fi
+          git add Formula/archon.rb
+          git commit -m "chore: bump archon to ${{ steps.tag.outputs.tag }}"
+          git push
