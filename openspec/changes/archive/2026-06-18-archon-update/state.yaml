@@ -1,5 +1,12 @@
-phase: judge
+phase: archive
 status: completed
+judge:
+  verdict: pass
+  retry: 1
+  judgment_day: "dual review, 5 confirmed issues fixed in re-apply, re-judge PASS"
+  mutation_gate: skipped (disabled)
+  playwright_gate: skipped (project is not web)
+verify: pass-with-warnings
 history:
   - {phase: explore, status: in_progress, ts: "2026-06-15T22:01:05Z"}
   - {phase: explore, status: completed, ts: "2026-06-15T22:04:00Z"}
@@ -17,6 +24,8 @@ history:
   - {phase: verify, status: completed, ts: "2026-06-15T22:52:00Z"}
   - {phase: judge, status: in_progress, ts: "2026-06-15T22:56:00Z"}
   - {phase: judge, status: completed, ts: "2026-06-15T23:10:00Z"}
+  - {phase: archive, status: in_progress, ts: "2026-06-18T01:45:19Z"}
+  - {phase: archive, status: completed, ts: "2026-06-18T01:45:19Z"}
 apply:
   chain_strategy: feature-branch-chain
   tracker_branch: feature/archon-update
