@@ -3,6 +3,8 @@ package initcmd
 import (
 	"strings"
 	"testing"
+
+	"github.com/archon-ai/archon/internal/config"
 )
 
 func TestRenderAgentsMD(t *testing.T) {
@@ -271,6 +273,121 @@ func TestTemplates_AgentsAndClaudeIdentical(t *testing.T) {
 	if agents != claude {
 		t.Error("agentsTemplate and claudeTemplate are not identical — they may have diverged silently")
 	}
+}
+
+func TestTemplates_PhaseModelsBlock(t *testing.T) {
+	data := TemplateData{
+		Agent:          "claude",
+		HarnessVersion: "1.0.0",
+		SkillCount:     10,
+		PhaseModels: config.ResolvePhaseModels(config.ModelConfig{
+			Phases: map[string]string{
+				"explore": "Opus 4.8",
+				"propose": "sonnet",
+				"design":  "claude-opus-4-8",
+			},
+		}),
+	}
+
+	content, err := RenderClaudeMD(data)
+	if err != nil {
+		t.Fatalf("RenderClaudeMD() error = %v", err)
+	}
+
+	mustContain := []string{
+		"## Phase Models",
+		"- explore: opus",
+		"- propose: sonnet",
+		"- design: opus",
+	}
+	for _, want := range mustContain {
+		if !strings.Contains(content, want) {
+			t.Errorf("rendered content missing %q", want)
+		}
+	}
+
+	// No raw display strings and no unresolved placeholder leak through.
+	if strings.Contains(content, "Opus 4.8") {
+		t.Error("rendered content contains raw display string \"Opus 4.8\"")
+	}
+	if strings.Contains(content, backtickPlaceholder) {
+		t.Error("rendered content still contains § placeholder")
+	}
+}
+
+func TestTemplates_PhaseModelsOmittedWhenEmpty(t *testing.T) {
+	data := TemplateData{
+		Agent:          "claude",
+		HarnessVersion: "1.0.0",
+		SkillCount:     10,
+		PhaseModels:    nil,
+	}
+
+	content, err := RenderClaudeMD(data)
+	if err != nil {
+		t.Fatalf("RenderClaudeMD() error = %v", err)
+	}
+
+	if strings.Contains(content, "## Phase Models") {
+		t.Error("rendered content should omit ## Phase Models header when PhaseModels is nil")
+	}
+}
+
+func TestTemplates_PhaseModelsBlockMatchesAcrossPaths(t *testing.T) {
+	mc := config.ModelConfig{
+		Default: "sonnet",
+		Phases: map[string]string{
+			"explore": "Opus 4.8",
+			"verify":  "haiku",
+		},
+	}
+
+	// Mirror init's writeTemplate data construction.
+	initData := TemplateData{
+		ProjectName:    "proj",
+		Agent:          "claude",
+		HarnessVersion: "1.0.0",
+		SkillCount:     10,
+		PhaseModels:    config.ResolvePhaseModels(mc),
+	}
+	// Mirror the TUI regenerateTemplate data construction for the same config.
+	tuiData := TemplateData{
+		ProjectName:    "proj",
+		Agent:          "claude",
+		HarnessVersion: "1.0.0",
+		SkillCount:     10,
+		PhaseModels:    config.ResolvePhaseModels(mc),
+	}
+
+	initContent, err := RenderClaudeMD(initData)
+	if err != nil {
+		t.Fatalf("init render error = %v", err)
+	}
+	tuiContent, err := RenderClaudeMD(tuiData)
+	if err != nil {
+		t.Fatalf("tui render error = %v", err)
+	}
+
+	initBlock := phaseModelsBlock(t, initContent)
+	tuiBlock := phaseModelsBlock(t, tuiContent)
+	if initBlock != tuiBlock {
+		t.Errorf("phase model blocks differ across paths:\ninit:\n%s\ntui:\n%s", initBlock, tuiBlock)
+	}
+}
+
+// phaseModelsBlock extracts the "## Phase Models" section up to the next "##"
+// header so the two render paths can be compared byte-for-byte.
+func phaseModelsBlock(t *testing.T, content string) string {
+	t.Helper()
+	start := strings.Index(content, "## Phase Models")
+	if start == -1 {
+		t.Fatal("content missing ## Phase Models block")
+	}
+	rest := content[start+len("## Phase Models"):]
+	if end := strings.Index(rest, "\n## "); end != -1 {
+		return content[start : start+len("## Phase Models")+end]
+	}
+	return content[start:]
 }
 
 func TestTemplates_LeaderPersona(t *testing.T) {

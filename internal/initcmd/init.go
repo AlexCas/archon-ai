@@ -93,7 +93,7 @@ func Run(opts Options) (*Result, error) {
 		return nil, fmt.Errorf("write rollback manifest: %w", err)
 	}
 
-	if err := writeTemplate(opts.ProjectDir, agentName, len(extracted)); err != nil {
+	if err := writeTemplate(opts.ProjectDir, agentName, len(extracted), config.ResolvePhaseModels(cfg.Models)); err != nil {
 		return nil, fmt.Errorf("render template: %w", err)
 	}
 
@@ -238,12 +238,13 @@ func buildRollbackManifest(cfg *config.Config, extracted []string, globalDir, pr
 	}
 }
 
-func writeTemplate(projectDir, agentName string, skillCount int) error {
+func writeTemplate(projectDir, agentName string, skillCount int, phaseModels []config.PhaseModel) error {
 	data := TemplateData{
 		ProjectName:    filepath.Base(projectDir),
 		Agent:          agentName,
 		HarnessVersion: version.Version,
 		SkillCount:     skillCount,
+		PhaseModels:    phaseModels,
 	}
 
 	var content string
