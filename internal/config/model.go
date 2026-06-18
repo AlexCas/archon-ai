@@ -1,6 +1,9 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
 type ModelConfig struct {
 	Default string            `yaml:"default,omitempty"`
@@ -63,11 +66,72 @@ var ValidPhases = map[string]bool{
 	"archive": true,
 }
 
+// PhaseOrder is the canonical, delegated SDD phase order. It excludes judge,
+// which is not delegated to an sdd-* sub-agent. Iterating this slice (rather
+// than a map) gives deterministic, byte-identical output across runs.
+var PhaseOrder = []string{"explore", "propose", "spec", "design", "tasks", "apply", "verify", "archive"}
+
+// claudeFamilies are the Claude model family aliases the delegation tool
+// accepts. NormalizeModel collapses display strings and full IDs down to one
+// of these.
+var claudeFamilies = []string{"opus", "sonnet", "haiku"}
+
+// PhaseModel pairs an SDD phase with its resolved, normalized model alias.
+type PhaseModel struct {
+	Phase string
+	Model string
+}
+
+// NormalizeModel maps a configured/display model value to an alias the
+// delegation tool accepts (opus|sonnet|haiku). It is case-insensitive,
+// tolerant of extra version digits, and idempotent for values already in
+// canonical/accepted form. ok is false when no known Claude model resolves
+// (e.g. typos like "Opues 4.8", or non-Claude Opencode models like "glm-5").
+func NormalizeModel(s string) (id string, ok bool) {
+	s = strings.ToLower(strings.TrimSpace(s))
+	if s == "" {
+		return "", false
+	}
+	for _, fam := range claudeFamilies {
+		if s == fam {
+			return fam, true
+		}
+	}
+	for _, fam := range claudeFamilies {
+		if strings.Contains(s, fam) {
+			return fam, true
+		}
+	}
+	return "", false
+}
+
+// ResolvePhaseModels returns phase→alias pairs in canonical PhaseOrder,
+// omitting any phase that resolves to nothing. For each phase it tries the
+// explicit Phases entry, falls back to Default, and omits the line if neither
+// normalizes. The function is pure and never mutates mc.
+func ResolvePhaseModels(mc ModelConfig) []PhaseModel {
+	var out []PhaseModel
+	for _, p := range PhaseOrder {
+		id, ok := NormalizeModel(mc.Phases[p])
+		if !ok {
+			id, ok = NormalizeModel(mc.Default)
+		}
+		if !ok {
+			continue
+		}
+		out = append(out, PhaseModel{Phase: p, Model: id})
+	}
+	return out
+}
+
 func Validate(model string) string {
 	if model == "" {
 		return ""
 	}
 	if KnownModels[model] {
+		return ""
+	}
+	if _, ok := NormalizeModel(model); ok {
 		return ""
 	}
 	return fmt.Sprintf("warning: %q is not a known model (accepted anyway)", model)
