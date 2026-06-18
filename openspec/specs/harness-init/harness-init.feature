@@ -74,6 +74,37 @@ Feature: Harness initialization UX
     And no raw display string appears in the block
 
   @happy
+  Scenario: Gemini model normalizes to its catalog id
+    Given "models.phases.spec" is set to a curated Gemini catalog id
+    When the orchestrator template is rendered
+    Then the "spec" line shows that Gemini catalog id as-is
+
+  @happy
+  Scenario: OpenAI model normalizes to its catalog id
+    Given "models.phases.tasks" is set to a curated OpenAI catalog id
+    When the orchestrator template is rendered
+    Then the "tasks" line shows that OpenAI catalog id as-is
+
+  @happy
+  Scenario: Opencode model normalizes to its catalog id
+    Given "models.phases.apply" is set to a curated Opencode catalog id
+    When the orchestrator template is rendered
+    Then the "apply" line shows that Opencode catalog id as-is
+
+  @edge
+  Scenario: Colliding value resolves by fixed precedence
+    Given a value that matches both Claude and a later provider
+    When the value is normalized
+    Then it resolves to the Claude canonical form
+
+  @happy
+  Scenario: Non-Claude default renders an identical block across paths
+    Given "models.default" is set to a curated non-Claude catalog id
+    When the file is rendered via "archon init" and via the TUI regenerate path
+    Then both produce a non-empty "## Phase Models" block
+    And the two blocks are byte-identical
+
+  @happy
   Scenario: Phase falls back to the default model
     Given "models.phases.verify" is unset
     And "models.default" is set
@@ -93,6 +124,12 @@ Feature: Harness initialization UX
     When the template is rendered twice
     Then both renders list the phases in canonical SDD order
     And the two renders are byte-identical
+
+  @edge
+  Scenario: Whole-token guard rejects a containing substring
+    Given "models.phases.verify" is set to "octopus"
+    When the value is normalized
+    Then it does not match the Claude "opus" family
 
   @error
   Scenario: Garbage model value is surfaced

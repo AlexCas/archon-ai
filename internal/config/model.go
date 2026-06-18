@@ -20,6 +20,26 @@ var ClaudeModels = []string{
 	"claude-haiku-4-5",
 }
 
+// GeminiModels is the curated, ordered list of Google Gemini models offered as
+// static choices in the TUI. The list is intentionally small and current; users
+// who need another model can always type a free-form string instead.
+var GeminiModels = []string{
+	"gemini-2.5-pro",
+	"gemini-2.5-flash",
+	"gemini-2.0-flash",
+}
+
+// OpenAIModels is the curated, ordered list of OpenAI models offered as static
+// choices in the TUI. The list is intentionally small and current; users who
+// need another model can always type a free-form string instead.
+var OpenAIModels = []string{
+	"gpt-4o",
+	"gpt-4o-mini",
+	"gpt-4.1",
+	"o3",
+	"o4-mini",
+}
+
 // OpencodeModels is the curated, ordered list of models available through the
 // Opencode Go subscription, offered as static choices in the TUI. Adjust this
 // list as the subscription catalog changes; the free-form string option remains
@@ -35,12 +55,14 @@ var OpencodeModels = []string{
 	"qwen3.7-plus",
 }
 
-// StaticModels returns the full ordered list of statically-selectable models,
-// Claude first then Opencode Go. The TUI renders these as pickable options and
-// still allows a free-form entry.
+// StaticModels returns the full ordered list of statically-selectable models in
+// fixed provider precedence: Claude → Gemini → OpenAI → Opencode Go. The TUI
+// renders these as pickable options and still allows a free-form entry.
 func StaticModels() []string {
-	out := make([]string, 0, len(ClaudeModels)+len(OpencodeModels))
+	out := make([]string, 0, len(ClaudeModels)+len(GeminiModels)+len(OpenAIModels)+len(OpencodeModels))
 	out = append(out, ClaudeModels...)
+	out = append(out, GeminiModels...)
+	out = append(out, OpenAIModels...)
 	out = append(out, OpencodeModels...)
 	return out
 }
@@ -77,23 +99,51 @@ var PhaseOrder = []string{"explore", "propose", "spec", "design", "tasks", "appl
 // of these.
 var claudeFamilies = []string{"opus", "sonnet", "haiku"}
 
+// providerFamily describes one provider row for NormalizeModel. A row is either
+// family-based (families non-empty, used by Claude for whole-token alias
+// collapsing) or catalog-based (catalog non-empty, matched by exact
+// case-insensitive id and emitted as-is). Exactly one field is populated per
+// row.
+type providerFamily struct {
+	families []string
+	catalog  []string
+}
+
+// providerFamilies is the ordered cross-provider precedence table NormalizeModel
+// walks. The order is fixed — Claude → Gemini → OpenAI → Opencode — so a value
+// that could match more than one provider resolves deterministically to the
+// earliest row.
+var providerFamilies = []providerFamily{
+	{families: claudeFamilies},
+	{catalog: GeminiModels},
+	{catalog: OpenAIModels},
+	{catalog: OpencodeModels},
+}
+
 // PhaseModel pairs an SDD phase with its resolved, normalized model alias.
 type PhaseModel struct {
 	Phase string
 	Model string
 }
 
-// NormalizeModel maps a configured/display model value to an alias the
-// delegation tool accepts (opus|sonnet|haiku). It is case-insensitive,
-// tolerant of extra version digits, and idempotent for values already in
-// canonical/accepted form. ok is false when no known Claude model resolves
-// (e.g. typos like "Opues 4.8", or non-Claude Opencode models like "glm-5").
+// NormalizeModel maps a configured/display model value to the canonical
+// identifier a provider accepts. It walks the fixed provider precedence
+// Claude → Gemini → OpenAI → Opencode and returns the first match; the per-row
+// match rule and canonical output differ by provider:
 //
-// A family matches only as a whole token: the value is split on non-alphanumeric
-// boundaries, so "claude-opus-4-8", "opus 4.8" and "opus" all resolve to "opus",
-// while a word that merely contains a family substring (e.g. "octopus") does
-// not. When a value names more than one family the fixed priority order
-// opus→sonnet→haiku wins, keeping resolution deterministic.
+//   - Claude (family row): the value is matched as a whole token and collapsed
+//     to a family alias (opus|sonnet|haiku). The value is split on
+//     non-alphanumeric boundaries, so "claude-opus-4-8", "opus 4.8" and "opus"
+//     all resolve to "opus", while a word that merely contains a family
+//     substring (e.g. "octopus") does not. When a value names more than one
+//     family the fixed priority opus→sonnet→haiku wins.
+//   - Gemini/OpenAI/Opencode (catalog rows): the trimmed, lowercased value must
+//     equal a curated catalog id exactly (case-insensitive); the canonical id is
+//     emitted as-is, e.g. "gpt-4o" → "gpt-4o", "glm-5" → "glm-5".
+//
+// Matching is case-insensitive and idempotent for values already in
+// canonical/accepted form. ok is false when no provider row resolves (e.g. typos
+// like "Opues 4.8", or a model not in any curated catalog).
 func NormalizeModel(s string) (id string, ok bool) {
 	s = strings.ToLower(strings.TrimSpace(s))
 	if s == "" {
@@ -102,10 +152,19 @@ func NormalizeModel(s string) (id string, ok bool) {
 	tokens := strings.FieldsFunc(s, func(r rune) bool {
 		return !unicode.IsLetter(r) && !unicode.IsDigit(r)
 	})
-	for _, fam := range claudeFamilies {
-		for _, tok := range tokens {
-			if tok == fam {
-				return fam, true
+	for _, pf := range providerFamilies {
+		// Claude-style family row: whole-token alias match.
+		for _, fam := range pf.families {
+			for _, tok := range tokens {
+				if tok == fam {
+					return fam, true
+				}
+			}
+		}
+		// Catalog row: exact case-insensitive id match, emitted as-is.
+		for _, id := range pf.catalog {
+			if s == strings.ToLower(id) {
+				return id, true
 			}
 		}
 	}

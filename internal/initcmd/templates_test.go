@@ -315,6 +315,27 @@ func TestTemplates_PhaseModelsBlock(t *testing.T) {
 	}
 }
 
+func TestTemplates_PhaseModelsNonClaudeDefault(t *testing.T) {
+	data := TemplateData{
+		Agent:          "claude",
+		HarnessVersion: "1.0.0",
+		SkillCount:     10,
+		PhaseModels:    config.ResolvePhaseModels(config.ModelConfig{Default: "gemini-2.5-pro"}),
+	}
+
+	content, err := RenderClaudeMD(data)
+	if err != nil {
+		t.Fatalf("RenderClaudeMD() error = %v", err)
+	}
+
+	if !strings.Contains(content, "## Phase Models") {
+		t.Error("rendered content missing ## Phase Models block for non-Claude default")
+	}
+	if !strings.Contains(content, "gemini-2.5-pro") {
+		t.Error("rendered content missing catalog id \"gemini-2.5-pro\"")
+	}
+}
+
 func TestTemplates_PhaseModelsOmittedWhenEmpty(t *testing.T) {
 	data := TemplateData{
 		Agent:          "claude",
@@ -334,10 +355,14 @@ func TestTemplates_PhaseModelsOmittedWhenEmpty(t *testing.T) {
 }
 
 func TestTemplates_PhaseModelsBlockMatchesAcrossPaths(t *testing.T) {
+	// Non-Claude default mixed with per-phase Claude and OpenAI values, so the
+	// across-paths byte-identity check exercises a non-Claude default too
+	// (spec scenario: "Non-Claude default renders an identical block across paths").
 	mc := config.ModelConfig{
-		Default: "sonnet",
+		Default: "gemini-2.5-pro",
 		Phases: map[string]string{
 			"explore": "Opus 4.8",
+			"tasks":   "gpt-4o",
 			"verify":  "haiku",
 		},
 	}
