@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"text/template"
+
+	"github.com/archon-ai/archon/internal/config"
 )
 
 // § is used as a placeholder for backtick in raw string literals.
@@ -157,7 +159,16 @@ const orchestratorTrailer = `
 - Config: .archon/config.yaml
 - Agent: {{.Agent}}
 - Harness Version: {{.HarnessVersion}}
+{{if .PhaseModels}}
+## Phase Models
 
+Advisory: when delegating an SDD phase, request the model below for that phase by
+passing §model: <id>§ to the Agent/Task delegation tool. This is a preference, not a
+hard gate; if the platform cannot honor per-delegation model selection, proceed with
+the default model.
+
+{{range .PhaseModels}}- {{.Phase}}: {{.Model}}
+{{end}}{{end}}
 ## State Management
 Phase state tracked in: openspec/changes/{change-name}/state.yaml
 Session state tracked in: SESSION_STATUS.md (repo root, archived with the change)
@@ -173,6 +184,7 @@ type TemplateData struct {
 	Agent          string
 	HarnessVersion string
 	SkillCount     int
+	PhaseModels    []config.PhaseModel // ordered, resolved; nil ⇒ block omitted
 }
 
 func RenderAgentsMD(data TemplateData) (string, error) {

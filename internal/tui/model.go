@@ -335,6 +335,7 @@ func regenerateTemplate(projectDir string, cfg *config.Config) error {
 		Agent:          cfg.Agent,
 		HarnessVersion: cfg.Version,
 		SkillCount:     cfg.SkillCount,
+		PhaseModels:    config.ResolvePhaseModels(cfg.Models),
 	}
 
 	var content string
