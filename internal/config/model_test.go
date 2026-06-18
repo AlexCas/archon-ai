@@ -15,6 +15,8 @@ func TestValidate(t *testing.T) {
 		{name: "known claude model sonnet", model: "claude-sonnet-4-6", wantWarn: false},
 		{name: "known claude model haiku", model: "claude-haiku-4-5", wantWarn: false},
 		{name: "known opencode model", model: "glm-5", wantWarn: false},
+		{name: "known openai model", model: "gpt-4o", wantWarn: false},
+		{name: "known gemini model", model: "gemini-2.5-pro", wantWarn: false},
 		{name: "normalizable display name", model: "Opus 4.8", wantWarn: false},
 		{name: "typo display name", model: "Opues 4.8", wantWarn: true},
 		{name: "unknown model", model: "future-model-v2", wantWarn: true},
@@ -51,13 +53,19 @@ func TestNormalizeModel(t *testing.T) {
 		{name: "full id haiku dated", in: "claude-haiku-4-5-20251001", wantID: "haiku", wantOK: true},
 		{name: "padded whitespace", in: "  Sonnet 4.6  ", wantID: "sonnet", wantOK: true},
 		{name: "typo no family", in: "Opues 4.8", wantID: "", wantOK: false},
-		{name: "opencode glm", in: "glm-5", wantID: "", wantOK: false},
-		{name: "opencode kimi", in: "kimi-k2.5", wantID: "", wantOK: false},
-		{name: "gpt", in: "gpt-4", wantID: "", wantOK: false},
+		{name: "opencode glm", in: "glm-5", wantID: "glm-5", wantOK: true},
+		{name: "opencode kimi", in: "kimi-k2.5", wantID: "kimi-k2.5", wantOK: true},
+		{name: "openai gpt-4o", in: "gpt-4o", wantID: "gpt-4o", wantOK: true},
+		{name: "openai gpt-4o uppercase", in: "GPT-4o", wantID: "gpt-4o", wantOK: true},
+		{name: "gemini pro", in: "gemini-2.5-pro", wantID: "gemini-2.5-pro", wantOK: true},
 		{name: "substring not whole token", in: "octopus", wantID: "", wantOK: false},
 		{name: "family embedded in word rejected", in: "supushaiku", wantID: "", wantOK: false},
 		{name: "multi family resolves by priority", in: "sonnet-opus", wantID: "opus", wantOK: true},
 		{name: "priority is position independent", in: "opus-sonnet", wantID: "opus", wantOK: true},
+		// Claude precedence: a value carrying a Claude family token resolves to
+		// the Claude alias because the Claude row is consulted before any catalog
+		// row, regardless of other tokens present.
+		{name: "claude row wins over later providers", in: "opus gpt-4o", wantID: "opus", wantOK: true},
 		{name: "separatorless glued form does not resolve", in: "opus4", wantID: "", wantOK: false},
 		{name: "empty", in: "", wantID: "", wantOK: false},
 	}
