@@ -1,4 +1,4 @@
-phase: judge
+phase: archive
 status: completed
 history:
   - {phase: explore, status: in_progress, ts: "2026-06-18T01:45:19Z"}
@@ -17,6 +17,8 @@ history:
   - {phase: verify, status: completed, ts: "2026-06-18T16:41:15Z"}
   - {phase: judge, status: in_progress, ts: "2026-06-18T16:41:15Z"}
   - {phase: judge, status: completed, ts: "2026-06-18T16:49:47Z"}
+  - {phase: archive, status: in_progress, ts: "2026-06-18T16:55:00Z"}
+  - {phase: archive, status: completed, ts: "2026-06-18T16:55:00Z"}
 judge:
   verdict: pass
   rounds: 2
