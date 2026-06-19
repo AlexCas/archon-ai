@@ -8,6 +8,7 @@ import (
 
 	"github.com/archon-ai/archon/internal/config"
 	"github.com/archon-ai/archon/internal/initcmd"
+	"github.com/archon-ai/archon/internal/models"
 	"github.com/archon-ai/archon/skills"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
@@ -81,11 +82,15 @@ var defaultKeys = keyMap{
 }
 
 func NewModel(cfg *config.Config, projectDir string) Model {
+	// Detect the offered model catalog once when the TUI opens. Detection must
+	// not run per keystroke nor during "archon init"; the cached slice is reused
+	// for the lifetime of the Models view.
+	catalog := models.Resolve()
 	return Model{
 		config:        cfg,
 		projectDir:    projectDir,
 		activeTab:     ModelsTab,
-		modelsTab:     newModelsTabState(cfg),
+		modelsTab:     newModelsTabState(cfg, catalog),
 		judgeTab:      newJudgeTabState(cfg.Judge),
 		mutationTab:   newMutationTabState(cfg.MutationTesting),
 		playwrightTab: newPlaywrightTabState(cfg.Playwright),
@@ -172,7 +177,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Adopt the freshly written config and rebuild tab states from it.
 		msg.cfg.HomeDir = m.projectDir
 		m.config = msg.cfg
-		m.modelsTab = newModelsTabState(msg.cfg)
+		// Reuse the catalog detected when the view first opened; init does not
+		// re-run detection.
+		m.modelsTab = newModelsTabState(msg.cfg, m.modelsTab.catalog)
 		m.judgeTab = newJudgeTabState(msg.cfg.Judge)
 		m.mutationTab = newMutationTabState(msg.cfg.MutationTesting)
 		m.playwrightTab = newPlaywrightTabState(msg.cfg.Playwright)

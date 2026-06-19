@@ -26,18 +26,40 @@ Feature: Harness initialization UX
     When the user runs "archon init --agent claude --playwright"
     Then "playwright.enabled" is true in ".archon/config.yaml"
 
-  @ux
-  Scenario: Selecting a static model in the TUI
-    Given the Models tab is focused on the default model input
-    When the user cycles the static catalog with "ctrl+n"
-    Then the input is set to a Claude or Opencode Go model from the catalog
+  @happy
+  Scenario: Installed opencode shows the live catalog
+    Given the "opencode" CLI is installed on PATH
+    When the user opens the Models view
+    Then the offered opencode models are enumerated live from the opencode CLI
+    And the stale curated opencode list is not shown
 
-  @ux
-  Scenario: Typing a free-form model
-    Given the Models tab default model input is empty
+  @happy
+  Scenario: Only installed agents' models are offered
+    Given the "opencode" CLI is not installed on PATH
+    When the user cycles the catalog in the Models view
+    Then no opencode models appear in the offered catalog
+    And models for installed agents remain offered
+
+  @edge
+  Scenario: Detection is cached once per Models view
+    Given the Models view has been opened and detection has run once
+    When the user cycles models and types repeatedly
+    Then detection does not run again for that session
+    And it never runs during "archon init"
+
+  @error
+  Scenario: Live enumeration error falls back silently
+    Given the "opencode" CLI is installed but enumeration fails, times out, or returns unparseable output
+    When the user opens the Models view
+    Then the curated opencode list is offered as a silent fallback
+    And the TUI is neither blocked nor shown an error
+
+  @happy
+  Scenario: Free-form entry and advisory behavior unchanged
+    Given the Models view default model input is empty
     When the user types "some-custom-model"
-    Then the value is accepted
-    And a non-blocking warning may be shown
+    Then the value is accepted and a non-blocking warning may be shown
+    And NormalizeModel and Validate behave exactly as before this feature
 
   @happy
   Scenario: Init records real frontmatter versions

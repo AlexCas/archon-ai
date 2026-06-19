@@ -253,7 +253,7 @@ func TestModelsTabState_AutoFill(t *testing.T) {
 			Default: "gpt-4",
 		},
 	}
-	state := newModelsTabState(cfg)
+	state := newModelsTabState(cfg, config.StaticModels())
 
 	// Check that placeholder includes default
 	placeholder := state.inputs[modelInputExplore].Placeholder
@@ -277,7 +277,7 @@ func TestModelsTabState_LockOnEdit(t *testing.T) {
 			Default: "gpt-4",
 		},
 	}
-	state := newModelsTabState(cfg)
+	state := newModelsTabState(cfg, config.StaticModels())
 
 	// Simulate user typing in explore field
 	state.focusedInput = modelInputExplore
@@ -306,7 +306,7 @@ func TestModelsTabState_ApplyToConfig(t *testing.T) {
 			Phases:  make(map[string]string),
 		},
 	}
-	state := newModelsTabState(cfg)
+	state := newModelsTabState(cfg, config.StaticModels())
 
 	state.inputs[modelInputDefault].SetValue("claude-sonnet-4")
 	state.inputs[modelInputExplore].SetValue("gpt-4o")
@@ -719,7 +719,7 @@ func TestSaveConfig_OpencodeLeaderMatchesInitMerge(t *testing.T) {
 func TestModelsTab_LeaderWarningGuard(t *testing.T) {
 	// Provider/model-id form: no warning, but the leader section still renders.
 	cfg := &config.Config{Agent: "opencode", Models: config.ModelConfig{Leader: "openai/gpt-4o"}}
-	state := newModelsTabState(cfg)
+	state := newModelsTabState(cfg, config.StaticModels())
 	view := state.view(80, 24)
 	if !contains(view, "Leader Model (opencode)") {
 		t.Fatal("leader section should render for opencode")
@@ -730,7 +730,7 @@ func TestModelsTab_LeaderWarningGuard(t *testing.T) {
 
 	// Non-slash unknown value: the advisory warning still shows.
 	cfg2 := &config.Config{Agent: "opencode", Models: config.ModelConfig{Leader: "notarealmodel"}}
-	state2 := newModelsTabState(cfg2)
+	state2 := newModelsTabState(cfg2, config.StaticModels())
 	if view2 := state2.view(80, 24); !contains(view2, "⚠") {
 		t.Errorf("non-slash unknown leader %q should still warn; view:\n%s", cfg2.Models.Leader, view2)
 	}
