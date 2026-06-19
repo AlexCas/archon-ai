@@ -1,13 +1,15 @@
 package tui
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/archon-ai/archon/internal/config"
+	"github.com/archon-ai/archon/internal/initcmd"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestNewModel(t *testing.T) {
@@ -251,7 +253,7 @@ func TestModelsTabState_AutoFill(t *testing.T) {
 			Default: "gpt-4",
 		},
 	}
-	state := newModelsTabState(cfg)
+	state := newModelsTabState(cfg, config.StaticModels())
 
 	// Check that placeholder includes default
 	placeholder := state.inputs[modelInputExplore].Placeholder
@@ -275,7 +277,7 @@ func TestModelsTabState_LockOnEdit(t *testing.T) {
 			Default: "gpt-4",
 		},
 	}
-	state := newModelsTabState(cfg)
+	state := newModelsTabState(cfg, config.StaticModels())
 
 	// Simulate user typing in explore field
 	state.focusedInput = modelInputExplore
@@ -304,7 +306,7 @@ func TestModelsTabState_ApplyToConfig(t *testing.T) {
 			Phases:  make(map[string]string),
 		},
 	}
-	state := newModelsTabState(cfg)
+	state := newModelsTabState(cfg, config.StaticModels())
 
 	state.inputs[modelInputDefault].SetValue("claude-sonnet-4")
 	state.inputs[modelInputExplore].SetValue("gpt-4o")
@@ -665,6 +667,72 @@ func TestSaveConfig_UpdatesExistingTemplate(t *testing.T) {
 	}
 	if !strings.Contains(content, "Skills: 20") {
 		t.Error("AGENTS.md should contain updated skill count 20")
+	}
+}
+
+// S7: the TUI save path must produce the same opencode.json agent.archon-leader
+// as a direct initcmd merge with the same leader model, byte-for-byte.
+func TestSaveConfig_OpencodeLeaderMatchesInitMerge(t *testing.T) {
+	const leader = "anthropic/claude-sonnet-4-20250514"
+
+	// TUI save path: drive saveConfig for an opencode project whose Models.Leader
+	// is set, then read the resulting opencode.json.
+	tuiDir := t.TempDir()
+	cfg := &config.Config{
+		HomeDir:    tuiDir,
+		Agent:      "opencode",
+		Version:    "1.0.0",
+		SkillCount: 10,
+		Models:     config.ModelConfig{Leader: leader},
+	}
+	m := NewModel(cfg, tuiDir)
+
+	result := m.saveConfig()()
+	if err, ok := result.(error); ok {
+		t.Fatalf("saveConfig() returned error: %v", err)
+	}
+
+	tuiBytes, err := os.ReadFile(filepath.Join(tuiDir, "opencode.json"))
+	if err != nil {
+		t.Fatalf("TUI opencode.json not written: %v", err)
+	}
+
+	// Reference path: a direct merge with the same leader into a fresh dir.
+	initDir := t.TempDir()
+	if _, err := initcmd.MergeOpencodeAgent(initDir, leader); err != nil {
+		t.Fatalf("MergeOpencodeAgent() error = %v", err)
+	}
+	initBytes, err := os.ReadFile(filepath.Join(initDir, "opencode.json"))
+	if err != nil {
+		t.Fatalf("init opencode.json not written: %v", err)
+	}
+
+	if !bytes.Equal(tuiBytes, initBytes) {
+		t.Errorf("TUI save != init merge:\nTUI:\n%s\ninit:\n%s", tuiBytes, initBytes)
+	}
+}
+
+// TestModelsTab_LeaderWarningGuard verifies the leader-model field does NOT show
+// the Claude-oriented advisory warning for a legitimate provider/model-id (which
+// contains "/"), matching the `--leader` CLI flag's guard — while a non-slash
+// unknown value still warns. This pins the CLI/TUI consistency fix.
+func TestModelsTab_LeaderWarningGuard(t *testing.T) {
+	// Provider/model-id form: no warning, but the leader section still renders.
+	cfg := &config.Config{Agent: "opencode", Models: config.ModelConfig{Leader: "openai/gpt-4o"}}
+	state := newModelsTabState(cfg, config.StaticModels())
+	view := state.view(80, 24)
+	if !contains(view, "Leader Model (opencode)") {
+		t.Fatal("leader section should render for opencode")
+	}
+	if contains(view, "⚠") {
+		t.Errorf("provider/model-id leader %q should not warn; view:\n%s", cfg.Models.Leader, view)
+	}
+
+	// Non-slash unknown value: the advisory warning still shows.
+	cfg2 := &config.Config{Agent: "opencode", Models: config.ModelConfig{Leader: "notarealmodel"}}
+	state2 := newModelsTabState(cfg2, config.StaticModels())
+	if view2 := state2.view(80, 24); !contains(view2, "⚠") {
+		t.Errorf("non-slash unknown leader %q should still warn; view:\n%s", cfg2.Models.Leader, view2)
 	}
 }
 

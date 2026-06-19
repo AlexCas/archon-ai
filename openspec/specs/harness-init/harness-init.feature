@@ -26,18 +26,40 @@ Feature: Harness initialization UX
     When the user runs "archon init --agent claude --playwright"
     Then "playwright.enabled" is true in ".archon/config.yaml"
 
-  @ux
-  Scenario: Selecting a static model in the TUI
-    Given the Models tab is focused on the default model input
-    When the user cycles the static catalog with "ctrl+n"
-    Then the input is set to a Claude or Opencode Go model from the catalog
+  @happy
+  Scenario: Installed opencode shows the live catalog
+    Given the "opencode" CLI is installed on PATH
+    When the user opens the Models view
+    Then the offered opencode models are enumerated live from the opencode CLI
+    And the stale curated opencode list is not shown
 
-  @ux
-  Scenario: Typing a free-form model
-    Given the Models tab default model input is empty
+  @happy
+  Scenario: Only installed agents' models are offered
+    Given the "opencode" CLI is not installed on PATH
+    When the user cycles the catalog in the Models view
+    Then no opencode models appear in the offered catalog
+    And models for installed agents remain offered
+
+  @edge
+  Scenario: Detection is cached once per Models view
+    Given the Models view has been opened and detection has run once
+    When the user cycles models and types repeatedly
+    Then detection does not run again for that session
+    And it never runs during "archon init"
+
+  @error
+  Scenario: Live enumeration error falls back silently
+    Given the "opencode" CLI is installed but enumeration fails, times out, or returns unparseable output
+    When the user opens the Models view
+    Then the curated opencode list is offered as a silent fallback
+    And the TUI is neither blocked nor shown an error
+
+  @happy
+  Scenario: Free-form entry and advisory behavior unchanged
+    Given the Models view default model input is empty
     When the user types "some-custom-model"
-    Then the value is accepted
-    And a non-blocking warning may be shown
+    Then the value is accepted and a non-blocking warning may be shown
+    And NormalizeModel and Validate behave exactly as before this feature
 
   @happy
   Scenario: Init records real frontmatter versions
@@ -136,3 +158,59 @@ Feature: Harness initialization UX
     Given "models.phases.propose" is set to an unresolvable value like "Opues 4.8"
     When the configured models are processed for rendering
     Then the user receives actionable feedback identifying the unknown value
+
+  # --- opencode-leader-mode ---
+
+  @happy
+  Scenario: Leader model survives clone and round-trip
+    Given "models.leader" set to "anthropic/claude-sonnet-4-20250514"
+    When the config is cloned and serialized then reloaded
+    Then "models.leader" equals "anthropic/claude-sonnet-4-20250514" verbatim
+
+  @happy
+  Scenario: Init writes the archon-leader agent
+    Given an opencode project with "models.leader" set and no "opencode.json"
+    When the user runs "archon init --agent opencode"
+    Then "opencode.json" sets "agent.archon-leader" with mode "primary"
+    And its "prompt" is "{file:./AGENTS.md}" and "model" equals "models.leader"
+    And the "opencode.json" path is registered for rollback
+
+  @edge
+  Scenario: Merge into an existing opencode.json preserves other keys
+    Given an opencode project whose "opencode.json" has unrelated keys and agents
+    When the user runs "archon init --agent opencode"
+    Then "agent.archon-leader" is added
+    And every pre-existing key and agent is left unchanged
+    And no "default_agent" key is written
+
+  @edge
+  Scenario: Re-running init is idempotent
+    Given an opencode project already initialized with "archon-leader"
+    When the user runs "archon init --agent opencode" again
+    Then "agent.archon-leader" appears exactly once with the same content
+    And no other key drifts
+
+  @edge
+  Scenario: Non-opencode agent writes no opencode.json
+    Given a project initialized with "archon init --agent claude"
+    When init completes
+    Then no "opencode.json" is created or modified
+
+  @error
+  Scenario: Empty leader model writes nothing
+    Given an opencode project with an empty "models.leader"
+    When the user runs "archon init --agent opencode"
+    Then no "opencode.json" is created
+    And no archon-leader agent is written
+
+  @happy
+  Scenario: TUI save matches init merge result
+    Given an opencode project and a chosen leader model
+    When the leader-model field is saved via the TUI Models tab
+    Then the resulting "agent.archon-leader" equals what "archon init" would produce
+
+  @edge
+  Scenario: Update leaves the opencode agent untouched
+    Given an opencode project with an existing "agent.archon-leader"
+    When the user runs "archon update"
+    Then "opencode.json" is not written or rewritten

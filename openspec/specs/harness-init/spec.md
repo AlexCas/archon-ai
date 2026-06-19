@@ -67,24 +67,85 @@ Scenario: Enabling Playwright at init
   Then "playwright.enabled" is true in .archon/config.yaml
 ```
 
-### Requirement: Static model selection with free-form fallback
+### Requirement: Dynamic model selection with free-form fallback
 
-Model configuration MUST offer a curated static catalog of Claude models and Opencode
-Go models as selectable options, AND MUST still accept any free-form model string.
-Unknown models are accepted with a warning, never rejected.
+Model configuration MUST offer a model catalog that is DYNAMIC: it reflects the
+agent CLIs detected on the system `PATH`. Models belonging to an agent CLI that is
+NOT installed MUST be hidden from the offered/cyclable catalog. When the `opencode`
+CLI is installed, the opencode portion of the catalog MUST be enumerated live from
+that CLI instead of the static curated list. ONLY when `opencode` IS installed but
+live enumeration fails (error, timeout, or unparseable output) MUST the offered
+catalog fall back silently to the curated opencode list; detection MUST NEVER break
+or block the TUI. (An absent `opencode` CLI does NOT trigger the curated fallback —
+its models are hidden per the filter rule above.) Detection MUST
+run once when the Models view is opened and be cached for that session — NOT per
+keystroke and NOT during `archon init`. Claude and any remote-only provider stay
+curated (no local enumeration). Free-form entry MUST always remain accepted (any
+string), and `NormalizeModel`, `Validate`, and free-form acceptance behavior MUST be
+unchanged by this feature.
 
-#### Scenario: Selecting a static model in the TUI
+| Aspect | Behavior |
+|--------|----------|
+| Catalog source | Detected agent CLIs on PATH (cached once per Models view) |
+| Uninstalled agent | Its models hidden from the offered catalog |
+| opencode installed | Live-enumerated catalog replaces curated opencode list |
+| Enumeration failure | opencode installed but enumeration fails/times out/unparseable → silent fallback to curated opencode list; TUI never blocked |
+| Claude / remote-only | Stays curated; no local enumeration |
+| Free-form / Validate / NormalizeModel | Unchanged; any string accepted with advisory warning |
+
+#### Scenario: Installed opencode shows the live catalog
 
 ```gherkin
-Scenario: Selecting a static model in the TUI
-  Given the Models tab is focused on the default model input
-  When the user cycles the static catalog with ctrl+n
-  Then the input is set to a Claude or Opencode Go model from the catalog
+@happy
+Scenario: Installed opencode shows the live catalog
+  Given the "opencode" CLI is installed on PATH
+  When the user opens the Models view
+  Then the offered opencode models are enumerated live from the opencode CLI
+  And the stale curated opencode list is not shown
+```
 
-Scenario: Typing a free-form model
-  Given the Models tab default model input is empty
+#### Scenario: Only installed agents' models are offered
+
+```gherkin
+@happy
+Scenario: Only installed agents' models are offered
+  Given the "opencode" CLI is not installed on PATH
+  When the user cycles the catalog in the Models view
+  Then no opencode models appear in the offered catalog
+  And models for installed agents remain offered
+```
+
+#### Scenario: Detection is cached once per Models view
+
+```gherkin
+@edge
+Scenario: Detection is cached once per Models view
+  Given the Models view has been opened and detection has run once
+  When the user cycles models and types repeatedly
+  Then detection does not run again for that session
+  And it never runs during "archon init"
+```
+
+#### Scenario: Live enumeration error falls back silently
+
+```gherkin
+@error
+Scenario: Live enumeration error falls back silently
+  Given the "opencode" CLI is installed but enumeration fails, times out, or returns unparseable output
+  When the user opens the Models view
+  Then the curated opencode list is offered as a silent fallback
+  And the TUI is neither blocked nor shown an error
+```
+
+#### Scenario: Free-form entry and advisory behavior unchanged
+
+```gherkin
+@happy
+Scenario: Free-form entry and advisory behavior unchanged
+  Given the Models view default model input is empty
   When the user types "some-custom-model"
   Then the value is accepted and a non-blocking warning may be shown
+  And NormalizeModel and Validate behave exactly as before this feature
 ```
 
 ### Requirement: Truthful skill inventory versions
@@ -306,4 +367,119 @@ Scenario: Non-Claude default renders an identical block across paths
   When the file is rendered via "archon init" and via the TUI regenerate path
   Then both produce a non-empty "## Phase Models" block
   And the two blocks are byte-identical
+```
+
+### Requirement: Configurable leader model
+
+`.archon/config.yaml` MUST hold a `models.leader` field carrying the FULL
+`provider/model-id` value verbatim (e.g. `anthropic/claude-sonnet-4-...`), with no
+prefix stripping or normalization applied to the stored value. The field MUST survive
+`Config.Clone()` and config serialization round-trips. Any validation of the value is
+advisory only and MUST NOT reject or rewrite it.
+
+#### Scenario: Leader model survives clone and round-trip
+
+```gherkin
+Scenario: Leader model survives clone and round-trip
+  Given "models.leader" set to "anthropic/claude-sonnet-4-20250514"
+  When the config is cloned and serialized then reloaded
+  Then "models.leader" equals "anthropic/claude-sonnet-4-20250514" verbatim
+```
+
+### Requirement: Opencode archon-leader agent merge at init
+
+For the **opencode** agent, `archon init` MUST additively merge a primary agent named
+`archon-leader` into the project `opencode.json` (creating the file when absent),
+setting ONLY `agent.archon-leader` with: `mode: "primary"`, `prompt:
+"{file:./AGENTS.md}"`, and `model` set to `models.leader`. The merge MUST be additive
+and idempotent — it MUST NOT modify or remove unrelated keys, and re-running init MUST
+produce the same result with no duplication or drift. The agent MUST NOT be set as the
+default agent (no `default_agent` written). The written `opencode.json` path MUST be
+registered in the rollback manifest.
+
+#### Scenario: Init writes the archon-leader agent
+
+```gherkin
+Scenario: Init writes the archon-leader agent
+  Given an opencode project with "models.leader" set and no "opencode.json"
+  When the user runs "archon init --agent opencode"
+  Then "opencode.json" sets "agent.archon-leader" with mode "primary"
+  And its "prompt" is "{file:./AGENTS.md}" and "model" equals "models.leader"
+  And the "opencode.json" path is registered for rollback
+```
+
+#### Scenario: Merge into an existing opencode.json preserves other keys
+
+```gherkin
+@edge
+Scenario: Merge into an existing opencode.json preserves other keys
+  Given an opencode project whose "opencode.json" has unrelated keys and agents
+  When the user runs "archon init --agent opencode"
+  Then "agent.archon-leader" is added
+  And every pre-existing key and agent is left unchanged
+  And no "default_agent" key is written
+```
+
+#### Scenario: Re-running init is idempotent
+
+```gherkin
+@edge
+Scenario: Re-running init is idempotent
+  Given an opencode project already initialized with "archon-leader"
+  When the user runs "archon init --agent opencode" again
+  Then "agent.archon-leader" appears exactly once with the same content
+  And no other key drifts
+```
+
+### Requirement: Leader merge no-op guards
+
+The archon-leader merge MUST be a no-op when the agent is not opencode OR when
+`models.leader` is empty: no `opencode.json` is created and nothing is written.
+
+#### Scenario: Non-opencode agent writes no opencode.json
+
+```gherkin
+@edge
+Scenario: Non-opencode agent writes no opencode.json
+  Given a project initialized with "archon init --agent claude"
+  When init completes
+  Then no "opencode.json" is created or modified
+```
+
+#### Scenario: Empty leader model writes nothing
+
+```gherkin
+@error
+Scenario: Empty leader model writes nothing
+  Given an opencode project with an empty "models.leader"
+  When the user runs "archon init --agent opencode"
+  Then no "opencode.json" is created
+  And no archon-leader agent is written
+```
+
+### Requirement: TUI and update write-path parity
+
+For an opencode project, saving the leader-model field in the TUI Models tab MUST
+produce the SAME archon-leader merge result as `archon init`, with no divergence
+between the two write paths. `archon update` MUST NOT write or rewrite the opencode
+agent (update stays skill-only).
+
+#### Scenario: TUI save matches init merge result
+
+```gherkin
+@happy
+Scenario: TUI save matches init merge result
+  Given an opencode project and a chosen leader model
+  When the leader-model field is saved via the TUI Models tab
+  Then the resulting "agent.archon-leader" equals what "archon init" would produce
+```
+
+#### Scenario: Update leaves the opencode agent untouched
+
+```gherkin
+@edge
+Scenario: Update leaves the opencode agent untouched
+  Given an opencode project with an existing "agent.archon-leader"
+  When the user runs "archon update"
+  Then "opencode.json" is not written or rewritten
 ```
