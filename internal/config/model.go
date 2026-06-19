@@ -194,8 +194,9 @@ var providerFamilies = []providerFamily{
 
 // PhaseModel pairs an SDD phase with its resolved, normalized model alias.
 type PhaseModel struct {
-	Phase string
-	Model string
+	Phase  string
+	Model  string
+	Effort string // resolved ModelRef.Effort (variant); "" = provider default
 }
 
 // NormalizeModel maps a configured/display model value to the canonical
@@ -257,7 +258,7 @@ func ResolvePhaseModels(mc ModelConfig) []PhaseModel {
 		if ref.Model == "" {
 			continue
 		}
-		out = append(out, PhaseModel{Phase: p, Model: ref.FullID()})
+		out = append(out, PhaseModel{Phase: p, Model: ref.FullID(), Effort: ref.Effort})
 	}
 	return out
 }

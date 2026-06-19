@@ -235,6 +235,21 @@ func TestModelRef_MarshalYAML(t *testing.T) {
 			t.Errorf("Marshal() = %q, want mapping with model/effort keys", got)
 		}
 	})
+
+	t.Run("effort survives a marshal->unmarshal round-trip", func(t *testing.T) {
+		in := ModelRef{Provider: "opencode", Model: "deepseek-v4-pro", Effort: "low"}
+		out, err := yaml.Marshal(in)
+		if err != nil {
+			t.Fatalf("Marshal() error = %v", err)
+		}
+		var got ModelRef
+		if err := yaml.Unmarshal(out, &got); err != nil {
+			t.Fatalf("Unmarshal() error = %v", err)
+		}
+		if got != in {
+			t.Errorf("round-trip = %+v, want %+v", got, in)
+		}
+	})
 }
 
 // TestModelConfig_StructuredFields covers M2: structured fields preserve
@@ -340,6 +355,56 @@ func TestResolvePhaseModels(t *testing.T) {
 		second := ResolvePhaseModels(mc)
 		if !reflect.DeepEqual(first, second) {
 			t.Errorf("non-deterministic: %v vs %v", first, second)
+		}
+	})
+
+	// E1-3: PhaseModel.Effort is carried from the resolved ref.
+	t.Run("phase ref effort carried into PhaseModel", func(t *testing.T) {
+		mc := ModelConfig{
+			Phases: map[string]ModelRef{
+				"spec": {Provider: "opencode", Model: "deepseek-v4-pro", Effort: "medium"},
+			},
+		}
+		got := ResolvePhaseModels(mc)
+		if len(got) != 1 {
+			t.Fatalf("got %d phases, want 1", len(got))
+		}
+		if got[0].Effort != "medium" {
+			t.Errorf("PhaseModel.Effort = %q, want %q", got[0].Effort, "medium")
+		}
+		if got[0].Model != "opencode/deepseek-v4-pro" {
+			t.Errorf("PhaseModel.Model = %q, want %q", got[0].Model, "opencode/deepseek-v4-pro")
+		}
+	})
+
+	t.Run("default fallback ref effort carried into PhaseModel", func(t *testing.T) {
+		mc := ModelConfig{
+			Default: ModelRef{Provider: "anthropic", Model: "claude-opus-4-8", Effort: "high"},
+			// No phases set — all phases fall back to Default.
+		}
+		got := ResolvePhaseModels(mc)
+		if len(got) != len(PhaseOrder) {
+			t.Fatalf("got %d phases, want %d", len(got), len(PhaseOrder))
+		}
+		for _, pm := range got {
+			if pm.Effort != "high" {
+				t.Errorf("phase %q: PhaseModel.Effort = %q, want %q", pm.Phase, pm.Effort, "high")
+			}
+		}
+	})
+
+	t.Run("empty effort stays empty", func(t *testing.T) {
+		mc := ModelConfig{
+			Phases: map[string]ModelRef{
+				"apply": {Provider: "openai", Model: "gpt-4o"},
+			},
+		}
+		got := ResolvePhaseModels(mc)
+		if len(got) != 1 {
+			t.Fatalf("got %d phases, want 1", len(got))
+		}
+		if got[0].Effort != "" {
+			t.Errorf("PhaseModel.Effort = %q, want empty", got[0].Effort)
 		}
 	})
 }

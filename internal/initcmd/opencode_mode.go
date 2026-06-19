@@ -16,10 +16,11 @@ const leaderAgentName = "archon-leader"
 // archonLeaderAgent is the fixed shape written under agent.archon-leader.
 // Struct field declaration order is the deterministic JSON output order.
 type archonLeaderAgent struct {
-	Mode        string `json:"mode"`        // always "primary"
-	Description string `json:"description"` // fixed cosmetic label
-	Model       string `json:"model"`       // verbatim models.leader
-	Prompt      string `json:"prompt"`      // "{file:./AGENTS.md}"
+	Mode        string `json:"mode"`              // always "primary"
+	Description string `json:"description"`       // fixed cosmetic label
+	Model       string `json:"model"`             // verbatim models.leader
+	Variant     string `json:"variant,omitempty"` // effort/reasoning level; omitted when empty
+	Prompt      string `json:"prompt"`            // "{file:./AGENTS.md}"
 }
 
 // phaseAgentName returns the opencode.json agent key for an SDD phase, e.g.
@@ -30,11 +31,12 @@ func phaseAgentName(phase string) string { return "archon-" + phase }
 // each resolvable SDD phase. Field declaration order is the deterministic JSON
 // output order.
 type archonPhaseAgent struct {
-	Mode        string `json:"mode"`        // always "subagent"
-	Hidden      bool   `json:"hidden"`      // always true (no omitempty)
-	Model       string `json:"model"`       // resolved per-phase FullID
-	Description string `json:"description"` // "Archon SDD <phase> phase"
-	Prompt      string `json:"prompt"`      // "{file:./AGENTS.md}"
+	Mode        string `json:"mode"`              // always "subagent"
+	Hidden      bool   `json:"hidden"`            // always true (no omitempty)
+	Model       string `json:"model"`             // resolved per-phase FullID
+	Variant     string `json:"variant,omitempty"` // effort/reasoning level; omitted when empty
+	Description string `json:"description"`       // "Archon SDD <phase> phase"
+	Prompt      string `json:"prompt"`            // "{file:./AGENTS.md}"
 }
 
 // MergeOpencodeAgent is the exported integration seam for callers outside this
@@ -85,6 +87,7 @@ func mergeOpencodeAgent(projectDir string, models config.ModelConfig) (written s
 			Mode:        "primary",
 			Description: "Archon SDD orchestration leader",
 			Model:       leaderFull,
+			Variant:     models.Leader.Effort,
 			Prompt:      "{file:./AGENTS.md}",
 		}
 	}
@@ -93,6 +96,7 @@ func mergeOpencodeAgent(projectDir string, models config.ModelConfig) (written s
 			Mode:        "subagent",
 			Hidden:      true,
 			Model:       pm.Model,
+			Variant:     pm.Effort,
 			Description: "Archon SDD " + pm.Phase + " phase",
 			Prompt:      "{file:./AGENTS.md}",
 		}

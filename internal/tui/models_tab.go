@@ -19,7 +19,12 @@ const (
 	providerSelect                // choosing a provider for the focused row
 	modelSelect                   // choosing a model within the picked provider
 	freeForm                      // typing a raw provider/model string
+	effortSelect                  // choosing an effort/reasoning level for a reasoning model
 )
+
+// effortOptions are the fixed effort levels offered for reasoning-capable models.
+// "default" maps to an empty Effort (provider default); the rest are passed verbatim.
+var effortOptions = []string{"default", "low", "medium", "high"}
 
 // modelRow is one editable assignment line: Default, one per SDD phase, and
 // (opencode only) Leader. ref holds the live value seeded from cfg; changed is
@@ -58,6 +63,7 @@ type modelsTabState struct {
 	modelCursor    int              // index into the active provider's FilterModelsForSDD list
 	pickedProvider string           // provider chosen in providerSelect, used by modelSelect
 	curModels      []opencode.Model // FilterModelsForSDD(providers[pickedProvider]), cached for modelSelect
+	effortCursor   int              // index into effortOptions (valid only while mode == effortSelect)
 
 	// Free-form text entry (shared; reset on each open).
 	input textinput.Model
@@ -135,6 +141,8 @@ func (m *modelsTabState) update(msg tea.Msg) (tea.Cmd, bool) {
 		return m.updateModelSelect(key)
 	case freeForm:
 		return m.updateFreeForm(key)
+	case effortSelect:
+		return m.updateEffortSelect(key)
 	}
 	return nil, true
 }
@@ -211,11 +219,40 @@ func (m *modelsTabState) updateModelSelect(key tea.KeyMsg) (tea.Cmd, bool) {
 			m.modelCursor++
 		}
 	case tea.KeyEnter:
-		m.rows[m.focusedRow].ref = refFromCacheKey(m.pickedProvider, m.curModels[m.modelCursor].ID)
+		picked := m.curModels[m.modelCursor]
+		m.rows[m.focusedRow].ref = refFromCacheKey(m.pickedProvider, picked.ID)
 		m.rows[m.focusedRow].changed = true
-		m.mode = rowNav
+		if picked.Reasoning {
+			m.mode = effortSelect
+			m.effortCursor = 0
+		} else {
+			m.mode = rowNav // Effort stays empty (ref freshly built)
+		}
 	case tea.KeyEsc:
 		m.mode = providerSelect
+	}
+	return nil, true
+}
+
+func (m *modelsTabState) updateEffortSelect(key tea.KeyMsg) (tea.Cmd, bool) {
+	switch key.Type {
+	case tea.KeyUp:
+		if m.effortCursor > 0 {
+			m.effortCursor--
+		}
+	case tea.KeyDown:
+		if m.effortCursor < len(effortOptions)-1 {
+			m.effortCursor++
+		}
+	case tea.KeyEnter:
+		opt := effortOptions[m.effortCursor]
+		if opt == "default" {
+			opt = ""
+		}
+		m.rows[m.focusedRow].ref.Effort = opt
+		m.mode = rowNav
+	case tea.KeyEsc:
+		m.mode = modelSelect // step back; model already set
 	}
 	return nil, true
 }
@@ -259,6 +296,8 @@ func (m *modelsTabState) hintLine() string {
 		return "↑/↓: choose model · Enter: set · Esc: back"
 	case freeForm:
 		return "type provider/model · Enter: set · Esc: cancel"
+	case effortSelect:
+		return "↑/↓: choose effort · Enter: set · Esc: back"
 	default:
 		if len(m.available) == 0 {
 			return "No detected models — press e to type a provider/model"
@@ -339,6 +378,20 @@ func (m *modelsTabState) renderRow(i int, label, focus, dim lipgloss.Style) stri
 			b.WriteString("  ")
 			b.WriteString(dim.Render("Enter to set · Esc to cancel"))
 			return b.String()
+
+		case effortSelect:
+			b.WriteString(label.Render(row.label + ":"))
+			b.WriteString(" Effort:\n")
+			for j, opt := range effortOptions {
+				if j == m.effortCursor {
+					b.WriteString(focus.Render("▸ " + opt))
+				} else {
+					b.WriteString("    " + opt)
+				}
+				b.WriteString("\n")
+			}
+			b.WriteString(dim.Render("↑/↓: choose effort · Enter: set · Esc: back"))
+			return strings.TrimRight(b.String(), "\n")
 		}
 	}
 
