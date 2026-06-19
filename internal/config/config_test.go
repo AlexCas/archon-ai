@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"reflect"
 	"testing"
 	"testing/fstest"
@@ -196,6 +197,7 @@ func TestConfig_CloneRoundtrip(t *testing.T) {
 		},
 		Models: ModelConfig{
 			Default: "claude-opus-4-8",
+			Leader:  "anthropic/claude-sonnet-4-20250514",
 			Phases:  map[string]string{"apply": "claude-sonnet-4-6", "verify": "claude-haiku-4-5"},
 		},
 		SkillInventory: []SkillInventory{
@@ -243,6 +245,11 @@ func TestConfig_Roundtrip(t *testing.T) {
 			Tool:      "gremlins",
 			Threshold: 0.80,
 		},
+		Models: ModelConfig{
+			Default: "claude-opus-4-8",
+			Leader:  "anthropic/claude-sonnet-4-20250514",
+			Phases:  map[string]string{"apply": "claude-sonnet-4-6"},
+		},
 		SkillInventory: []SkillInventory{
 			{Name: "sdd-init", Version: "2.0", Source: "embedded"},
 			{Name: "sdd-propose", Version: "1.5", Source: "embedded"},
@@ -254,15 +261,10 @@ func TestConfig_Roundtrip(t *testing.T) {
 		t.Fatalf("Save() error = %v", err)
 	}
 
+	// Load from the real file Save() wrote, so this exercises the actual
+	// serialize -> reload path (not an empty in-memory FS).
 	loaded := &Config{HomeDir: tmpDir}
-	data, err := fstest.MapFS{}.ReadFile(".archon/config.yaml")
-	if err != nil {
-		t.Skip("Skipping roundtrip test - requires actual file system read")
-	}
-
-	if err := loaded.Load(fstest.MapFS{
-		".archon/config.yaml": &fstest.MapFile{Data: data},
-	}); err != nil {
+	if err := loaded.Load(os.DirFS(tmpDir)); err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
 
@@ -274,5 +276,12 @@ func TestConfig_Roundtrip(t *testing.T) {
 	}
 	if loaded.SkillCount != original.SkillCount {
 		t.Errorf("SkillCount = %v, want %v", loaded.SkillCount, original.SkillCount)
+	}
+	// S1: models.leader must survive serialize -> reload verbatim.
+	if loaded.Models.Leader != original.Models.Leader {
+		t.Errorf("Models.Leader = %q, want %q", loaded.Models.Leader, original.Models.Leader)
+	}
+	if loaded.Models.Default != original.Models.Default {
+		t.Errorf("Models.Default = %q, want %q", loaded.Models.Default, original.Models.Default)
 	}
 }

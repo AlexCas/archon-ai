@@ -1,0 +1,20 @@
+phase: judge
+status: completed-pr1
+note: "Chained delivery — verify/judge run per PR. PR1 (core) PASSED and is being delivered. PR2 (TUI) will re-enter apply→verify→judge before archive."
+history:
+  - {phase: explore, status: in_progress, ts: "2026-06-18T23:12:49Z"}
+  - {phase: explore, status: completed, ts: "2026-06-18T23:17:05Z"}
+  - {phase: propose, status: in_progress, ts: "2026-06-18T23:19:32Z"}
+  - {phase: propose, status: completed, ts: "2026-06-18T23:21:23Z"}
+  - {phase: spec, status: in_progress, ts: "2026-06-18T23:23:58Z"}
+  - {phase: spec, status: completed, ts: "2026-06-18T23:25:33Z"}
+  - {phase: design, status: in_progress, ts: "2026-06-18T23:26:13Z"}
+  - {phase: design, status: completed, ts: "2026-06-18T23:28:15Z"}
+  - {phase: tasks, status: in_progress, ts: "2026-06-18T23:32:48Z"}
+  - {phase: tasks, status: completed, ts: "2026-06-18T23:35:53Z"}
+  - {phase: apply, status: in_progress, ts: "2026-06-18T23:39:10Z"}
+  - {phase: apply, status: completed-pr1, ts: "2026-06-18T23:45:35Z"}
+  - {phase: verify, status: in_progress-pr1, ts: "2026-06-18T23:45:35Z"}
+  - {phase: verify, status: completed-pr1, ts: "2026-06-18T23:47:47Z"}
+  - {phase: judge, status: in_progress-pr1, ts: "2026-06-18T23:47:47Z"}
+  - {phase: judge, status: completed-pr1, ts: "2026-06-19T00:04:14Z"}
