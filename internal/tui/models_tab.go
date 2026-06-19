@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/archon-ai/archon/internal/config"
@@ -64,6 +65,13 @@ type modelsTabState struct {
 	pickedProvider string           // provider chosen in providerSelect, used by modelSelect
 	curModels      []opencode.Model // FilterModelsForSDD(providers[pickedProvider]), cached for modelSelect
 	effortCursor   int              // index into effortOptions (valid only while mode == effortSelect)
+
+	// Picker scroll state prevents the list overflowing the terminal.
+	// pickerOffset is the first visible item index; pickerMaxVisible caps the
+	// rendered window. Both are valid only while mode is providerSelect or
+	// modelSelect, and are updated in view() plus the updateXxxSelect methods.
+	pickerOffset     int
+	pickerMaxVisible int
 
 	// Free-form text entry (shared; reset on each open).
 	input textinput.Model
@@ -189,9 +197,17 @@ func (m *modelsTabState) updateProviderSelect(key tea.KeyMsg) (tea.Cmd, bool) {
 		if m.providerCursor > 0 {
 			m.providerCursor--
 		}
+		// Scroll up if cursor left the visible window.
+		if m.providerCursor < m.pickerOffset {
+			m.pickerOffset = m.providerCursor
+		}
 	case tea.KeyDown:
 		if m.providerCursor < len(m.available)-1 {
 			m.providerCursor++
+		}
+		// Scroll down if cursor passed the last visible item.
+		if m.providerCursor >= m.pickerOffset+m.pickerMaxVisible {
+			m.pickerOffset = m.providerCursor - m.pickerMaxVisible + 1
 		}
 	case tea.KeyEnter:
 		m.pickedProvider = m.available[m.providerCursor]
@@ -202,6 +218,7 @@ func (m *modelsTabState) updateProviderSelect(key tea.KeyMsg) (tea.Cmd, bool) {
 		}
 		m.mode = modelSelect
 		m.modelCursor = 0
+		m.pickerOffset = 0
 	case tea.KeyEsc:
 		m.mode = rowNav
 	}
@@ -214,9 +231,17 @@ func (m *modelsTabState) updateModelSelect(key tea.KeyMsg) (tea.Cmd, bool) {
 		if m.modelCursor > 0 {
 			m.modelCursor--
 		}
+		// Scroll up if cursor left the visible window.
+		if m.modelCursor < m.pickerOffset {
+			m.pickerOffset = m.modelCursor
+		}
 	case tea.KeyDown:
 		if m.modelCursor < len(m.curModels)-1 {
 			m.modelCursor++
+		}
+		// Scroll down if cursor passed the last visible item.
+		if m.modelCursor >= m.pickerOffset+m.pickerMaxVisible {
+			m.pickerOffset = m.modelCursor - m.pickerMaxVisible + 1
 		}
 	case tea.KeyEnter:
 		picked := m.curModels[m.modelCursor]
@@ -307,6 +332,18 @@ func (m *modelsTabState) hintLine() string {
 }
 
 func (m *modelsTabState) view(width, height int) string {
+	// Compute how many picker items fit in the visible area.
+	// Overhead: tab chrome (~2 lines padding) + title (1) + hint (1) + blank (1)
+	// + row overhead (2: label + header). For providerSelect and modelSelect
+	// the effective item lines = height - ~13. Clamp to a sane range.
+	m.pickerMaxVisible = height - 13
+	if m.pickerMaxVisible < 3 {
+		m.pickerMaxVisible = 3
+	}
+	if m.pickerMaxVisible > 20 {
+		m.pickerMaxVisible = 20
+	}
+
 	var b strings.Builder
 	title := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("63")).MarginBottom(1)
 	hint := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
@@ -342,22 +379,43 @@ func (m *modelsTabState) renderRow(i int, label, focus, dim lipgloss.Style) stri
 		case providerSelect:
 			b.WriteString(label.Render(row.label + ":"))
 			b.WriteString(" [pick provider]\n")
-			for j, id := range m.available {
-				marker := "  "
+			total := len(m.available)
+			end := m.pickerOffset + m.pickerMaxVisible
+			if end > total {
+				end = total
+			}
+			if m.pickerOffset > 0 {
+				b.WriteString(dim.Render(fmt.Sprintf("  ↑ %d more", m.pickerOffset)))
+				b.WriteString("\n")
+			}
+			for j := m.pickerOffset; j < end; j++ {
+				id := m.available[j]
 				if j == m.providerCursor {
-					marker = "▸ "
-					b.WriteString(focus.Render(marker + id))
+					b.WriteString(focus.Render("▸ " + id))
 				} else {
-					b.WriteString("  " + marker + id)
+					b.WriteString("    " + id)
 				}
 				b.WriteString("\n")
+			}
+			if end < total {
+				b.WriteString(dim.Render(fmt.Sprintf("  ↓ %d more", total-end)))
 			}
 			return strings.TrimRight(b.String(), "\n")
 
 		case modelSelect:
 			b.WriteString(label.Render(row.label + ":"))
 			b.WriteString(" Provider: " + m.pickedProvider + "\n")
-			for j, mod := range m.curModels {
+			total := len(m.curModels)
+			end := m.pickerOffset + m.pickerMaxVisible
+			if end > total {
+				end = total
+			}
+			if m.pickerOffset > 0 {
+				b.WriteString(dim.Render(fmt.Sprintf("  ↑ %d more", m.pickerOffset)))
+				b.WriteString("\n")
+			}
+			for j := m.pickerOffset; j < end; j++ {
+				mod := m.curModels[j]
 				name := mod.Name
 				if name == "" {
 					name = mod.ID
@@ -368,6 +426,9 @@ func (m *modelsTabState) renderRow(i int, label, focus, dim lipgloss.Style) stri
 					b.WriteString("    " + name)
 				}
 				b.WriteString("\n")
+			}
+			if end < total {
+				b.WriteString(dim.Render(fmt.Sprintf("  ↓ %d more", total-end)))
 			}
 			return strings.TrimRight(b.String(), "\n")
 
