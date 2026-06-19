@@ -93,7 +93,7 @@ func (c *Config) Clone() *Config {
 		MutationTesting: c.MutationTesting,
 		Judge:           c.Judge,
 		Playwright:      c.Playwright,
-		Models:          ModelConfig{Default: c.Models.Default, Leader: c.Models.Leader, Phases: make(map[string]string, len(c.Models.Phases))},
+		Models:          ModelConfig{Default: c.Models.Default, Leader: c.Models.Leader, Phases: make(map[string]ModelRef, len(c.Models.Phases))},
 		SkillInventory:  make([]SkillInventory, len(c.SkillInventory)),
 	}
 	for k, v := range c.Models.Phases {

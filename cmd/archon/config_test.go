@@ -163,6 +163,37 @@ func TestConfigCmd_List(t *testing.T) {
 	}
 }
 
+// TestConfigCmd_SetProviderQualified confirms the ParseModelRef + FullID seam
+// end-to-end: setting a provider-qualified value and getting it back returns the
+// same string. (S1f-1, optional)
+func TestConfigCmd_SetProviderQualified(t *testing.T) {
+	tmpDir := setupProjectWithConfig(t)
+	origDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	var stdout1, stderr1 bytes.Buffer
+	root1 := newRootCmd(&stdout1, &stderr1)
+	root1.SetArgs([]string{"config", "set", "models.default", "opencode/deepseek-v4-pro"})
+
+	if err := root1.Execute(); err != nil {
+		t.Fatalf("set Execute() error = %v, stderr = %s", err, stderr1.String())
+	}
+
+	var stdout2, stderr2 bytes.Buffer
+	root2 := newRootCmd(&stdout2, &stderr2)
+	root2.SetArgs([]string{"config", "get", "models.default"})
+
+	if err := root2.Execute(); err != nil {
+		t.Fatalf("get Execute() error = %v, stderr = %s", err, stderr2.String())
+	}
+
+	got := strings.TrimSpace(stdout2.String())
+	if got != "opencode/deepseek-v4-pro" {
+		t.Errorf("config get models.default = %q, want %q", got, "opencode/deepseek-v4-pro")
+	}
+}
+
 func TestConfigCmd_ListEmpty(t *testing.T) {
 	tmpDir := t.TempDir()
 	archonDir := filepath.Join(tmpDir, ".archon")

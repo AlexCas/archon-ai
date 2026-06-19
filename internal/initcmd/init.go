@@ -99,7 +99,7 @@ func Run(opts Options) (*Result, error) {
 	// This must run before WriteManifest so the written path is registered for
 	// rollback alongside everything else init created.
 	if agentName == "opencode" {
-		mergedPath, err := mergeOpencodeAgent(opts.ProjectDir, cfg.Models.Leader)
+		mergedPath, err := mergeOpencodeAgent(opts.ProjectDir, cfg.Models.Leader.FullID())
 		if err != nil {
 			return nil, fmt.Errorf("merge opencode agent: %w", err)
 		}
@@ -205,13 +205,13 @@ func createSymlinks(globalDir, projectDir string, skills []string) error {
 }
 
 func buildConfig(agentName string, extracted []string, inventory []config.SkillInventory, modelDefault string, modelLeader string, modelPhases map[string]string, playwright bool) *config.Config {
-	var phases map[string]string
+	var phases map[string]config.ModelRef
 	for k, v := range modelPhases {
 		if v != "" {
 			if phases == nil {
-				phases = make(map[string]string)
+				phases = make(map[string]config.ModelRef)
 			}
-			phases[k] = v
+			phases[k] = config.ParseModelRef(v)
 		}
 	}
 
@@ -230,8 +230,8 @@ func buildConfig(agentName string, extracted []string, inventory []config.SkillI
 			Enabled: playwright,
 		},
 		Models: config.ModelConfig{
-			Default: modelDefault,
-			Leader:  modelLeader,
+			Default: config.ParseModelRef(modelDefault),
+			Leader:  config.ParseModelRef(modelLeader),
 			Phases:  phases,
 		},
 		SkillInventory: inventory,

@@ -281,10 +281,10 @@ func TestTemplates_PhaseModelsBlock(t *testing.T) {
 		HarnessVersion: "1.0.0",
 		SkillCount:     10,
 		PhaseModels: config.ResolvePhaseModels(config.ModelConfig{
-			Phases: map[string]string{
-				"explore": "Opus 4.8",
-				"propose": "sonnet",
-				"design":  "claude-opus-4-8",
+			Phases: map[string]config.ModelRef{
+				"explore": {Model: "opus"},
+				"propose": {Model: "sonnet"},
+				"design":  {Model: "opus"},
 			},
 		}),
 	}
@@ -320,7 +320,7 @@ func TestTemplates_PhaseModelsNonClaudeDefault(t *testing.T) {
 		Agent:          "claude",
 		HarnessVersion: "1.0.0",
 		SkillCount:     10,
-		PhaseModels:    config.ResolvePhaseModels(config.ModelConfig{Default: "gemini-2.5-pro"}),
+		PhaseModels:    config.ResolvePhaseModels(config.ModelConfig{Default: config.ModelRef{Model: "gemini-2.5-pro"}}),
 	}
 
 	content, err := RenderClaudeMD(data)
@@ -359,11 +359,11 @@ func TestTemplates_PhaseModelsBlockMatchesAcrossPaths(t *testing.T) {
 	// across-paths byte-identity check exercises a non-Claude default too
 	// (spec scenario: "Non-Claude default renders an identical block across paths").
 	mc := config.ModelConfig{
-		Default: "gemini-2.5-pro",
-		Phases: map[string]string{
-			"explore": "Opus 4.8",
-			"tasks":   "gpt-4o",
-			"verify":  "haiku",
+		Default: config.ModelRef{Model: "gemini-2.5-pro"},
+		Phases: map[string]config.ModelRef{
+			"explore": {Model: "opus"},
+			"tasks":   {Model: "gpt-4o"},
+			"verify":  {Model: "haiku"},
 		},
 	}
 

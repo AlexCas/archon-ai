@@ -1,0 +1,15 @@
+{
+  "opencode": {
+    "id": "opencode",
+    "name": "Opencode",
+    "models": {
+      "deepseek-v4-pro": {
+        "id": "deepseek-v4-pro",
+        "name": "DeepSeek V4 Pro",
+        "tool_call": true,
+        "reasoning": false
+      }
+    }
+  },
+  "broken": 42
+}

@@ -2,10 +2,14 @@ package config
 
 import (
 	"os"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"testing/fstest"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestConfig_Load(t *testing.T) {
@@ -48,12 +52,36 @@ skill_inventory:
 					Tool:      "gremlins",
 					Threshold: 0.80,
 				},
+				// S1c-1: flat-string scalars decode to ModelRef{Model: value}
 				Models: ModelConfig{
-					Default: "claude-sonnet-4",
-					Phases:  map[string]string{"apply": "gpt-4o"},
+					Default: ModelRef{Model: "claude-sonnet-4"},
+					Phases:  map[string]ModelRef{"apply": {Model: "gpt-4o"}},
 				},
 				SkillInventory: []SkillInventory{
 					{Name: "sdd-init", Version: "2.0", Source: "embedded"},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			// S1c-1: mapping-form fixture decodes to structured ModelRef
+			name: "mapping-form model ref",
+			fs: fstest.MapFS{
+				".archon/config.yaml": &fstest.MapFile{
+					Data: []byte(`harness_version: "1.0.0"
+agent: opencode
+models:
+  default:
+    provider: opencode
+    model: deepseek-v4-pro
+`),
+				},
+			},
+			want: Config{
+				Version: "1.0.0",
+				Agent:   "opencode",
+				Models: ModelConfig{
+					Default: ModelRef{Provider: "opencode", Model: "deepseek-v4-pro"},
 				},
 			},
 			wantErr: false,
@@ -124,14 +152,14 @@ agent: claude
 					t.Errorf("MutationTesting.Threshold = %v, want %v", got.MutationTesting.Threshold, tt.want.MutationTesting.Threshold)
 				}
 				if got.Models.Default != tt.want.Models.Default {
-					t.Errorf("Models.Default = %v, want %v", got.Models.Default, tt.want.Models.Default)
+					t.Errorf("Models.Default = %+v, want %+v", got.Models.Default, tt.want.Models.Default)
 				}
 				if len(got.Models.Phases) != len(tt.want.Models.Phases) {
 					t.Errorf("Models.Phases length = %d, want %d", len(got.Models.Phases), len(tt.want.Models.Phases))
 				} else {
 					for k, v := range tt.want.Models.Phases {
 						if got.Models.Phases[k] != v {
-							t.Errorf("Models.Phases[%q] = %q, want %q", k, got.Models.Phases[k], v)
+							t.Errorf("Models.Phases[%q] = %+v, want %+v", k, got.Models.Phases[k], v)
 						}
 					}
 				}
@@ -180,6 +208,7 @@ func TestConfig_Save(t *testing.T) {
 // independent copy. It fails loudly if a new Config field is added without being
 // copied in Clone (the clone would then differ from the original via DeepEqual).
 func TestConfig_CloneRoundtrip(t *testing.T) {
+	// S1c-3: Default/Leader/Phases use ModelRef values
 	original := &Config{
 		Version:    "1.2.3",
 		Agent:      "claude",
@@ -196,9 +225,12 @@ func TestConfig_CloneRoundtrip(t *testing.T) {
 			BaseURL: "http://localhost:3000",
 		},
 		Models: ModelConfig{
-			Default: "claude-opus-4-8",
-			Leader:  "anthropic/claude-sonnet-4-20250514",
-			Phases:  map[string]string{"apply": "claude-sonnet-4-6", "verify": "claude-haiku-4-5"},
+			Default: ModelRef{Provider: "anthropic", Model: "claude-sonnet-4-20250514"},
+			Leader:  ModelRef{Provider: "anthropic", Model: "claude-opus-4-8"},
+			Phases: map[string]ModelRef{
+				"apply":  {Model: "claude-sonnet-4-6"},
+				"verify": {Model: "claude-haiku-4-5"},
+			},
 		},
 		SkillInventory: []SkillInventory{
 			{Name: "sdd-init", Version: "2.0", Source: "embedded"},
@@ -219,9 +251,9 @@ func TestConfig_CloneRoundtrip(t *testing.T) {
 		t.Fatal("Clone() returned the same pointer as the original")
 	}
 
-	// Independent maps: mutating the clone must not affect the original.
-	clone.Models.Phases["apply"] = "MUTATED"
-	if original.Models.Phases["apply"] == "MUTATED" {
+	// S1c-3: Independent maps — mutating the clone must not affect the original.
+	clone.Models.Phases["apply"] = ModelRef{Model: "MUTATED"}
+	if original.Models.Phases["apply"] == (ModelRef{Model: "MUTATED"}) {
 		t.Error("mutating clone.Models.Phases affected the original (shared map)")
 	}
 
@@ -235,6 +267,7 @@ func TestConfig_CloneRoundtrip(t *testing.T) {
 func TestConfig_Roundtrip(t *testing.T) {
 	tmpDir := t.TempDir()
 
+	// S1c-4: Default/Leader/Phases use ModelRef values
 	original := &Config{
 		Version:    "1.0.0",
 		Agent:      "opencode",
@@ -246,9 +279,9 @@ func TestConfig_Roundtrip(t *testing.T) {
 			Threshold: 0.80,
 		},
 		Models: ModelConfig{
-			Default: "claude-opus-4-8",
-			Leader:  "anthropic/claude-sonnet-4-20250514",
-			Phases:  map[string]string{"apply": "claude-sonnet-4-6"},
+			Default: ModelRef{Provider: "anthropic", Model: "claude-opus-4-8"},
+			Leader:  ModelRef{Provider: "anthropic", Model: "claude-sonnet-4-20250514"},
+			Phases:  map[string]ModelRef{"apply": {Provider: "openai", Model: "claude-sonnet-4-6"}},
 		},
 		SkillInventory: []SkillInventory{
 			{Name: "sdd-init", Version: "2.0", Source: "embedded"},
@@ -277,11 +310,105 @@ func TestConfig_Roundtrip(t *testing.T) {
 	if loaded.SkillCount != original.SkillCount {
 		t.Errorf("SkillCount = %v, want %v", loaded.SkillCount, original.SkillCount)
 	}
-	// S1: models.leader must survive serialize -> reload verbatim.
+	// S1c-4: ModelRef is a comparable value type — direct comparison works.
 	if loaded.Models.Leader != original.Models.Leader {
-		t.Errorf("Models.Leader = %q, want %q", loaded.Models.Leader, original.Models.Leader)
+		t.Errorf("Models.Leader = %+v, want %+v", loaded.Models.Leader, original.Models.Leader)
 	}
 	if loaded.Models.Default != original.Models.Default {
-		t.Errorf("Models.Default = %q, want %q", loaded.Models.Default, original.Models.Default)
+		t.Errorf("Models.Default = %+v, want %+v", loaded.Models.Default, original.Models.Default)
+	}
+}
+
+// TestConfig_FlatStringRoundtripByteIdentical asserts that a legacy flat-string
+// models block loads and re-marshals with its models: block byte-identical. (S1c-2, M4)
+func TestConfig_FlatStringRoundtripByteIdentical(t *testing.T) {
+	// The legacy flat fixture as it would appear in config.yaml
+	modelsBlock := "models:\n  default: claude-sonnet-4\n  phases:\n    apply: gpt-4o\n"
+	fullYAML := "harness_version: 1.0.0\nagent: opencode\n" + modelsBlock
+
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, ".archon", "config.yaml")
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := os.WriteFile(configPath, []byte(fullYAML), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	cfg := &Config{HomeDir: tmpDir}
+	if err := cfg.Load(os.DirFS(tmpDir)); err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	// Marshal just the models block to compare
+	got, err := yaml.Marshal(cfg.Models)
+	if err != nil {
+		t.Fatalf("yaml.Marshal(models) error = %v", err)
+	}
+
+	// The expected models block (without the "models:" wrapper key, just the value)
+	// yaml.Marshal of ModelConfig should produce: default: claude-sonnet-4\nphases:\n    apply: gpt-4o\n
+	wantModels := "default: claude-sonnet-4\nphases:\n    apply: gpt-4o\n"
+	gotStr := string(got)
+	if gotStr != wantModels {
+		t.Errorf("models block round-trip mismatch:\n got: %q\nwant: %q", gotStr, wantModels)
+	}
+
+	// Assert empty-leader config does NOT produce a leader: key
+	if strings.Contains(gotStr, "leader:") {
+		t.Error("models block contains unexpected 'leader:' key for empty leader")
+	}
+
+	// Assert a config with NO models key saves without inventing a models: block
+	minimalYAML := "harness_version: 1.0.0\nagent: opencode\n"
+	if err := os.WriteFile(configPath, []byte(minimalYAML), 0o644); err != nil {
+		t.Fatalf("WriteFile minimal: %v", err)
+	}
+	var minCfg Config
+	minCfg.HomeDir = tmpDir
+	if err := minCfg.Load(os.DirFS(tmpDir)); err != nil {
+		t.Fatalf("Load() minimal error = %v", err)
+	}
+	// Save and re-read; models block must not appear
+	if err := minCfg.Save(); err != nil {
+		t.Fatalf("Save() minimal error = %v", err)
+	}
+	savedBytes, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if strings.Contains(string(savedBytes), "models:") {
+		t.Errorf("saved minimal config contains unexpected 'models:' block:\n%s", savedBytes)
+	}
+}
+
+// TestConfig_SlashedScalarRoundtripByteIdentical asserts that a legacy
+// provider-qualified scalar (the documented `provider/model` form, e.g. the
+// --leader flag) re-marshals as the SAME one-line scalar, not a mapping — so an
+// existing config that used provider/model strings is not churned on save. (M4,
+// judge issue 1)
+func TestConfig_SlashedScalarRoundtripByteIdentical(t *testing.T) {
+	// leader uses the documented provider/model scalar; a phase too
+	modelsBlock := "default: claude-sonnet-4\nleader: anthropic/claude-sonnet-4-20250514\nphases:\n    apply: opencode/deepseek-v4-pro\n"
+
+	var mc ModelConfig
+	if err := yaml.Unmarshal([]byte(modelsBlock), &mc); err != nil {
+		t.Fatalf("Unmarshal: %v", err)
+	}
+	// Sanity: the slashed scalar split into provider + model
+	if mc.Leader.Provider != "anthropic" || mc.Leader.Model != "claude-sonnet-4-20250514" {
+		t.Fatalf("leader split wrong: %+v", mc.Leader)
+	}
+
+	got, err := yaml.Marshal(mc)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	if string(got) != modelsBlock {
+		t.Errorf("slashed-scalar round-trip mismatch:\n got: %q\nwant: %q", string(got), modelsBlock)
+	}
+	// Explicitly assert no value churned into a mapping
+	if strings.Contains(string(got), "provider:") {
+		t.Errorf("a scalar value was rewritten as a mapping:\n%s", got)
 	}
 }

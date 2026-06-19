@@ -370,7 +370,7 @@ func TestUpdate_PreservesUserConfigAndTemplate(t *testing.T) {
 	cfg.CreatedAt = createdAt
 	cfg.MutationTesting = config.MutationTesting{Enabled: true, Tool: "gremlins", Threshold: 0.9}
 	cfg.Playwright = config.Playwright{Enabled: true, TestDir: "e2e", BaseURL: "http://localhost"}
-	cfg.Models = config.ModelConfig{Default: "claude-x", Phases: map[string]string{"apply": "gpt-4o"}}
+	cfg.Models = config.ModelConfig{Default: config.ModelRef{Model: "claude-x"}, Phases: map[string]config.ModelRef{"apply": {Model: "gpt-4o"}}}
 	if err := cfg.Save(); err != nil {
 		t.Fatalf("Save() error = %v", err)
 	}
@@ -417,7 +417,7 @@ func TestUpdate_PreservesUserConfigAndTemplate(t *testing.T) {
 	if !after.Playwright.Enabled || after.Playwright.TestDir != "e2e" {
 		t.Errorf("Playwright not preserved: %+v", after.Playwright)
 	}
-	if after.Models.Default != "claude-x" || after.Models.Phases["apply"] != "gpt-4o" {
+	if after.Models.Default.FullID() != "claude-x" || after.Models.Phases["apply"].FullID() != "gpt-4o" {
 		t.Errorf("Models not preserved: %+v", after.Models)
 	}
 }
