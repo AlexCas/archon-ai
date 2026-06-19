@@ -24,6 +24,11 @@ func toolModel(id, name string) opencode.Model {
 	return opencode.Model{ID: id, Name: name, ToolCall: true}
 }
 
+// reasoningModel returns a Model with ToolCall=true and Reasoning=true.
+func reasoningModel(id, name string) opencode.Model {
+	return opencode.Model{ID: id, Name: name, ToolCall: true, Reasoning: true}
+}
+
 // noToolModel returns a Model with ToolCall=false (not usable for SDD picks).
 func noToolModel(id, name string) opencode.Model {
 	return opencode.Model{ID: id, Name: name, ToolCall: false}
@@ -459,5 +464,167 @@ func TestModelsTab_ProviderNoSDDModelsFallsBackToFreeForm(t *testing.T) {
 	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // pick opencode → no SDD models → freeForm
 	if st.mode != freeForm {
 		t.Errorf("mode = %v, want freeForm when provider has no SDD models", st.mode)
+	}
+}
+
+// E3-5a: picking a Reasoning=true model enters effortSelect mode.
+func TestModelsTab_ReasoningModelEntersEffortSelect(t *testing.T) {
+	providers := map[string]opencode.Provider{
+		"anthropic": prov("anthropic",
+			reasoningModel("anthropic/claude-opus-4-8", "Claude Opus 4.8"),
+		),
+	}
+	cfg := &config.Config{}
+	st := newModelsTabState(cfg, providers, nil)
+
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // → providerSelect
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // → modelSelect (anthropic)
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // pick reasoning model → effortSelect
+
+	if st.mode != effortSelect {
+		t.Errorf("mode = %v, want effortSelect after picking reasoning model", st.mode)
+	}
+	if st.effortCursor != 0 {
+		t.Errorf("effortCursor = %d, want 0 (reset to top)", st.effortCursor)
+	}
+}
+
+// E3-5b: choosing "high" in effortSelect sets ref.Effort = "high" and returns to rowNav.
+func TestModelsTab_EffortSelectHighSetsEffort(t *testing.T) {
+	providers := map[string]opencode.Provider{
+		"anthropic": prov("anthropic",
+			reasoningModel("anthropic/claude-opus-4-8", "Claude Opus 4.8"),
+		),
+	}
+	cfg := &config.Config{}
+	st := newModelsTabState(cfg, providers, nil)
+
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // → providerSelect
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // → modelSelect
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // → effortSelect (cursor 0 = "default")
+
+	// Navigate to "high" (index 3): Down x3
+	st.update(tea.KeyMsg{Type: tea.KeyDown})
+	st.update(tea.KeyMsg{Type: tea.KeyDown})
+	st.update(tea.KeyMsg{Type: tea.KeyDown})
+	if st.effortCursor != 3 {
+		t.Fatalf("effortCursor = %d, want 3 (high)", st.effortCursor)
+	}
+
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // confirm "high"
+
+	if st.mode != rowNav {
+		t.Errorf("mode = %v, want rowNav after effort selection", st.mode)
+	}
+	if st.rows[0].ref.Effort != "high" {
+		t.Errorf("ref.Effort = %q, want %q", st.rows[0].ref.Effort, "high")
+	}
+}
+
+// E3-5c: choosing "default" in effortSelect maps to empty Effort.
+func TestModelsTab_EffortSelectDefaultMapsToEmpty(t *testing.T) {
+	providers := map[string]opencode.Provider{
+		"anthropic": prov("anthropic",
+			reasoningModel("anthropic/claude-opus-4-8", "Claude Opus 4.8"),
+		),
+	}
+	cfg := &config.Config{}
+	st := newModelsTabState(cfg, providers, nil)
+
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // → providerSelect
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // → modelSelect
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // → effortSelect (cursor 0 = "default")
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // confirm "default"
+
+	if st.mode != rowNav {
+		t.Errorf("mode = %v, want rowNav", st.mode)
+	}
+	if st.rows[0].ref.Effort != "" {
+		t.Errorf("ref.Effort = %q, want empty (default maps to empty)", st.rows[0].ref.Effort)
+	}
+}
+
+// E3-5d: picking a Reasoning=false model skips effortSelect → rowNav, Effort empty.
+func TestModelsTab_NonReasoningModelSkipsEffortSelect(t *testing.T) {
+	providers := map[string]opencode.Provider{
+		"openai": prov("openai",
+			toolModel("openai/gpt-4o", "GPT-4o"), // ToolCall=true, Reasoning=false
+		),
+	}
+	cfg := &config.Config{}
+	st := newModelsTabState(cfg, providers, nil)
+
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // → providerSelect
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // → modelSelect (openai)
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // pick non-reasoning model → rowNav directly
+
+	if st.mode != rowNav {
+		t.Errorf("mode = %v, want rowNav (effort step skipped for non-reasoning model)", st.mode)
+	}
+	if st.rows[0].ref.Effort != "" {
+		t.Errorf("ref.Effort = %q, want empty for non-reasoning model", st.rows[0].ref.Effort)
+	}
+}
+
+// E3-5e: Esc from effortSelect returns to modelSelect (model already set, not cleared).
+func TestModelsTab_EscFromEffortSelectGoesBackToModelSelect(t *testing.T) {
+	providers := map[string]opencode.Provider{
+		"anthropic": prov("anthropic",
+			reasoningModel("anthropic/claude-opus-4-8", "Claude Opus 4.8"),
+		),
+	}
+	cfg := &config.Config{}
+	st := newModelsTabState(cfg, providers, nil)
+
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // → providerSelect
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // → modelSelect
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // → effortSelect
+	if st.mode != effortSelect {
+		t.Fatalf("expected effortSelect, got %v", st.mode)
+	}
+
+	// The model ref is already set when we entered effortSelect.
+	modelAlreadySet := st.rows[0].ref.FullID()
+	if modelAlreadySet == "" {
+		t.Fatal("model should already be set before Esc from effortSelect")
+	}
+
+	st.update(tea.KeyMsg{Type: tea.KeyEsc}) // back to modelSelect
+
+	if st.mode != modelSelect {
+		t.Errorf("mode = %v, want modelSelect after Esc from effortSelect", st.mode)
+	}
+	// Model ref stays set (Esc does not clear it).
+	if st.rows[0].ref.FullID() != modelAlreadySet {
+		t.Errorf("ref.FullID() = %q after Esc, want %q (model should stay)", st.rows[0].ref.FullID(), modelAlreadySet)
+	}
+}
+
+// E3-5f: effortSelect renders a cursor list with "Effort:" header and hint.
+func TestModelsTab_EffortSelectView(t *testing.T) {
+	providers := map[string]opencode.Provider{
+		"anthropic": prov("anthropic",
+			reasoningModel("anthropic/claude-opus-4-8", "Claude Opus 4.8"),
+		),
+	}
+	cfg := &config.Config{}
+	st := newModelsTabState(cfg, providers, nil)
+	st.setWidth(80)
+
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // → providerSelect
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // → modelSelect
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // → effortSelect
+
+	view := st.view(80, 24)
+	for _, opt := range effortOptions {
+		if !strings.Contains(view, opt) {
+			t.Errorf("view missing effort option %q; view:\n%s", opt, view)
+		}
+	}
+	if !strings.Contains(view, "Effort:") {
+		t.Errorf("view missing \"Effort:\" header; view:\n%s", view)
+	}
+	if !strings.Contains(view, "choose effort") {
+		t.Errorf("view missing effort hint; view:\n%s", view)
 	}
 }

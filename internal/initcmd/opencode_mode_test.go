@@ -391,6 +391,114 @@ func TestMergeOpencodeAgent_SubagentFixedFields(t *testing.T) {
 	}
 }
 
+// E2-3a: variant key present when the leader Effort is non-empty.
+func TestMergeOpencodeAgent_LeaderVariantPresent(t *testing.T) {
+	dir := t.TempDir()
+
+	models := config.ModelConfig{
+		Leader: config.ModelRef{Provider: "anthropic", Model: "claude-opus-4-8", Effort: "high"},
+	}
+	if _, err := mergeOpencodeAgent(dir, models); err != nil {
+		t.Fatalf("mergeOpencodeAgent() error = %v", err)
+	}
+
+	doc := readOpencodeDoc(t, dir)
+	leader := leaderAgentFrom(t, doc)
+	if leader["variant"] != "high" {
+		t.Errorf("agent.archon-leader.variant = %v, want %q", leader["variant"], "high")
+	}
+}
+
+// E2-3b: variant key absent (omitted) when the leader Effort is empty.
+func TestMergeOpencodeAgent_LeaderVariantAbsentWhenEmpty(t *testing.T) {
+	dir := t.TempDir()
+
+	models := config.ModelConfig{
+		Leader: config.ParseModelRef(testLeaderModel), // no Effort
+	}
+	if _, err := mergeOpencodeAgent(dir, models); err != nil {
+		t.Fatalf("mergeOpencodeAgent() error = %v", err)
+	}
+
+	doc := readOpencodeDoc(t, dir)
+	leader := leaderAgentFrom(t, doc)
+	if _, exists := leader["variant"]; exists {
+		t.Errorf("agent.archon-leader.variant must be absent when Effort is empty, got %v", leader["variant"])
+	}
+}
+
+// E2-3c: variant key present on a phase subagent when Effort is set.
+func TestMergeOpencodeAgent_PhaseVariantPresent(t *testing.T) {
+	dir := t.TempDir()
+
+	models := config.ModelConfig{
+		Phases: map[string]config.ModelRef{
+			"spec": {Provider: "opencode", Model: "deepseek-v4-pro", Effort: "medium"},
+		},
+	}
+	if _, err := mergeOpencodeAgent(dir, models); err != nil {
+		t.Fatalf("mergeOpencodeAgent() error = %v", err)
+	}
+
+	doc := readOpencodeDoc(t, dir)
+	specAgent := phaseAgentFrom(t, doc, "spec")
+	if specAgent["variant"] != "medium" {
+		t.Errorf("agent.archon-spec.variant = %v, want %q", specAgent["variant"], "medium")
+	}
+}
+
+// E2-3d: variant key absent on a phase subagent when Effort is empty.
+func TestMergeOpencodeAgent_PhaseVariantAbsentWhenEmpty(t *testing.T) {
+	dir := t.TempDir()
+
+	models := config.ModelConfig{
+		Default: config.ParseModelRef("anthropic/claude-sonnet-4-6"), // no Effort
+	}
+	if _, err := mergeOpencodeAgent(dir, models); err != nil {
+		t.Fatalf("mergeOpencodeAgent() error = %v", err)
+	}
+
+	doc := readOpencodeDoc(t, dir)
+	for _, phase := range config.PhaseOrder {
+		a := phaseAgentFrom(t, doc, phase)
+		if _, exists := a["variant"]; exists {
+			t.Errorf("agent.archon-%s.variant must be absent when Effort is empty, got %v", phase, a["variant"])
+		}
+	}
+}
+
+// E2-3e: re-run with mixed effort/empty is byte-identical (idempotency).
+func TestMergeOpencodeAgent_IdempotentWithMixedEffort(t *testing.T) {
+	dir := t.TempDir()
+
+	models := config.ModelConfig{
+		Leader:  config.ModelRef{Provider: "anthropic", Model: "claude-opus-4-8", Effort: "high"},
+		Default: config.ParseModelRef("anthropic/claude-sonnet-4-6"), // empty Effort
+		Phases: map[string]config.ModelRef{
+			"spec": {Provider: "opencode", Model: "deepseek-v4-pro", Effort: "low"},
+		},
+	}
+	if _, err := mergeOpencodeAgent(dir, models); err != nil {
+		t.Fatalf("first mergeOpencodeAgent() error = %v", err)
+	}
+	first, err := os.ReadFile(filepath.Join(dir, "opencode.json"))
+	if err != nil {
+		t.Fatalf("read first: %v", err)
+	}
+
+	if _, err := mergeOpencodeAgent(dir, models); err != nil {
+		t.Fatalf("second mergeOpencodeAgent() error = %v", err)
+	}
+	second, err := os.ReadFile(filepath.Join(dir, "opencode.json"))
+	if err != nil {
+		t.Fatalf("read second: %v", err)
+	}
+
+	if !bytes.Equal(first, second) {
+		t.Errorf("merge is not idempotent with mixed effort:\nfirst:\n%s\nsecond:\n%s", first, second)
+	}
+}
+
 // W3-8: _PhasesSetEmptyLeaderWritesSubagentsNoLeader — leader empty, default
 // set → subagents present, archon-leader absent.
 func TestMergeOpencodeAgent_PhasesSetEmptyLeaderWritesSubagentsNoLeader(t *testing.T) {
