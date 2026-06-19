@@ -50,6 +50,71 @@ func setupInitializedProject(t *testing.T, embeddedFS fstest.MapFS) (string, str
 	return homeDir, projectDir
 }
 
+// S8: "Update leaves the opencode agent untouched". An opencode project with an
+// existing opencode.json (agent.archon-leader) must have that file left
+// unwritten and unchanged after archon update, since update is skill-only and
+// never calls the merge.
+func TestUpdate_LeavesOpencodeJSONUntouched(t *testing.T) {
+	embeddedFS := updateEmbeddedFS()
+	tmpDir := t.TempDir()
+	homeDir := filepath.Join(tmpDir, "home")
+	projectDir := filepath.Join(tmpDir, "project")
+	for _, d := range []string{homeDir, projectDir, filepath.Join(projectDir, ".opencode")} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatalf("MkdirAll(%s) error = %v", d, err)
+		}
+	}
+
+	// Initialize an opencode project that writes opencode.json via the merge.
+	if _, err := Run(Options{
+		HomeDir:     homeDir,
+		ProjectDir:  projectDir,
+		Agent:       "opencode",
+		ModelLeader: "anthropic/claude-sonnet-4-20250514",
+		EmbeddedFS:  embeddedFS,
+	}); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	opencodePath := filepath.Join(projectDir, "opencode.json")
+	before, err := os.ReadFile(opencodePath)
+	if err != nil {
+		t.Fatalf("opencode.json not created by init: %v", err)
+	}
+	infoBefore, err := os.Stat(opencodePath)
+	if err != nil {
+		t.Fatalf("Stat() error = %v", err)
+	}
+
+	// Introduce a real skill gap so update actually does work and writes skills.
+	embeddedFS["sdd-init/SKILL.md"] = &fstest.MapFile{
+		Data: []byte("---\nname: sdd-init\nmetadata:\n  version: \"9.0\"\n---\n# Init"),
+	}
+
+	if _, err := Update(UpdateOptions{
+		HomeDir:    homeDir,
+		ProjectDir: projectDir,
+		EmbeddedFS: embeddedFS,
+	}); err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+
+	after, err := os.ReadFile(opencodePath)
+	if err != nil {
+		t.Fatalf("opencode.json missing after update: %v", err)
+	}
+	if string(before) != string(after) {
+		t.Errorf("opencode.json was rewritten by update:\nbefore:\n%s\nafter:\n%s", before, after)
+	}
+	infoAfter, err := os.Stat(opencodePath)
+	if err != nil {
+		t.Fatalf("Stat() error = %v", err)
+	}
+	if !infoAfter.ModTime().Equal(infoBefore.ModTime()) {
+		t.Errorf("opencode.json mtime changed: before %v, after %v", infoBefore.ModTime(), infoAfter.ModTime())
+	}
+}
+
 // Scenario: "Update before init reports an actionable error".
 func TestUpdate_BeforeInitReportsActionableError(t *testing.T) {
 	tmpDir := t.TempDir()

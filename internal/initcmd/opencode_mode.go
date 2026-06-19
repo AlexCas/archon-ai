@@ -20,6 +20,14 @@ type archonLeaderAgent struct {
 	Prompt      string `json:"prompt"`      // "{file:./AGENTS.md}"
 }
 
+// MergeOpencodeAgent is the exported integration seam for callers outside this
+// package (notably the TUI save path). It delegates to mergeOpencodeAgent so
+// init and the TUI share a single writer implementation and produce
+// byte-identical opencode.json output.
+func MergeOpencodeAgent(projectDir, leader string) (written string, err error) {
+	return mergeOpencodeAgent(projectDir, leader)
+}
+
 // mergeOpencodeAgent additively merges agent.archon-leader into
 // <projectDir>/opencode.json. It is a no-op (returns "", nil) when leader == "".
 //

@@ -6,12 +6,12 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/charmbracelet/bubbles/key"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/archon-ai/archon/internal/config"
 	"github.com/archon-ai/archon/internal/initcmd"
 	"github.com/archon-ai/archon/skills"
+	"github.com/charmbracelet/bubbles/key"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"golang.org/x/term"
 )
 
@@ -259,8 +259,8 @@ func (m Model) renderTabs() string {
 
 func (m Model) renderTabContent() string {
 	style := lipgloss.NewStyle().
-		Width(m.width - 2).
-		Height(m.height - 8).
+		Width(m.width-2).
+		Height(m.height-8).
 		Padding(1, 2)
 
 	switch m.activeTab {
@@ -320,7 +320,16 @@ func (m Model) saveConfig() tea.Cmd {
 			return fmt.Errorf("saved config but failed to regenerate orchestrator: %w", err)
 		}
 
-		// Only update in-memory config after both save and regenerate succeed
+		// For opencode projects, merge the archon-leader agent into the project
+		// opencode.json using the same writer as init so both paths produce
+		// byte-identical output. No-op when models.leader is empty.
+		if cfg.Agent == "opencode" {
+			if _, err := initcmd.MergeOpencodeAgent(m.projectDir, cfg.Models.Leader); err != nil {
+				return fmt.Errorf("saved config but failed to merge opencode agent: %w", err)
+			}
+		}
+
+		// Only update in-memory config after save, regenerate, and merge succeed
 		m.config = cfg
 
 		return "✓ Configuration saved"
