@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/archon-ai/archon/internal/config"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestNewModel(t *testing.T) {
@@ -251,7 +251,7 @@ func TestModelsTabState_AutoFill(t *testing.T) {
 			Default: "gpt-4",
 		},
 	}
-	state := newModelsTabState(cfg)
+	state := newModelsTabState(cfg, config.StaticModels())
 
 	// Check that placeholder includes default
 	placeholder := state.inputs[modelInputExplore].Placeholder
@@ -275,7 +275,7 @@ func TestModelsTabState_LockOnEdit(t *testing.T) {
 			Default: "gpt-4",
 		},
 	}
-	state := newModelsTabState(cfg)
+	state := newModelsTabState(cfg, config.StaticModels())
 
 	// Simulate user typing in explore field
 	state.focusedInput = modelInputExplore
@@ -304,7 +304,7 @@ func TestModelsTabState_ApplyToConfig(t *testing.T) {
 			Phases:  make(map[string]string),
 		},
 	}
-	state := newModelsTabState(cfg)
+	state := newModelsTabState(cfg, config.StaticModels())
 
 	state.inputs[modelInputDefault].SetValue("claude-sonnet-4")
 	state.inputs[modelInputExplore].SetValue("gpt-4o")

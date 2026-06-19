@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/archon-ai/archon/internal/config"
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // TestIntegration_SaveAndReload tests the full save/load cycle.
@@ -226,7 +226,7 @@ func TestEdgeCases_ModelPhaseDeletion(t *testing.T) {
 			},
 		},
 	}
-	state := newModelsTabState(cfg)
+	state := newModelsTabState(cfg, config.StaticModels())
 
 	// Clear the propose value
 	state.inputs[modelInputPropose].SetValue("")
@@ -248,7 +248,7 @@ func TestEdgeCases_AllPhasesLocked(t *testing.T) {
 			Phases:  make(map[string]string),
 		},
 	}
-	state := newModelsTabState(cfg)
+	state := newModelsTabState(cfg, config.StaticModels())
 
 	// Lock all phases
 	for i := range state.phaseNames {
@@ -398,7 +398,7 @@ func TestEdgeCases_ModelsTabNavigation(t *testing.T) {
 			Phases:  make(map[string]string),
 		},
 	}
-	state := newModelsTabState(cfg)
+	state := newModelsTabState(cfg, config.StaticModels())
 
 	// Navigate down through all inputs
 	for i := 0; i < len(state.inputs); i++ {

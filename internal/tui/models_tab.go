@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/archon-ai/archon/internal/config"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/archon-ai/archon/internal/config"
 )
 
 // modelsTabState holds the state for the Models configuration tab.
@@ -16,6 +16,7 @@ type modelsTabState struct {
 	focusedInput  int
 	phaseNames    []string
 	autoFillLocks map[int]bool // tracks which phase inputs have been manually edited
+	catalog       []string     // detected, ordered model catalog cached once at open
 }
 
 // modelInputIndices maps input indices to their purpose.
@@ -31,7 +32,7 @@ const (
 	modelInputArchive = 8
 )
 
-func newModelsTabState(cfg *config.Config) modelsTabState {
+func newModelsTabState(cfg *config.Config, catalog []string) modelsTabState {
 	phaseNames := []string{
 		"explore", "propose", "spec", "design",
 		"tasks", "apply", "verify", "archive",
@@ -60,6 +61,7 @@ func newModelsTabState(cfg *config.Config) modelsTabState {
 		focusedInput:  modelInputDefault,
 		phaseNames:    phaseNames,
 		autoFillLocks: make(map[int]bool),
+		catalog:       catalog,
 	}
 
 	// Update auto-fill placeholders
@@ -123,10 +125,10 @@ func (m *modelsTabState) update(msg tea.Msg) (tea.Cmd, bool) {
 }
 
 // cycleStaticModel sets the focused input to the next/previous model in the
-// static catalog (Claude + Opencode Go). An empty entry leads the catalog so
-// users can cycle back to "no value" and still type a free-form model name.
+// detected catalog cached at open. An empty entry leads the catalog so users
+// can cycle back to "no value" and still type a free-form model name.
 func (m *modelsTabState) cycleStaticModel(dir int) {
-	catalog := append([]string{""}, config.StaticModels()...)
+	catalog := append([]string{""}, m.catalog...)
 	current := m.inputs[m.focusedInput].Value()
 
 	idx := 0
@@ -181,9 +183,9 @@ func (m *modelsTabState) view(width, height int) string {
 	b.WriteString(titleStyle.Render("Model Configuration"))
 	b.WriteString("\n")
 	hintStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
-	b.WriteString(hintStyle.Render("ctrl+n/ctrl+p: cycle static models  ·  or type any model name"))
+	b.WriteString(hintStyle.Render("ctrl+n/ctrl+p: cycle detected models  ·  or type any model name"))
 	b.WriteString("\n")
-	b.WriteString(hintStyle.Render("Static: " + strings.Join(config.StaticModels(), ", ")))
+	b.WriteString(hintStyle.Render("Available: " + strings.Join(m.catalog, ", ")))
 	b.WriteString("\n\n")
 
 	// Default model
