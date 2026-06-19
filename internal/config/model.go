@@ -8,6 +8,7 @@ import (
 
 type ModelConfig struct {
 	Default string            `yaml:"default,omitempty"`
+	Leader  string            `yaml:"leader,omitempty"`
 	Phases  map[string]string `yaml:"phases,omitempty"`
 }
 

@@ -21,6 +21,7 @@ type Options struct {
 	Force        bool
 	EmbeddedFS   fs.FS
 	ModelDefault string
+	ModelLeader  string
 	ModelPhases  map[string]string
 	// Playwright enables generation and execution of Playwright E2E tests.
 	Playwright bool
@@ -81,7 +82,7 @@ func Run(opts Options) (*Result, error) {
 	projectSkillsDir := res.ProjectSkillsDir
 	extracted := res.Extracted
 
-	cfg := buildConfig(agentName, extracted, res.Inventory, opts.ModelDefault, opts.ModelPhases, opts.Playwright)
+	cfg := buildConfig(agentName, extracted, res.Inventory, opts.ModelDefault, opts.ModelLeader, opts.ModelPhases, opts.Playwright)
 	cfg.HomeDir = opts.ProjectDir
 	if err := cfg.Save(); err != nil {
 		return nil, fmt.Errorf("save config: %w", err)
@@ -89,12 +90,26 @@ func Run(opts Options) (*Result, error) {
 
 	rollback := buildRollbackManifest(cfg, extracted, globalSkillsDir, projectSkillsDir)
 	rollback.HomeDir = opts.ProjectDir
-	if err := rollback.WriteManifest(); err != nil {
-		return nil, fmt.Errorf("write rollback manifest: %w", err)
-	}
 
 	if err := writeTemplate(opts.ProjectDir, agentName, len(extracted), config.ResolvePhaseModels(cfg.Models)); err != nil {
 		return nil, fmt.Errorf("render template: %w", err)
+	}
+
+	// Merge the archon-leader agent into opencode.json for opencode projects.
+	// This must run before WriteManifest so the written path is registered for
+	// rollback alongside everything else init created.
+	if agentName == "opencode" {
+		mergedPath, err := mergeOpencodeAgent(opts.ProjectDir, cfg.Models.Leader)
+		if err != nil {
+			return nil, fmt.Errorf("merge opencode agent: %w", err)
+		}
+		if mergedPath != "" {
+			rollback.CreatedPaths = append(rollback.CreatedPaths, mergedPath)
+		}
+	}
+
+	if err := rollback.WriteManifest(); err != nil {
+		return nil, fmt.Errorf("write rollback manifest: %w", err)
 	}
 
 	if err := createOpenSpecDir(opts.ProjectDir); err != nil {
@@ -189,7 +204,7 @@ func createSymlinks(globalDir, projectDir string, skills []string) error {
 	return nil
 }
 
-func buildConfig(agentName string, extracted []string, inventory []config.SkillInventory, modelDefault string, modelPhases map[string]string, playwright bool) *config.Config {
+func buildConfig(agentName string, extracted []string, inventory []config.SkillInventory, modelDefault string, modelLeader string, modelPhases map[string]string, playwright bool) *config.Config {
 	var phases map[string]string
 	for k, v := range modelPhases {
 		if v != "" {
@@ -216,6 +231,7 @@ func buildConfig(agentName string, extracted []string, inventory []config.SkillI
 		},
 		Models: config.ModelConfig{
 			Default: modelDefault,
+			Leader:  modelLeader,
 			Phases:  phases,
 		},
 		SkillInventory: inventory,

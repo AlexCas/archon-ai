@@ -87,6 +87,7 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 		modelApplyFlag   string
 		modelVerifyFlag  string
 		modelArchiveFlag string
+		modelLeaderFlag  string
 	)
 
 	cmd := &cobra.Command{
@@ -137,6 +138,15 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 			if w := config.Validate(modelFlag); w != "" {
 				fmt.Fprintln(stderr, w)
 			}
+			// The leader model is an opencode provider/model-id (e.g.
+			// "anthropic/claude-sonnet-4-...") rather than a Claude family alias,
+			// so only run the Claude-oriented advisory check when the value is not
+			// already in provider/model-id form (contains "/").
+			if !strings.Contains(modelLeaderFlag, "/") {
+				if w := config.Validate(modelLeaderFlag); w != "" {
+					fmt.Fprintln(stderr, w)
+				}
+			}
 
 			opts := initcmd.Options{
 				HomeDir:           homeDir,
@@ -146,6 +156,7 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 				EmbeddedFS:        skills.FS,
 				ModelDefault:      modelFlag,
 				ModelPhases:       modelFlags,
+				ModelLeader:       modelLeaderFlag,
 				Playwright:        playwrightFlag,
 				OverwriteTemplate: forceFlag,
 			}
@@ -187,6 +198,7 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 	cmd.Flags().StringVar(&modelApplyFlag, "model-apply", "", "Model for the apply phase")
 	cmd.Flags().StringVar(&modelVerifyFlag, "model-verify", "", "Model for the verify phase")
 	cmd.Flags().StringVar(&modelArchiveFlag, "model-archive", "", "Model for the archive phase")
+	cmd.Flags().StringVar(&modelLeaderFlag, "leader", "", "Opencode leader model (provider/model-id) for the archon-leader primary agent")
 
 	return cmd
 }

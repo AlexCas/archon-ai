@@ -1,0 +1,24 @@
+phase: archive
+status: completed
+note: "Chained delivery — PR1 (core) delivered as PR #41 (judge PASS). PR2 (TUI) judge PASS. Delta spec synced into openspec/specs/harness-init/spec.md; change archived."
+history:
+  - {phase: explore, status: in_progress, ts: "2026-06-18T23:12:49Z"}
+  - {phase: explore, status: completed, ts: "2026-06-18T23:17:05Z"}
+  - {phase: propose, status: in_progress, ts: "2026-06-18T23:19:32Z"}
+  - {phase: propose, status: completed, ts: "2026-06-18T23:21:23Z"}
+  - {phase: spec, status: in_progress, ts: "2026-06-18T23:23:58Z"}
+  - {phase: spec, status: completed, ts: "2026-06-18T23:25:33Z"}
+  - {phase: design, status: in_progress, ts: "2026-06-18T23:26:13Z"}
+  - {phase: design, status: completed, ts: "2026-06-18T23:28:15Z"}
+  - {phase: tasks, status: in_progress, ts: "2026-06-18T23:32:48Z"}
+  - {phase: tasks, status: completed, ts: "2026-06-18T23:35:53Z"}
+  - {phase: apply, status: in_progress, ts: "2026-06-18T23:39:10Z"}
+  - {phase: apply, status: completed-pr1, ts: "2026-06-18T23:45:35Z"}
+  - {phase: verify, status: completed-pr1, ts: "2026-06-18T23:47:47Z"}
+  - {phase: judge, status: completed-pr1, ts: "2026-06-19T00:04:14Z"}
+  - {phase: apply, status: completed-pr2, ts: "2026-06-19T00:09:55Z"}
+  - {phase: verify, status: completed-pr2, ts: "2026-06-19T00:09:55Z"}
+  - {phase: judge, status: completed-pr2, ts: "2026-06-19T00:19:39Z"}
+  - {phase: archive, status: in_progress, ts: "2026-06-19T00:19:39Z"}
+  - {phase: archive, status: completed, ts: "2026-06-19T00:22:29Z"}
+
