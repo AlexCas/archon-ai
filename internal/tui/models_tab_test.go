@@ -13,7 +13,7 @@ import (
 // construction and the tab reads only from m.catalog on cycle/type, never
 // re-running detection.
 func TestModelsTab_DetectionCachedOncePerView(t *testing.T) {
-	cfg := &config.Config{Models: config.ModelConfig{Default: ""}}
+	cfg := &config.Config{Models: config.ModelConfig{Default: config.ModelRef{}}}
 
 	// detectCount proves detection is performed exactly once, at open, through
 	// the injectable seam — and never again on cycle/type.
@@ -60,7 +60,7 @@ func TestModelsTab_DetectionCachedOncePerView(t *testing.T) {
 // TestModelsTab_CycleAndHintFromInjectedCatalog covers spec rows 6.2: cycling
 // and the renamed "Available:" hint render from the injected catalog slice.
 func TestModelsTab_CycleAndHintFromInjectedCatalog(t *testing.T) {
-	cfg := &config.Config{Models: config.ModelConfig{Default: ""}}
+	cfg := &config.Config{Models: config.ModelConfig{Default: config.ModelRef{}}}
 	catalog := []string{"alpha-1", "beta-2"}
 	state := newModelsTabState(cfg, catalog)
 	state.setWidth(120)
@@ -99,7 +99,7 @@ func TestModelsTab_CycleAndHintFromInjectedCatalog(t *testing.T) {
 // entry and advisory behavior unchanged": an arbitrary value is accepted and
 // NormalizeModel / Validate behave exactly as before this feature.
 func TestModelsTab_FreeFormEntryUnchanged(t *testing.T) {
-	cfg := &config.Config{Models: config.ModelConfig{Default: ""}}
+	cfg := &config.Config{Models: config.ModelConfig{Default: config.ModelRef{}}}
 	// A deliberately small catalog that does NOT contain the typed value.
 	state := newModelsTabState(cfg, []string{"claude-opus-4-8"})
 

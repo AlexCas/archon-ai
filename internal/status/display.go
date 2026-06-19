@@ -52,11 +52,11 @@ func DisplayWithUpdate(w io.Writer, cfg *config.Config, n int) {
 
 	fmt.Fprintln(w, "  Models")
 	fmt.Fprintln(w, "  ------")
-	if cfg.Models.Default == "" && len(cfg.Models.Phases) == 0 {
+	if cfg.Models.Default.FullID() == "" && len(cfg.Models.Phases) == 0 {
 		fmt.Fprintln(w, "    (none configured)")
 	} else {
-		if cfg.Models.Default != "" {
-			fmt.Fprintf(w, "    Default:  %s\n", cfg.Models.Default)
+		if cfg.Models.Default.FullID() != "" {
+			fmt.Fprintf(w, "    Default:  %s\n", cfg.Models.Default.FullID())
 		}
 		if len(cfg.Models.Phases) > 0 {
 			phases := make([]string, 0, len(cfg.Models.Phases))
@@ -65,7 +65,7 @@ func DisplayWithUpdate(w io.Writer, cfg *config.Config, n int) {
 			}
 			sort.Strings(phases)
 			for _, phase := range phases {
-				fmt.Fprintf(w, "    %-8s %s\n", phase+":", cfg.Models.Phases[phase])
+				fmt.Fprintf(w, "    %-8s %s\n", phase+":", cfg.Models.Phases[phase].FullID())
 			}
 		}
 	}

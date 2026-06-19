@@ -16,9 +16,9 @@ func TestNewModel(t *testing.T) {
 	cfg := &config.Config{
 		Agent: "opencode",
 		Models: config.ModelConfig{
-			Default: "gpt-4",
-			Phases: map[string]string{
-				"explore": "claude-sonnet-4",
+			Default: config.ModelRef{Model: "gpt-4"},
+			Phases: map[string]config.ModelRef{
+				"explore": {Model: "claude-sonnet-4"},
 			},
 		},
 		MutationTesting: config.MutationTesting{
@@ -121,7 +121,7 @@ func TestModel_Update_Save(t *testing.T) {
 	cfg := &config.Config{
 		HomeDir: t.TempDir(),
 		Models: config.ModelConfig{
-			Default: "gpt-4",
+			Default: config.ModelRef{Model: "gpt-4"},
 		},
 	}
 	m := NewModel(cfg, cfg.HomeDir)
@@ -250,7 +250,7 @@ func TestCheckTerminal(t *testing.T) {
 func TestModelsTabState_AutoFill(t *testing.T) {
 	cfg := &config.Config{
 		Models: config.ModelConfig{
-			Default: "gpt-4",
+			Default: config.ModelRef{Model: "gpt-4"},
 		},
 	}
 	state := newModelsTabState(cfg, config.StaticModels())
@@ -274,7 +274,7 @@ func TestModelsTabState_AutoFill(t *testing.T) {
 func TestModelsTabState_LockOnEdit(t *testing.T) {
 	cfg := &config.Config{
 		Models: config.ModelConfig{
-			Default: "gpt-4",
+			Default: config.ModelRef{Model: "gpt-4"},
 		},
 	}
 	state := newModelsTabState(cfg, config.StaticModels())
@@ -302,8 +302,8 @@ func TestModelsTabState_LockOnEdit(t *testing.T) {
 func TestModelsTabState_ApplyToConfig(t *testing.T) {
 	cfg := &config.Config{
 		Models: config.ModelConfig{
-			Default: "gpt-4",
-			Phases:  make(map[string]string),
+			Default: config.ModelRef{Model: "gpt-4"},
+			Phases:  make(map[string]config.ModelRef),
 		},
 	}
 	state := newModelsTabState(cfg, config.StaticModels())
@@ -314,11 +314,11 @@ func TestModelsTabState_ApplyToConfig(t *testing.T) {
 
 	state.applyToConfig(cfg)
 
-	if cfg.Models.Default != "claude-sonnet-4" {
-		t.Errorf("default = %q, want %q", cfg.Models.Default, "claude-sonnet-4")
+	if cfg.Models.Default.FullID() != "claude-sonnet-4" {
+		t.Errorf("default = %q, want %q", cfg.Models.Default.FullID(), "claude-sonnet-4")
 	}
-	if cfg.Models.Phases["explore"] != "gpt-4o" {
-		t.Errorf("explore = %q, want %q", cfg.Models.Phases["explore"], "gpt-4o")
+	if cfg.Models.Phases["explore"].FullID() != "gpt-4o" {
+		t.Errorf("explore = %q, want %q", cfg.Models.Phases["explore"].FullID(), "gpt-4o")
 	}
 	if _, exists := cfg.Models.Phases["propose"]; exists {
 		t.Error("propose should be deleted when empty")
@@ -561,8 +561,8 @@ func TestSaveConfig_FailureDoesNotMutateInMemoryConfig(t *testing.T) {
 	}
 
 	// Verify in-memory config was NOT mutated
-	if m.config.Models.Default != "" {
-		t.Errorf("in-memory config was mutated: Models.Default = %q", m.config.Models.Default)
+	if m.config.Models.Default.FullID() != "" {
+		t.Errorf("in-memory config was mutated: Models.Default = %q", m.config.Models.Default.FullID())
 	}
 	if m.config.Agent != "opencode" {
 		t.Errorf("in-memory config was mutated: Agent = %q", m.config.Agent)
@@ -683,7 +683,7 @@ func TestSaveConfig_OpencodeLeaderMatchesInitMerge(t *testing.T) {
 		Agent:      "opencode",
 		Version:    "1.0.0",
 		SkillCount: 10,
-		Models:     config.ModelConfig{Leader: leader},
+		Models:     config.ModelConfig{Leader: config.ParseModelRef(leader)},
 	}
 	m := NewModel(cfg, tuiDir)
 
@@ -718,21 +718,21 @@ func TestSaveConfig_OpencodeLeaderMatchesInitMerge(t *testing.T) {
 // unknown value still warns. This pins the CLI/TUI consistency fix.
 func TestModelsTab_LeaderWarningGuard(t *testing.T) {
 	// Provider/model-id form: no warning, but the leader section still renders.
-	cfg := &config.Config{Agent: "opencode", Models: config.ModelConfig{Leader: "openai/gpt-4o"}}
+	cfg := &config.Config{Agent: "opencode", Models: config.ModelConfig{Leader: config.ParseModelRef("openai/gpt-4o")}}
 	state := newModelsTabState(cfg, config.StaticModels())
 	view := state.view(80, 24)
 	if !contains(view, "Leader Model (opencode)") {
 		t.Fatal("leader section should render for opencode")
 	}
 	if contains(view, "⚠") {
-		t.Errorf("provider/model-id leader %q should not warn; view:\n%s", cfg.Models.Leader, view)
+		t.Errorf("provider/model-id leader %q should not warn; view:\n%s", cfg.Models.Leader.FullID(), view)
 	}
 
 	// Non-slash unknown value: the advisory warning still shows.
-	cfg2 := &config.Config{Agent: "opencode", Models: config.ModelConfig{Leader: "notarealmodel"}}
+	cfg2 := &config.Config{Agent: "opencode", Models: config.ModelConfig{Leader: config.ParseModelRef("notarealmodel")}}
 	state2 := newModelsTabState(cfg2, config.StaticModels())
 	if view2 := state2.view(80, 24); !contains(view2, "⚠") {
-		t.Errorf("non-slash unknown leader %q should still warn; view:\n%s", cfg2.Models.Leader, view2)
+		t.Errorf("non-slash unknown leader %q should still warn; view:\n%s", cfg2.Models.Leader.FullID(), view2)
 	}
 }
 

@@ -47,14 +47,14 @@ func newModelsTabState(cfg *config.Config, catalog []string) modelsTabState {
 	inputs := make([]textinput.Model, 1+len(phaseNames))
 
 	// Default model input
-	inputs[modelInputDefault] = newModelInput("Default model", cfg.Models.Default)
+	inputs[modelInputDefault] = newModelInput("Default model", cfg.Models.Default.FullID())
 
 	// Phase inputs
 	for i, phase := range phaseNames {
 		idx := i + 1
 		value := ""
 		if cfg.Models.Phases != nil {
-			value = cfg.Models.Phases[phase]
+			value = cfg.Models.Phases[phase].FullID()
 		}
 		inputs[idx] = newModelInput(phase, value)
 	}
@@ -66,7 +66,7 @@ func newModelsTabState(cfg *config.Config, catalog []string) modelsTabState {
 	// agents it is constructed but never rendered or focus-traversed.
 	leaderEnabled := cfg.Agent == "opencode"
 	if leaderEnabled {
-		inputs = append(inputs, newModelInput("Leader model", cfg.Models.Leader))
+		inputs = append(inputs, newModelInput("Leader model", cfg.Models.Leader.FullID()))
 	}
 
 	state := modelsTabState{
@@ -280,17 +280,17 @@ func (m *modelsTabState) view(width, height int) string {
 }
 
 func (m *modelsTabState) applyToConfig(cfg *config.Config) {
-	cfg.Models.Default = m.inputs[modelInputDefault].Value()
+	cfg.Models.Default = config.ParseModelRef(m.inputs[modelInputDefault].Value())
 
 	if cfg.Models.Phases == nil {
-		cfg.Models.Phases = make(map[string]string)
+		cfg.Models.Phases = make(map[string]config.ModelRef)
 	}
 
 	for i, phase := range m.phaseNames {
 		idx := i + 1
 		value := m.inputs[idx].Value()
 		if value != "" {
-			cfg.Models.Phases[phase] = value
+			cfg.Models.Phases[phase] = config.ParseModelRef(value)
 		} else {
 			delete(cfg.Models.Phases, phase)
 		}
@@ -299,7 +299,7 @@ func (m *modelsTabState) applyToConfig(cfg *config.Config) {
 	// Leader model is opencode-only; for other agents the input is not in the
 	// focus ring and we leave cfg.Models.Leader as loaded.
 	if idx := m.leaderInputIndex(); idx >= 0 {
-		cfg.Models.Leader = m.inputs[idx].Value()
+		cfg.Models.Leader = config.ParseModelRef(m.inputs[idx].Value())
 	}
 }
 

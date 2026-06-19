@@ -19,9 +19,9 @@ func TestIntegration_SaveAndReload(t *testing.T) {
 		HomeDir: projectDir,
 		Agent:   "opencode",
 		Models: config.ModelConfig{
-			Default: "gpt-4",
-			Phases: map[string]string{
-				"explore": "claude-sonnet-4",
+			Default: config.ModelRef{Model: "gpt-4"},
+			Phases: map[string]config.ModelRef{
+				"explore": {Model: "claude-sonnet-4"},
 			},
 		},
 		MutationTesting: config.MutationTesting{
@@ -59,11 +59,11 @@ func TestIntegration_SaveAndReload(t *testing.T) {
 		t.Fatalf("reload: %v", err)
 	}
 
-	if reloaded.Models.Default != "gpt-4o" {
-		t.Errorf("reloaded default = %q, want %q", reloaded.Models.Default, "gpt-4o")
+	if reloaded.Models.Default.FullID() != "gpt-4o" {
+		t.Errorf("reloaded default = %q, want %q", reloaded.Models.Default.FullID(), "gpt-4o")
 	}
-	if reloaded.Models.Phases["explore"] != "gpt-4o-mini" {
-		t.Errorf("reloaded explore = %q, want %q", reloaded.Models.Phases["explore"], "gpt-4o-mini")
+	if reloaded.Models.Phases["explore"].FullID() != "gpt-4o-mini" {
+		t.Errorf("reloaded explore = %q, want %q", reloaded.Models.Phases["explore"].FullID(), "gpt-4o-mini")
 	}
 	if !reloaded.MutationTesting.Enabled {
 		t.Error("reloaded enabled should be true")
@@ -77,8 +77,8 @@ func TestIntegration_SaveAndReload(t *testing.T) {
 func TestEdgeCases_EmptyDefaultModel(t *testing.T) {
 	cfg := &config.Config{
 		Models: config.ModelConfig{
-			Default: "",
-			Phases:  make(map[string]string),
+			Default: config.ModelRef{},
+			Phases:  make(map[string]config.ModelRef),
 		},
 	}
 	m := NewModel(cfg, "")
@@ -94,7 +94,7 @@ func TestEdgeCases_EmptyDefaultModel(t *testing.T) {
 func TestEdgeCases_UnknownModelWarning(t *testing.T) {
 	cfg := &config.Config{
 		Models: config.ModelConfig{
-			Default: "unknown-model-xyz",
+			Default: config.ModelRef{Model: "unknown-model-xyz"},
 		},
 	}
 	m := NewModel(cfg, "")
@@ -136,7 +136,7 @@ func TestEdgeCases_SaveWithoutChanges(t *testing.T) {
 		HomeDir: projectDir,
 		Agent:   "opencode",
 		Models: config.ModelConfig{
-			Default: "gpt-4",
+			Default: config.ModelRef{Model: "gpt-4"},
 		},
 	}
 
@@ -219,10 +219,10 @@ func TestEdgeCases_MutationThresholdBounds(t *testing.T) {
 func TestEdgeCases_ModelPhaseDeletion(t *testing.T) {
 	cfg := &config.Config{
 		Models: config.ModelConfig{
-			Default: "gpt-4",
-			Phases: map[string]string{
-				"explore": "claude-sonnet-4",
-				"propose": "gpt-4o",
+			Default: config.ModelRef{Model: "gpt-4"},
+			Phases: map[string]config.ModelRef{
+				"explore": {Model: "claude-sonnet-4"},
+				"propose": {Model: "gpt-4o"},
 			},
 		},
 	}
@@ -235,8 +235,8 @@ func TestEdgeCases_ModelPhaseDeletion(t *testing.T) {
 	if _, exists := cfg.Models.Phases["propose"]; exists {
 		t.Error("propose should be deleted when empty")
 	}
-	if cfg.Models.Phases["explore"] != "claude-sonnet-4" {
-		t.Errorf("explore = %q, want %q", cfg.Models.Phases["explore"], "claude-sonnet-4")
+	if cfg.Models.Phases["explore"].FullID() != "claude-sonnet-4" {
+		t.Errorf("explore = %q, want %q", cfg.Models.Phases["explore"].FullID(), "claude-sonnet-4")
 	}
 }
 
@@ -244,8 +244,8 @@ func TestEdgeCases_ModelPhaseDeletion(t *testing.T) {
 func TestEdgeCases_AllPhasesLocked(t *testing.T) {
 	cfg := &config.Config{
 		Models: config.ModelConfig{
-			Default: "gpt-4",
-			Phases:  make(map[string]string),
+			Default: config.ModelRef{Model: "gpt-4"},
+			Phases:  make(map[string]config.ModelRef),
 		},
 	}
 	state := newModelsTabState(cfg, config.StaticModels())
@@ -394,8 +394,8 @@ func TestEdgeCases_MutationTabFocusToggle(t *testing.T) {
 func TestEdgeCases_ModelsTabNavigation(t *testing.T) {
 	cfg := &config.Config{
 		Models: config.ModelConfig{
-			Default: "gpt-4",
-			Phases:  make(map[string]string),
+			Default: config.ModelRef{Model: "gpt-4"},
+			Phases:  make(map[string]config.ModelRef),
 		},
 	}
 	state := newModelsTabState(cfg, config.StaticModels())
@@ -420,10 +420,10 @@ func TestIntegration_ConfigFilePersistence(t *testing.T) {
 		HomeDir: projectDir,
 		Agent:   "claude",
 		Models: config.ModelConfig{
-			Default: "claude-sonnet-4",
-			Phases: map[string]string{
-				"explore": "gpt-4",
-				"apply":   "gpt-4o",
+			Default: config.ModelRef{Model: "claude-sonnet-4"},
+			Phases: map[string]config.ModelRef{
+				"explore": {Model: "gpt-4"},
+				"apply":   {Model: "gpt-4o"},
 			},
 		},
 		MutationTesting: config.MutationTesting{
@@ -469,9 +469,9 @@ func TestIntegration_ConfigFilePersistence(t *testing.T) {
 func TestIntegration_TabStateConsistency(t *testing.T) {
 	cfg := &config.Config{
 		Models: config.ModelConfig{
-			Default: "gpt-4",
-			Phases: map[string]string{
-				"explore": "claude-sonnet-4",
+			Default: config.ModelRef{Model: "gpt-4"},
+			Phases: map[string]config.ModelRef{
+				"explore": {Model: "claude-sonnet-4"},
 			},
 		},
 		MutationTesting: config.MutationTesting{

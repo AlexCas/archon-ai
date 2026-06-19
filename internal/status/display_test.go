@@ -86,14 +86,14 @@ func TestDisplay(t *testing.T) {
 		{
 			name: "models configured",
 			cfg: &config.Config{
-				Version:    "1.0.0",
-				Agent:      "opencode",
-				SkillCount: 10,
-				CreatedAt:  time.Date(2026, 6, 10, 0, 0, 0, 0, time.UTC),
+				Version:         "1.0.0",
+				Agent:           "opencode",
+				SkillCount:      10,
+				CreatedAt:       time.Date(2026, 6, 10, 0, 0, 0, 0, time.UTC),
 				MutationTesting: config.MutationTesting{Enabled: false},
 				Models: config.ModelConfig{
-					Default: "claude-sonnet-4",
-					Phases:  map[string]string{"apply": "gpt-4o"},
+					Default: config.ModelRef{Model: "claude-sonnet-4"},
+					Phases:  map[string]config.ModelRef{"apply": {Model: "gpt-4o"}},
 				},
 			},
 			contains: []string{

@@ -4,12 +4,83 @@ import (
 	"fmt"
 	"strings"
 	"unicode"
+
+	"gopkg.in/yaml.v3"
 )
 
+// ModelRef is a structured provider+model assignment. An empty Provider is a
+// valid advisory-only state (FullID returns the bare Model); a bare legacy alias
+// decodes to this state and re-marshals as the same scalar.
+type ModelRef struct {
+	Provider string `yaml:"provider,omitempty"`
+	Model    string `yaml:"model,omitempty"`
+	Effort   string `yaml:"effort,omitempty"`
+}
+
+// FullID returns the provider-qualified id used by delegations:
+//   - Model already contains "/" -> returned as-is (no double-prefix).
+//   - non-empty Provider + bare Model -> "<provider>/<model>".
+//   - empty Provider -> the bare Model (no leading slash).
+func (r ModelRef) FullID() string {
+	if strings.Contains(r.Model, "/") {
+		return r.Model
+	}
+	if r.Provider == "" {
+		return r.Model
+	}
+	return r.Provider + "/" + r.Model
+}
+
+// UnmarshalYAML accepts either a legacy scalar ("provider/model" or bare "model")
+// or a structured mapping ({provider, model, effort}).
+func (r *ModelRef) UnmarshalYAML(node *yaml.Node) error {
+	if node.Kind == yaml.ScalarNode {
+		s := node.Value
+		if i := strings.Index(s, "/"); i >= 0 { // split on the FIRST "/"
+			r.Provider = s[:i]
+			r.Model = s[i+1:]
+			return nil
+		}
+		r.Provider = "" // bare alias -> empty provider, NEVER guessed
+		r.Model = s
+		return nil
+	}
+	type modelRefAlias ModelRef // strips the custom method -> no recursion
+	var tmp modelRefAlias
+	if err := node.Decode(&tmp); err != nil {
+		return err
+	}
+	*r = ModelRef(tmp)
+	return nil
+}
+
+// MarshalYAML emits a scalar equal to FullID() when Effort == "", keeping
+// unmigrated flat-string configs byte-identical — both a bare alias ("opus")
+// and a provider-qualified scalar ("anthropic/claude-...") re-serialize to the
+// same one-line form they were loaded from. Only an effort-bearing ref (which
+// has no legacy scalar representation) marshals as a mapping.
+func (r ModelRef) MarshalYAML() (any, error) {
+	if r.Effort == "" {
+		return r.FullID(), nil // SCALAR — byte-identical for unmigrated configs
+	}
+	type modelRefAlias ModelRef // mapping, no recursion
+	return modelRefAlias(r), nil
+}
+
+// ParseModelRef splits a user-supplied "provider/model" string into a ModelRef.
+// A bare value (no "/") yields an empty Provider (advisory-only). Splitting on
+// the FIRST "/" mirrors FullID/UnmarshalYAML, so ParseModelRef and UnmarshalYAML agree.
+func ParseModelRef(s string) ModelRef {
+	if i := strings.Index(s, "/"); i >= 0 {
+		return ModelRef{Provider: s[:i], Model: s[i+1:]}
+	}
+	return ModelRef{Model: s}
+}
+
 type ModelConfig struct {
-	Default string            `yaml:"default,omitempty"`
-	Leader  string            `yaml:"leader,omitempty"`
-	Phases  map[string]string `yaml:"phases,omitempty"`
+	Default ModelRef            `yaml:"default,omitempty"`
+	Leader  ModelRef            `yaml:"leader,omitempty"`
+	Phases  map[string]ModelRef `yaml:"phases,omitempty"`
 }
 
 // ClaudeModels is the curated, ordered list of Claude models offered as static
@@ -172,21 +243,21 @@ func NormalizeModel(s string) (id string, ok bool) {
 	return "", false
 }
 
-// ResolvePhaseModels returns phase→alias pairs in canonical PhaseOrder,
-// omitting any phase that resolves to nothing. For each phase it tries the
-// explicit Phases entry, falls back to Default, and omits the line if neither
-// normalizes. The function is pure and never mutates mc.
+// ResolvePhaseModels returns phase->model pairs in canonical PhaseOrder. For each
+// phase it prefers the explicit Phases entry, falls back to Default, and omits the
+// phase when neither yields a model. The emitted Model is ref.FullID():
+// "<provider>/<model>" when a provider is present, else the bare alias.
 func ResolvePhaseModels(mc ModelConfig) []PhaseModel {
 	var out []PhaseModel
 	for _, p := range PhaseOrder {
-		id, ok := NormalizeModel(mc.Phases[p])
-		if !ok {
-			id, ok = NormalizeModel(mc.Default)
+		ref, ok := mc.Phases[p]
+		if !ok || ref.Model == "" {
+			ref = mc.Default
 		}
-		if !ok {
+		if ref.Model == "" {
 			continue
 		}
-		out = append(out, PhaseModel{Phase: p, Model: id})
+		out = append(out, PhaseModel{Phase: p, Model: ref.FullID()})
 	}
 	return out
 }
