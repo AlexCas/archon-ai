@@ -3,9 +3,11 @@ package tui
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/archon-ai/archon/internal/config"
+	"github.com/archon-ai/archon/internal/opencode"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -38,9 +40,13 @@ func TestIntegration_SaveAndReload(t *testing.T) {
 	// Create TUI model
 	m := NewModel(cfg, projectDir)
 
-	// Modify state
-	m.modelsTab.inputs[modelInputDefault].SetValue("gpt-4o")
-	m.modelsTab.inputs[modelInputExplore].SetValue("gpt-4o-mini")
+	// Set values via the new rows API — directly set refs and mark changed.
+	m.modelsTab.rows[0].ref = config.ParseModelRef("gpt-4o")
+	m.modelsTab.rows[0].changed = true
+	// explore is rows[1] (PhaseOrder[0])
+	m.modelsTab.rows[1].ref = config.ParseModelRef("gpt-4o-mini")
+	m.modelsTab.rows[1].changed = true
+
 	m.mutationTab.enabled = true
 	m.mutationTab.threshold.SetValue(75)
 
@@ -83,15 +89,16 @@ func TestEdgeCases_EmptyDefaultModel(t *testing.T) {
 	}
 	m := NewModel(cfg, "")
 
-	// Check placeholder with empty default
-	placeholder := m.modelsTab.inputs[modelInputExplore].Placeholder
-	if contains(placeholder, "()") {
-		t.Log("placeholder with empty default is fine")
+	// Default row should have empty ref
+	if m.modelsTab.rows[0].ref.FullID() != "" {
+		t.Errorf("default row ref = %q, want empty", m.modelsTab.rows[0].ref.FullID())
 	}
 }
 
-// TestEdgeCases_UnknownModelWarning tests that unknown models show warnings.
-func TestEdgeCases_UnknownModelWarning(t *testing.T) {
+// TestEdgeCases_LegacyModelRendersWithoutPanic asserts the Models tab renders a
+// legacy/unknown model value (not in the catalog) without panicking. The picker
+// keeps such values verbatim; there is no advisory warning (dropped per D2).
+func TestEdgeCases_LegacyModelRendersWithoutPanic(t *testing.T) {
 	cfg := &config.Config{
 		Models: config.ModelConfig{
 			Default: config.ModelRef{Model: "unknown-model-xyz"},
@@ -105,9 +112,6 @@ func TestEdgeCases_UnknownModelWarning(t *testing.T) {
 	if view == "" {
 		t.Error("View should not be empty")
 	}
-
-	// The view should render without panicking
-	_ = view
 }
 
 // TestEdgeCases_QuickTabSwitching tests rapid tab switching.
@@ -226,10 +230,22 @@ func TestEdgeCases_ModelPhaseDeletion(t *testing.T) {
 			},
 		},
 	}
-	state := newModelsTabState(cfg, config.StaticModels())
+	state := newModelsTabState(cfg, map[string]opencode.Provider{}, nil)
 
-	// Clear the propose value
-	state.inputs[modelInputPropose].SetValue("")
+	// Clear the propose value via free-form (rows[2] = propose, PhaseOrder index 1)
+	// Find the propose row index
+	proposeIdx := -1
+	for i, r := range state.rows {
+		if r.phase == "propose" {
+			proposeIdx = i
+			break
+		}
+	}
+	if proposeIdx < 0 {
+		t.Fatal("propose row not found")
+	}
+	state.rows[proposeIdx].ref = config.ModelRef{} // clear
+	state.rows[proposeIdx].changed = true
 	state.applyToConfig(cfg)
 
 	if _, exists := cfg.Models.Phases["propose"]; exists {
@@ -237,37 +253,6 @@ func TestEdgeCases_ModelPhaseDeletion(t *testing.T) {
 	}
 	if cfg.Models.Phases["explore"].FullID() != "claude-sonnet-4" {
 		t.Errorf("explore = %q, want %q", cfg.Models.Phases["explore"].FullID(), "claude-sonnet-4")
-	}
-}
-
-// TestEdgeCases_AllPhasesLocked tests auto-fill with all phases locked.
-func TestEdgeCases_AllPhasesLocked(t *testing.T) {
-	cfg := &config.Config{
-		Models: config.ModelConfig{
-			Default: config.ModelRef{Model: "gpt-4"},
-			Phases:  make(map[string]config.ModelRef),
-		},
-	}
-	state := newModelsTabState(cfg, config.StaticModels())
-
-	// Lock all phases
-	for i := range state.phaseNames {
-		idx := i + 1
-		state.inputs[idx].SetValue("custom-" + state.phaseNames[i])
-		state.autoFillLocks[idx] = true
-	}
-
-	// Change default
-	state.inputs[modelInputDefault].SetValue("claude-sonnet-4")
-	state.updateAutoFill()
-
-	// All phases should keep their values
-	for i := range state.phaseNames {
-		idx := i + 1
-		expected := "custom-" + state.phaseNames[i]
-		if state.inputs[idx].Value() != expected {
-			t.Errorf("phase %s = %q, want %q", state.phaseNames[i], state.inputs[idx].Value(), expected)
-		}
 	}
 }
 
@@ -307,13 +292,13 @@ func TestEdgeCases_StatusMessagePersistence(t *testing.T) {
 	m.statusErr = false
 
 	view := m.View()
-	if !contains(view, "Test status") {
+	if !strings.Contains(view, "Test status") {
 		t.Error("View should contain status message")
 	}
 
 	m.statusErr = true
 	view = m.View()
-	if !contains(view, "Test status") {
+	if !strings.Contains(view, "Test status") {
 		t.Error("View should contain error status")
 	}
 }
@@ -390,7 +375,7 @@ func TestEdgeCases_MutationTabFocusToggle(t *testing.T) {
 	}
 }
 
-// TestEdgeCases_ModelsTabNavigation tests navigation in models tab.
+// TestEdgeCases_ModelsTabNavigation tests navigation in models tab using Down key.
 func TestEdgeCases_ModelsTabNavigation(t *testing.T) {
 	cfg := &config.Config{
 		Models: config.ModelConfig{
@@ -398,16 +383,17 @@ func TestEdgeCases_ModelsTabNavigation(t *testing.T) {
 			Phases:  make(map[string]config.ModelRef),
 		},
 	}
-	state := newModelsTabState(cfg, config.StaticModels())
+	state := newModelsTabState(cfg, map[string]opencode.Provider{}, nil)
 
-	// Navigate down through all inputs
-	for i := 0; i < len(state.inputs); i++ {
+	// Navigate down through all rows (clamped — will stop at the last row)
+	total := len(state.rows)
+	for i := 0; i < total+2; i++ {
 		state.update(tea.KeyMsg{Type: tea.KeyDown})
 	}
 
-	// Should wrap around
-	if state.focusedInput != 0 {
-		t.Errorf("after full cycle, focusedInput = %d, want 0", state.focusedInput)
+	// Should clamp at the last row index
+	if state.focusedRow != total-1 {
+		t.Errorf("after clamped navigation, focusedRow = %d, want %d", state.focusedRow, total-1)
 	}
 }
 
@@ -454,13 +440,13 @@ func TestIntegration_ConfigFilePersistence(t *testing.T) {
 
 	// Verify content contains key fields
 	content := string(data)
-	if !contains(content, "agent:") {
+	if !strings.Contains(content, "agent:") {
 		t.Error("config should contain agent field")
 	}
-	if !contains(content, "mutation_testing:") {
+	if !strings.Contains(content, "mutation_testing:") {
 		t.Error("config should contain mutation_testing field")
 	}
-	if !contains(content, "models:") {
+	if !strings.Contains(content, "models:") {
 		t.Error("config should contain models field")
 	}
 }
@@ -482,9 +468,9 @@ func TestIntegration_TabStateConsistency(t *testing.T) {
 	}
 	m := NewModel(cfg, "")
 
-	// Verify initial state
-	if m.modelsTab.inputs[modelInputDefault].Value() != "gpt-4" {
-		t.Error("default model not loaded")
+	// Verify initial state — rows[0] is Default
+	if m.modelsTab.rows[0].ref.FullID() != "gpt-4" {
+		t.Errorf("default model not loaded: %q", m.modelsTab.rows[0].ref.FullID())
 	}
 	if !m.mutationTab.enabled {
 		t.Error("mutation enabled not loaded")
@@ -494,12 +480,13 @@ func TestIntegration_TabStateConsistency(t *testing.T) {
 	}
 
 	// Modify state
-	m.modelsTab.inputs[modelInputDefault].SetValue("gpt-4o")
+	m.modelsTab.rows[0].ref = config.ParseModelRef("gpt-4o")
+	m.modelsTab.rows[0].changed = true
 	m.mutationTab.enabled = false
 	m.agentTab.selectedAgent = "claude"
 
 	// Verify modifications
-	if m.modelsTab.inputs[modelInputDefault].Value() != "gpt-4o" {
+	if m.modelsTab.rows[0].ref.FullID() != "gpt-4o" {
 		t.Error("default model not updated")
 	}
 	if m.mutationTab.enabled {

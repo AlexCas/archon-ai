@@ -6,7 +6,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 )
+
+// builtinProviderID is the always-available built-in opencode provider. Defined
+// locally so this package never imports internal/models (which holds its own
+// copy for the flat-catalog path) — avoiding an import cycle.
+const builtinProviderID = "opencode"
 
 // Model is one model entry within a provider. Only the fields the foundation
 // needs are captured; the cache carries many more (family/cost/limit/…) which
@@ -64,7 +70,9 @@ func LoadModels(path string) (map[string]Provider, error) {
 }
 
 // LoadModelsOrEmpty returns an empty map and nil error when the cache file is
-// absent; any other read/parse error from LoadModels propagates.
+// absent; any other read/parse error from LoadModels propagates. This is the
+// corrupt-vs-absent seam the TUI keys off: absent cache => no warning, corrupt
+// cache => a propagated error the caller can surface.
 func LoadModelsOrEmpty(path string) (map[string]Provider, error) {
 	providers, err := LoadModels(path)
 	if err != nil {
@@ -74,4 +82,43 @@ func LoadModelsOrEmpty(path string) (map[string]Provider, error) {
 		return nil, err
 	}
 	return providers, nil
+}
+
+// hasToolCallModel reports whether the provider has at least one model that
+// supports tool calling (required for SDD phases).
+func hasToolCallModel(p Provider) bool {
+	for _, m := range p.Models {
+		if m.ToolCall {
+			return true
+		}
+	}
+	return false
+}
+
+// FilterModelsForSDD returns the provider's tool_call-capable models, sorted by
+// Name. Models without tool_call are excluded.
+func FilterModelsForSDD(p Provider) []Model {
+	var out []Model
+	for _, m := range p.Models {
+		if m.ToolCall {
+			out = append(out, m)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
+}
+
+// DetectAvailableProviders returns the provider IDs usable for SDD, sorted. A
+// provider qualifies when it has at least one tool_call model, OR its ID is the
+// built-in "opencode" provider (always offered when present). Simplified: no
+// auth.json / env-var detection.
+func DetectAvailableProviders(providers map[string]Provider) []string {
+	var available []string
+	for id, p := range providers {
+		if id == builtinProviderID || hasToolCallModel(p) {
+			available = append(available, id)
+		}
+	}
+	sort.Strings(available)
+	return available
 }

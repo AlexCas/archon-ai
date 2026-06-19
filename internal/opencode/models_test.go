@@ -106,3 +106,71 @@ func TestLoadModelsOrEmpty_ParseError(t *testing.T) {
 		t.Error("LoadModelsOrEmpty(invalid.json) error = nil, want non-nil")
 	}
 }
+
+// TestHasToolCallModel covers the tool_call detection helper.
+func TestHasToolCallModel(t *testing.T) {
+	withTC := Provider{ID: "p", Models: map[string]Model{
+		"a": {Name: "a", ToolCall: false},
+		"b": {Name: "b", ToolCall: true},
+	}}
+	if !hasToolCallModel(withTC) {
+		t.Error("hasToolCallModel(withTC) = false, want true")
+	}
+	noTC := Provider{ID: "p", Models: map[string]Model{
+		"a": {Name: "a", ToolCall: false},
+	}}
+	if hasToolCallModel(noTC) {
+		t.Error("hasToolCallModel(noTC) = true, want false")
+	}
+	if hasToolCallModel(Provider{ID: "p"}) {
+		t.Error("hasToolCallModel(empty) = true, want false")
+	}
+}
+
+// TestFilterModelsForSDD asserts only tool_call models are kept, sorted by Name.
+func TestFilterModelsForSDD(t *testing.T) {
+	p := Provider{ID: "p", Models: map[string]Model{
+		"z":   {Name: "Zeta", ToolCall: true},
+		"a":   {Name: "Alpha", ToolCall: true},
+		"mid": {Name: "Mid", ToolCall: false},
+	}}
+	got := FilterModelsForSDD(p)
+	if len(got) != 2 {
+		t.Fatalf("FilterModelsForSDD len = %d, want 2 (%v)", len(got), got)
+	}
+	if got[0].Name != "Alpha" || got[1].Name != "Zeta" {
+		t.Errorf("FilterModelsForSDD = [%q, %q], want [Alpha, Zeta]", got[0].Name, got[1].Name)
+	}
+	for _, m := range got {
+		if m.Name == "Mid" {
+			t.Error("non-tool_call model Mid leaked into result")
+		}
+	}
+}
+
+// TestDetectAvailableProviders asserts sorted IDs, tool_call providers included,
+// no-tool_call non-opencode excluded, and opencode always included if present.
+func TestDetectAvailableProviders(t *testing.T) {
+	t.Run("tool_call providers sorted", func(t *testing.T) {
+		providers := map[string]Provider{
+			"zeta":     {ID: "zeta", Models: map[string]Model{"m": {ToolCall: true}}},
+			"requesty": {ID: "requesty", Models: map[string]Model{"m": {ToolCall: true}}},
+		}
+		got := DetectAvailableProviders(providers)
+		want := []string{"requesty", "zeta"}
+		if len(got) != 2 || got[0] != want[0] || got[1] != want[1] {
+			t.Errorf("DetectAvailableProviders = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("opencode always included, no-tool_call excluded", func(t *testing.T) {
+		providers := map[string]Provider{
+			"opencode": {ID: "opencode", Models: map[string]Model{"m": {ToolCall: false}}},
+			"foo":      {ID: "foo", Models: map[string]Model{"m": {ToolCall: false}}},
+		}
+		got := DetectAvailableProviders(providers)
+		if len(got) != 1 || got[0] != "opencode" {
+			t.Errorf("DetectAvailableProviders = %v, want [opencode]", got)
+		}
+	})
+}
