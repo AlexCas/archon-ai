@@ -8,7 +8,7 @@ import (
 
 	"github.com/archon-ai/archon/internal/config"
 	"github.com/archon-ai/archon/internal/initcmd"
-	"github.com/archon-ai/archon/internal/models"
+	"github.com/archon-ai/archon/internal/opencode"
 	"github.com/archon-ai/archon/skills"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
@@ -36,6 +36,9 @@ type Model struct {
 	quitting   bool
 	statusMsg  string
 	statusErr  bool
+	// Provider catalog loaded once when the TUI opens; reused on agentInitDoneMsg rebuild.
+	providers map[string]opencode.Provider
+	cacheErr  error
 	// Tab states
 	modelsTab     modelsTabState
 	judgeTab      judgeTabState
@@ -82,15 +85,22 @@ var defaultKeys = keyMap{
 }
 
 func NewModel(cfg *config.Config, projectDir string) Model {
-	// Detect the offered model catalog once when the TUI opens. Detection must
-	// not run per keystroke nor during "archon init"; the cached slice is reused
-	// for the lifetime of the Models view.
-	catalog := models.Resolve()
+	// Load the opencode provider catalog once when the TUI opens. Absent cache =>
+	// empty map + nil err (silent); corrupt cache => err (drives an inline warning).
+	var providers map[string]opencode.Provider
+	var cacheErr error
+	if path, err := opencode.DefaultCachePath(); err == nil {
+		providers, cacheErr = opencode.LoadModelsOrEmpty(path)
+	} else {
+		cacheErr = err
+	}
 	return Model{
 		config:        cfg,
 		projectDir:    projectDir,
 		activeTab:     ModelsTab,
-		modelsTab:     newModelsTabState(cfg, catalog),
+		providers:     providers,
+		cacheErr:      cacheErr,
+		modelsTab:     newModelsTabState(cfg, providers, cacheErr),
 		judgeTab:      newJudgeTabState(cfg.Judge),
 		mutationTab:   newMutationTabState(cfg.MutationTesting),
 		playwrightTab: newPlaywrightTabState(cfg.Playwright),
@@ -177,9 +187,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Adopt the freshly written config and rebuild tab states from it.
 		msg.cfg.HomeDir = m.projectDir
 		m.config = msg.cfg
-		// Reuse the catalog detected when the view first opened; init does not
+		// Reuse the provider map loaded when the view first opened; init does not
 		// re-run detection.
-		m.modelsTab = newModelsTabState(msg.cfg, m.modelsTab.catalog)
+		m.modelsTab = newModelsTabState(msg.cfg, m.providers, m.cacheErr)
 		m.judgeTab = newJudgeTabState(msg.cfg.Judge)
 		m.mutationTab = newMutationTabState(msg.cfg.MutationTesting)
 		m.playwrightTab = newPlaywrightTabState(msg.cfg.Playwright)
