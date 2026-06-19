@@ -49,14 +49,14 @@ Catalog-agnostic: resolver composes with Slice 1's Gemini/OpenAI lists once merg
 
 ## Phase 5: TUI Wiring (PR2, stacked on PR1)
 
-- [ ] 5.1 `internal/tui/models_tab.go`: add `catalog []string` field to `modelsTabState`; change `newModelsTabState(cfg, catalog []string)`; store on state.
-- [ ] 5.2 Same file, `cycleStaticModel`: build cycle list from `m.catalog` (empty-lead) instead of `config.StaticModels()`.
-- [ ] 5.3 Same file, `view`: hint reads `m.catalog`; rename label "Static:" → "Available:".
-- [ ] 5.4 `internal/tui/model.go`: compute `models.Resolve()` once at open; pass into BOTH `newModelsTabState` call sites (~line 88, ~line 175).
+- [x] 5.1 `internal/tui/models_tab.go`: add `catalog []string` field to `modelsTabState`; change `newModelsTabState(cfg, catalog []string)`; store on state.
+- [x] 5.2 Same file, `cycleStaticModel`: build cycle list from `m.catalog` (empty-lead) instead of `config.StaticModels()`.
+- [x] 5.3 Same file, `view`: hint reads `m.catalog`; rename label "Static:" → "Available:".
+- [x] 5.4 `internal/tui/model.go`: compute `models.Resolve()` once at open; pass into BOTH `newModelsTabState` call sites (~line 88, ~line 175).
 
 ## Phase 6: TUI Tests (PR2)
 
-- [ ] 6.1 `internal/tui/models_tab_test.go`, "Detection is cached once per Models view": resolver runs once at open; cycle/type reads `m.catalog`; call-counter fake not re-invoked; never at init.
-- [ ] 6.2 Same file: cycling and "Available:" hint render from injected catalog slice.
-- [ ] 6.3 Same file, "Free-form entry and advisory behavior unchanged": arbitrary value accepted; `NormalizeModel`/`Validate` intact.
-- [ ] 6.4 Verify PR2: `go build ./...`, `go test`/`go vet ./internal/tui/...`.
+- [x] 6.1 `internal/tui/models_tab_test.go`, "Detection is cached once per Models view": resolver runs once at open; cycle/type reads `m.catalog`; call-counter fake not re-invoked; never at init.
+- [x] 6.2 Same file: cycling and "Available:" hint render from injected catalog slice.
+- [x] 6.3 Same file, "Free-form entry and advisory behavior unchanged": arbitrary value accepted; `NormalizeModel`/`Validate` intact.
+- [x] 6.4 Verify PR2: `go build ./...`, `go test`/`go vet ./internal/tui/...`.

@@ -34,3 +34,40 @@
 - Status: completed
 
 JUDGMENT: APPROVED
+
+---
+
+# Judge Phase Report — PR2 (TUI), final cycle
+
+**Verdict**: pass
+**Retry**: 1 / 3
+
+## Judgment-Day Result (PR2 diff)
+- Judge A: APPROVED
+- Judge B: APPROVED
+- No CRITICAL, no WARNING (real). Findings are INFO/SUGGESTION only.
+
+## Gates
+- Mutation gate: skipped; Playwright: skipped (not web).
+
+## Independent verification by both judges
+- S "Detection is cached once per Models view": `models.Resolve()` has exactly ONE call site (`model.go` `NewModel`); reload path (`agentInitDoneMsg`) reuses `m.modelsTab.catalog` (no re-detect); `WindowSizeMsg`/tab switches don't reconstruct the tab. Test `TestModelsTab_DetectionCachedOncePerView` proves detect runs once across repeated cycle/type.
+- S "Free-form entry and advisory behavior unchanged": `applyToConfig` writes raw `.Value()` (no catalog-membership check); `Validate`/`NormalizeModel` intact. Test `TestModelsTab_FreeFormEntryUnchanged`.
+- Detection never during `archon init` (grep: no `internal/models` usage in `initcmd/`/`cmd/`).
+- Empty-catalog safe (`append([]string{""}, m.catalog...)` ⇒ len ≥ 1, no div-by-zero).
+- `config.StaticModels()` not orphaned (still seeds `KnownModels`). `internal/models/` + `internal/config/model.go` untouched in PR2. All `newModelsTabState` callers updated.
+- `go build`, `go test ./...`, `go vet`, `gofmt -l` (PR2 files) clean.
+
+## Fix applied (this round)
+- `internal/tui/models_tab.go`: hint text "cycle static models" → "cycle detected models", aligning with the renamed "Available:" label (Judge A cosmetic suggestion). Re-verified green.
+
+## Deferred follow-ups (non-blocking, documented)
+- INFO (Judge B): `models.Resolve()` is synchronous in `NewModel`, so `archon tui` startup can block up to the 2s `listTimeout` if opencode is installed-but-slow (bounded; no shellout when opencode absent). A lazy/async resolve (detect when the Models tab is first rendered, with a "detecting…" state) would remove the startup stall — deliberately deferred to a follow-up, not done in this slice.
+- SUGGESTION (Judge B): a `NewModel`-level test with an injected resolver would close the last production-wiring test gap; `Resolve()` is a package-level func not parameterized into `NewModel`, so this needs a new seam — deferred.
+- SUGGESTION (carried): `LookPathDetector` probes `codex`/`gemini` though only `claude`/`opencode` are consumed — intentional, forward-looking.
+
+## State Update (PR2 / whole change)
+- Phase: judge
+- Status: completed (PR1 + PR2)
+
+JUDGMENT: APPROVED
