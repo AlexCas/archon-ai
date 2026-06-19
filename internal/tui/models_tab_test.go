@@ -2,6 +2,7 @@ package tui
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -597,6 +598,214 @@ func TestModelsTab_EscFromEffortSelectGoesBackToModelSelect(t *testing.T) {
 	// Model ref stays set (Esc does not clear it).
 	if st.rows[0].ref.FullID() != modelAlreadySet {
 		t.Errorf("ref.FullID() = %q after Esc, want %q (model should stay)", st.rows[0].ref.FullID(), modelAlreadySet)
+	}
+}
+
+// scrollUpText returns true when the rendered view contains the "↑ N more"
+// indicator (not the hint line "↑/↓"). We check for the dim style prefix.
+func scrollUpText(v string) bool {
+	return strings.Contains(v, "↑ ") && !strings.Contains(v, "↑/↓")
+}
+
+// E3-6a: provider picker scrolls when there are more providers than maxVisible.
+func TestModelsTab_ProviderSelectScrolls(t *testing.T) {
+	// Create 15 providers (more than maxVisible at height=24: 24-13=11).
+	providers := make(map[string]opencode.Provider)
+	for i := 0; i < 15; i++ {
+		id := fmt.Sprintf("provider-%02d", i)
+		providers[id] = prov(id, toolModel(id+"/model-1", "Model 1"))
+	}
+	cfg := &config.Config{}
+	st := newModelsTabState(cfg, providers, nil)
+	st.mode = providerSelect
+	st.providerCursor = 0
+
+	// view() computes maxVisible = height - 13 = 24 - 13 = 11.
+	view := st.view(80, 24)
+
+	// Should NOT show "↑ N more" at offset 0 (the hint line "↑/↓" is not the indicator).
+	if strings.Contains(view, "↑ ") && !strings.Contains(view, "↑/↓") {
+		t.Errorf("should not show scroll-up at offset 0; view:\n%s", view)
+	}
+	// Should show "↓ N more" since 15 > 11.
+	if !strings.Contains(view, "↓ 4 more") {
+		t.Errorf("should show '↓ 4 more' (15 total - 11 visible); view:\n%s", view)
+	}
+	// Should show provider-00 (the first one).
+	if !strings.Contains(view, "provider-00") {
+		t.Errorf("should show the first provider; view:\n%s", view)
+	}
+}
+
+// E3-6b: scrolling down in provider picker adjusts offset and shows scroll-up indicator.
+func TestModelsTab_ProviderSelectScrollDown(t *testing.T) {
+	providers := make(map[string]opencode.Provider)
+	for i := 0; i < 15; i++ {
+		id := fmt.Sprintf("provider-%02d", i)
+		providers[id] = prov(id, toolModel(id+"/model-1", "Model 1"))
+	}
+	cfg := &config.Config{}
+	st := newModelsTabState(cfg, providers, nil)
+	st.pickerMaxVisible = 5
+	st.mode = providerSelect
+
+	// Navigate far enough that cursor passes the visible window edge.
+	for i := 0; i < 6; i++ {
+		st.update(tea.KeyMsg{Type: tea.KeyDown})
+	}
+	if st.providerCursor != 6 {
+		t.Fatalf("providerCursor = %d, want 6", st.providerCursor)
+	}
+	if st.pickerOffset != 2 {
+		t.Errorf("pickerOffset = %d, want 2 (cursor 6 - maxVisible 5 + 1)", st.pickerOffset)
+	}
+
+	// view() recomputes pickerMaxVisible, so set it back after the call.
+	view := st.view(80, 24)
+	st.pickerMaxVisible = 5
+	if !strings.Contains(view, "↑ 2 more") {
+		t.Errorf("should show '↑ 2 more'; view:\n%s", view)
+	}
+
+	// Navigate all the way to the bottom.
+	for i := 0; i < 10; i++ {
+		st.update(tea.KeyMsg{Type: tea.KeyDown})
+	}
+	if st.providerCursor != 14 {
+		t.Fatalf("providerCursor = %d, want 14 (last)", st.providerCursor)
+	}
+	// maxVisible was restored to 5 after view(), so offset at bottom: 14-5+1=10.
+	if st.pickerOffset != 10 {
+		t.Errorf("pickerOffset = %d, want 10 (last visible window at bottom)", st.pickerOffset)
+	}
+
+	view = st.view(80, 24)
+	if !strings.Contains(view, "↑ 10 more") {
+		t.Errorf("should show '↑ 10 more' at bottom; view:\n%s", view)
+	}
+	if !strings.Contains(view, "provider-14") {
+		t.Errorf("last provider should be visible; view:\n%s", view)
+	}
+}
+
+// E3-6c: scrolling up in provider picker adjusts offset back.
+func TestModelsTab_ProviderSelectScrollUp(t *testing.T) {
+	providers := make(map[string]opencode.Provider)
+	for i := 0; i < 15; i++ {
+		id := fmt.Sprintf("provider-%02d", i)
+		providers[id] = prov(id, toolModel(id+"/model-1", "Model 1"))
+	}
+	cfg := &config.Config{}
+	st := newModelsTabState(cfg, providers, nil)
+	st.pickerMaxVisible = 5
+	st.mode = providerSelect
+	st.providerCursor = 14
+	st.pickerOffset = 10
+
+	// Press Up to go to cursor 13 (still in visible window, no offset change).
+	st.update(tea.KeyMsg{Type: tea.KeyUp})
+	if st.pickerOffset != 10 {
+		t.Errorf("pickerOffset = %d, want 10 (still within window)", st.pickerOffset)
+	}
+
+	// 10 Ups from cursor 13 → cursor 3, offset follows cursor when it enters range.
+	// cursor: 13→12→11→10→9→8→7→6→5→4→3
+	// offset triggers at cursor=9 (9 < 10 → offset=9), then 8,7,6,5,4,3
+	for i := 0; i < 10; i++ {
+		st.update(tea.KeyMsg{Type: tea.KeyUp})
+	}
+	if st.providerCursor != 3 {
+		t.Fatalf("providerCursor = %d, want 3", st.providerCursor)
+	}
+	if st.pickerOffset != 3 {
+		t.Errorf("pickerOffset = %d, want 3 (cursor at start of window)", st.pickerOffset)
+	}
+
+	// Press Up once more → cursor 2, offset should become 2.
+	st.update(tea.KeyMsg{Type: tea.KeyUp})
+	if st.pickerOffset != 2 {
+		t.Errorf("pickerOffset = %d, want 2 (cursor above window)", st.pickerOffset)
+	}
+
+	st.pickerMaxVisible = 5
+	view := st.view(80, 24)
+	if scrollUpText(view) {
+		t.Errorf("should not show scroll-up at top; view:\n%s", view)
+	}
+}
+
+// E3-6d: model picker scrolls when there are many models.
+func TestModelsTab_ModelSelectScrolls(t *testing.T) {
+	// One provider with 15 models.
+	models := make([]opencode.Model, 0, 15)
+	for i := 0; i < 15; i++ {
+		models = append(models, toolModel(fmt.Sprintf("p/m-%02d", i), fmt.Sprintf("Model %02d", i)))
+	}
+	providers := map[string]opencode.Provider{
+		"test-prov": prov("test-prov", models...),
+	}
+	cfg := &config.Config{}
+	st := newModelsTabState(cfg, providers, nil)
+	st.pickerMaxVisible = 5
+
+	// Enter providerSelect → enter modelSelect.
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // → providerSelect (test-prov at 0)
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // → modelSelect
+
+	if st.mode != modelSelect {
+		t.Fatalf("mode = %v, want modelSelect", st.mode)
+	}
+	if st.pickerOffset != 0 {
+		t.Errorf("pickerOffset = %d, want 0 on entry", st.pickerOffset)
+	}
+
+	// Navigate to item 6.
+	for i := 0; i < 6; i++ {
+		st.update(tea.KeyMsg{Type: tea.KeyDown})
+	}
+	if st.modelCursor != 6 {
+		t.Fatalf("modelCursor = %d, want 6", st.modelCursor)
+	}
+	if st.pickerOffset != 2 {
+		t.Errorf("pickerOffset = %d, want 2 (cursor 6 - maxVisible 5 + 1)", st.pickerOffset)
+	}
+
+	st.pickerMaxVisible = 5
+	view := st.view(80, 24)
+	if !strings.Contains(view, "↑ 2 more") {
+		t.Errorf("should show '↑ 2 more'; view:\n%s", view)
+	}
+	if !strings.Contains(view, "Model 06") {
+		t.Errorf("should show Model 06 (cursor); view:\n%s", view)
+	}
+}
+
+// E3-6e: model picker resets scroll offset when entering from providerSelect.
+func TestModelsTab_ModelSelectResetsOffset(t *testing.T) {
+	models := make([]opencode.Model, 0, 10)
+	for i := 0; i < 10; i++ {
+		models = append(models, toolModel(fmt.Sprintf("p/m-%02d", i), fmt.Sprintf("M%02d", i)))
+	}
+	providers := map[string]opencode.Provider{
+		"p1": prov("p1", models...),
+		"p2": prov("p2", toolModel("p2/m", "M")),
+	}
+	cfg := &config.Config{}
+	st := newModelsTabState(cfg, providers, nil)
+	st.pickerMaxVisible = 3
+
+	// Enter providerSelect, scroll down, then enter modelSelect.
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // → providerSelect
+	st.update(tea.KeyMsg{Type: tea.KeyDown})  // cursor to p2
+
+	// This should not affect modelSelect's offset since pickerOffset gets reset.
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // → modelSelect
+
+	if st.mode != modelSelect {
+		t.Fatalf("mode = %v, want modelSelect", st.mode)
+	}
+	if st.pickerOffset != 0 {
+		t.Errorf("pickerOffset = %d, want 0 after entering modelSelect", st.pickerOffset)
 	}
 }
 
