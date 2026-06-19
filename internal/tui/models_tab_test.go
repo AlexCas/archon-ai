@@ -809,6 +809,218 @@ func TestModelsTab_ModelSelectResetsOffset(t *testing.T) {
 	}
 }
 
+// E3-7a: typing filters providers in providerSelect.
+func TestModelsTab_ProviderSelectFilter(t *testing.T) {
+	providers := map[string]opencode.Provider{
+		"anthropic":  prov("anthropic", toolModel("anthropic/claude-opus-4-8", "Claude Opus 4.8")),
+		"openai":     prov("openai", toolModel("openai/gpt-4o", "GPT-4o")),
+		"opencode":   prov("opencode", toolModel("deepseek-v4-pro", "DeepSeek V4 Pro")),
+		"google":     prov("google", toolModel("google/gemini-2", "Gemini 2")),
+		"xai":        prov("xai", toolModel("xai/grok-4", "Grok 4")),
+	}
+	cfg := &config.Config{}
+	st := newModelsTabState(cfg, providers, nil)
+	st.mode = providerSelect
+	st.pickerMaxVisible = 20 // show all for simplicity
+
+	// Type "open" → should match "openai" and "opencode".
+	st.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'o'}})
+	st.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	st.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'e'}})
+	st.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+
+	if st.filter != "open" {
+		t.Fatalf("filter = %q, want %q", st.filter, "open")
+	}
+	// filteredLen should be 2 (openai, opencode).
+	if n := st.filteredLen(); n != 2 {
+		t.Fatalf("filteredLen = %d, want 2", n)
+	}
+	// Cursor should be reset to 0.
+	if st.providerCursor != 0 {
+		t.Errorf("providerCursor = %d, want 0 after filter", st.providerCursor)
+	}
+
+	// First visible filtered item should be "openai" (sorted: openai < opencode).
+	idx0 := st.filteredIndices[0]
+	if st.available[idx0] != "openai" {
+		t.Errorf("first filtered provider = %q, want %q", st.available[idx0], "openai")
+	}
+
+	// View should show filter text.
+	view := st.view(80, 24)
+	if !strings.Contains(view, "filter: open") {
+		t.Errorf("view should show filter text; view:\n%s", view)
+	}
+
+	// Backspace should remove last character.
+	st.update(tea.KeyMsg{Type: tea.KeyBackspace})
+	if st.filter != "ope" {
+		t.Errorf("filter after backspace = %q, want %q", st.filter, "ope")
+	}
+	// After "ope": matches "openai" and "opencode" still (both contain "ope").
+	if n := st.filteredLen(); n != 2 {
+		t.Errorf("filteredLen after backspace = %d, want 2", n)
+	}
+}
+
+// E3-7b: Esc clears the filter but stays in providerSelect; second Esc exits to rowNav.
+func TestModelsTab_ProviderSelectFilterEsc(t *testing.T) {
+	providers := map[string]opencode.Provider{
+		"openai":   prov("openai", toolModel("openai/gpt-4o", "GPT-4o")),
+		"opencode": prov("opencode", toolModel("deepseek-v4-pro", "DeepSeek V4 Pro")),
+	}
+	cfg := &config.Config{}
+	st := newModelsTabState(cfg, providers, nil)
+	st.mode = providerSelect
+
+	// Type a filter.
+	st.update(keyMsg('o'))
+	if st.filter != "o" {
+		t.Fatalf("filter = %q, want %q", st.filter, "o")
+	}
+
+	// First Esc → clears filter, stays in providerSelect.
+	st.update(tea.KeyMsg{Type: tea.KeyEsc})
+	if st.filter != "" {
+		t.Errorf("filter should be empty after first Esc, got %q", st.filter)
+	}
+	if st.mode != providerSelect {
+		t.Errorf("mode = %v, want providerSelect after first Esc", st.mode)
+	}
+
+	// Second Esc → exits to rowNav.
+	st.update(tea.KeyMsg{Type: tea.KeyEsc})
+	if st.mode != rowNav {
+		t.Errorf("mode = %v, want rowNav after second Esc", st.mode)
+	}
+}
+
+// E3-7c: typing filters models in modelSelect.
+func TestModelsTab_ModelSelectFilter(t *testing.T) {
+	providers := map[string]opencode.Provider{
+		"test": prov("test",
+			toolModel("test/claude-opus", "Claude Opus"),
+			toolModel("test/claude-sonnet", "Claude Sonnet"),
+			toolModel("test/gpt-4o", "GPT-4o"),
+			toolModel("test/gpt-4o-mini", "GPT-4o Mini"),
+		),
+	}
+	cfg := &config.Config{}
+	st := newModelsTabState(cfg, providers, nil)
+	st.pickerMaxVisible = 20
+
+	// Enter providerSelect → modelSelect.
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // → providerSelect (test at 0)
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // → modelSelect
+
+	// Type "claude".
+	st.update(keyMsg('c'))
+	st.update(keyMsg('l'))
+	st.update(keyMsg('a'))
+	st.update(keyMsg('u'))
+	st.update(keyMsg('d'))
+	st.update(keyMsg('e'))
+
+	if st.filter != "claude" {
+		t.Fatalf("filter = %q, want %q", st.filter, "claude")
+	}
+	if n := st.filteredLen(); n != 2 {
+		t.Fatalf("filteredLen = %d, want 2 (Claude Opus, Claude Sonnet)", n)
+	}
+
+	// First visible filtered item should be "Claude Opus" (sorted by Name).
+	idx0 := st.filteredIndices[0]
+	if st.curModels[idx0].Name != "Claude Opus" {
+		t.Errorf("first filtered model = %q, want %q", st.curModels[idx0].Name, "Claude Opus")
+	}
+
+	// Cursor at 0; navigate down and select.
+	st.update(tea.KeyMsg{Type: tea.KeyDown})
+	if st.modelCursor != 1 {
+		t.Fatalf("modelCursor = %d, want 1", st.modelCursor)
+	}
+	st.update(tea.KeyMsg{Type: tea.KeyEnter})
+	if st.mode != rowNav {
+		t.Errorf("mode = %v, want rowNav after selection", st.mode)
+	}
+	// Filter should be cleared after selection.
+	if st.filter != "" {
+		t.Errorf("filter should be empty after selection, got %q", st.filter)
+	}
+	// Should have selected "Claude Sonnet" (index 1 in filtered = second Claude model).
+	if st.rows[0].ref.FullID() != "test/claude-sonnet" {
+		t.Errorf("selected ref = %q, want %q", st.rows[0].ref.FullID(), "test/claude-sonnet")
+	}
+}
+
+// E3-7d: typing a filter that matches nothing shows "(no matches)".
+func TestModelsTab_FilterNoMatches(t *testing.T) {
+	providers := map[string]opencode.Provider{
+		"openai": prov("openai", toolModel("openai/gpt-4o", "GPT-4o")),
+	}
+	cfg := &config.Config{}
+	st := newModelsTabState(cfg, providers, nil)
+	st.mode = providerSelect
+
+	st.update(keyMsg('z'))
+	st.update(keyMsg('z'))
+	st.update(keyMsg('z'))
+
+	if n := st.filteredLen(); n != 0 {
+		t.Fatalf("filteredLen = %d, want 0 (no matches)", n)
+	}
+
+	view := st.view(80, 24)
+	if !strings.Contains(view, "(no matches)") {
+		t.Errorf("view should show '(no matches)'; view:\n%s", view)
+	}
+
+	// Enter should be a no-op (no crash).
+	st.update(tea.KeyMsg{Type: tea.KeyEnter})
+	if st.mode != providerSelect {
+		t.Errorf("mode = %v, want providerSelect (no-op on Enter with no matches)", st.mode)
+	}
+}
+
+// E3-7e: filter is cleared when entering modelSelect from providerSelect.
+func TestModelsTab_FilterClearedOnModeTransition(t *testing.T) {
+	providers := map[string]opencode.Provider{
+		"openai":   prov("openai", toolModel("openai/gpt-4o", "GPT-4o")),
+		"opencode": prov("opencode", toolModel("deepseek-v4-pro", "DeepSeek V4 Pro")),
+	}
+	cfg := &config.Config{}
+	st := newModelsTabState(cfg, providers, nil)
+	st.pickerMaxVisible = 20
+
+	st.update(tea.KeyMsg{Type: tea.KeyEnter}) // → providerSelect
+
+	// Type filter "open".
+	st.update(keyMsg('o'))
+	st.update(keyMsg('p'))
+	st.update(keyMsg('e'))
+	st.update(keyMsg('n'))
+	if st.filter != "open" {
+		t.Fatalf("filter = %q, want %q", st.filter, "open")
+	}
+	if st.filteredLen() != 2 {
+		t.Fatalf("filteredLen = %d, want 2", st.filteredLen())
+	}
+
+	// Press Enter to select "openai" (cursor at 0).
+	st.update(tea.KeyMsg{Type: tea.KeyEnter})
+	if st.mode != modelSelect {
+		t.Fatalf("mode = %v, want modelSelect", st.mode)
+	}
+	// Filter should be cleared for modelSelect.
+	if st.filter != "" {
+		t.Errorf("filter should be empty in modelSelect, got %q", st.filter)
+	}
+	if st.filteredIndices != nil {
+		t.Errorf("filteredIndices should be nil in modelSelect")
+	}
+}
+
 // E3-5f: effortSelect renders a cursor list with "Effort:" header and hint.
 func TestModelsTab_EffortSelectView(t *testing.T) {
 	providers := map[string]opencode.Provider{

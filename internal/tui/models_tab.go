@@ -73,6 +73,13 @@ type modelsTabState struct {
 	pickerOffset     int
 	pickerMaxVisible int
 
+	// Picker live filter. filter holds the typed search string; filteredIndices
+	// maps the visible (matching) position back to the original index in
+	// available or curModels depending on mode. nil filteredIndices means no
+	// filter (show all).
+	filter          string
+	filteredIndices []int
+
 	// Free-form text entry (shared; reset on each open).
 	input textinput.Model
 
@@ -174,6 +181,9 @@ func (m *modelsTabState) updateRowNav(key tea.KeyMsg) (tea.Cmd, bool) {
 		}
 		m.mode = providerSelect
 		m.providerCursor = 0
+		m.pickerOffset = 0
+		m.filter = ""
+		m.filteredIndices = nil
 		return nil, true
 	case tea.KeyRunes:
 		if len(key.Runes) == 1 && key.Runes[0] == 'e' {
@@ -191,70 +201,182 @@ func (m *modelsTabState) openFreeForm() {
 	m.input.Focus()
 }
 
+// rebuildFilter recomputes filteredIndices from m.filter and the current mode.
+// It is called whenever the filter text changes or the mode transitions to
+// providerSelect/modelSelect with a non-empty filter.
+func (m *modelsTabState) rebuildFilter() {
+	if m.filter == "" {
+		m.filteredIndices = nil
+		return
+	}
+	lower := strings.ToLower(m.filter)
+	switch m.mode {
+	case providerSelect:
+		idx := make([]int, 0, len(m.available))
+		for i, p := range m.available {
+			if strings.Contains(strings.ToLower(p), lower) {
+				idx = append(idx, i)
+			}
+		}
+		m.filteredIndices = idx
+	case modelSelect:
+		idx := make([]int, 0, len(m.curModels))
+		for i, mod := range m.curModels {
+			name := mod.Name
+			if name == "" {
+				name = mod.ID
+			}
+			if strings.Contains(strings.ToLower(name), lower) {
+				idx = append(idx, i)
+			}
+		}
+		m.filteredIndices = idx
+	default:
+		m.filteredIndices = nil
+	}
+}
+
+// filteredLen returns the number of items visible after applying m.filter.
+func (m *modelsTabState) filteredLen() int {
+	if m.filteredIndices == nil {
+		switch m.mode {
+		case providerSelect:
+			return len(m.available)
+		case modelSelect:
+			return len(m.curModels)
+		}
+	}
+	return len(m.filteredIndices)
+}
+
 func (m *modelsTabState) updateProviderSelect(key tea.KeyMsg) (tea.Cmd, bool) {
+	total := m.filteredLen()
+
 	switch key.Type {
 	case tea.KeyUp:
 		if m.providerCursor > 0 {
 			m.providerCursor--
 		}
-		// Scroll up if cursor left the visible window.
 		if m.providerCursor < m.pickerOffset {
 			m.pickerOffset = m.providerCursor
 		}
 	case tea.KeyDown:
-		if m.providerCursor < len(m.available)-1 {
+		if m.providerCursor < total-1 {
 			m.providerCursor++
 		}
-		// Scroll down if cursor passed the last visible item.
 		if m.providerCursor >= m.pickerOffset+m.pickerMaxVisible {
 			m.pickerOffset = m.providerCursor - m.pickerMaxVisible + 1
 		}
 	case tea.KeyEnter:
-		m.pickedProvider = m.available[m.providerCursor]
+		if total == 0 {
+			return nil, true // no selection possible
+		}
+		idx := m.providerCursor
+		if m.filteredIndices != nil {
+			idx = m.filteredIndices[idx]
+		}
+		m.pickedProvider = m.available[idx]
 		m.curModels = opencode.FilterModelsForSDD(m.providers[m.pickedProvider])
 		if len(m.curModels) == 0 {
-			m.openFreeForm() // provider qualified (built-in) but has no SDD models
+			m.openFreeForm()
 			return nil, true
 		}
 		m.mode = modelSelect
 		m.modelCursor = 0
 		m.pickerOffset = 0
+		m.filter = ""
+		m.filteredIndices = nil
 	case tea.KeyEsc:
-		m.mode = rowNav
+		if m.filter != "" {
+			m.filter = ""
+			m.filteredIndices = nil
+			m.providerCursor = 0
+			m.pickerOffset = 0
+		} else {
+			m.mode = rowNav
+		}
+	case tea.KeyBackspace:
+		if m.filter != "" {
+			m.filter = m.filter[:len(m.filter)-1]
+			m.rebuildFilter()
+			m.providerCursor = 0
+			m.pickerOffset = 0
+		}
+	case tea.KeyRunes:
+		for _, r := range key.Runes {
+			if r >= 32 && r <= 126 { // printable ASCII
+				m.filter += string(r)
+			}
+		}
+		m.rebuildFilter()
+		m.providerCursor = 0
+		m.pickerOffset = 0
 	}
 	return nil, true
 }
 
 func (m *modelsTabState) updateModelSelect(key tea.KeyMsg) (tea.Cmd, bool) {
+	total := m.filteredLen()
+
 	switch key.Type {
 	case tea.KeyUp:
 		if m.modelCursor > 0 {
 			m.modelCursor--
 		}
-		// Scroll up if cursor left the visible window.
 		if m.modelCursor < m.pickerOffset {
 			m.pickerOffset = m.modelCursor
 		}
 	case tea.KeyDown:
-		if m.modelCursor < len(m.curModels)-1 {
+		if m.modelCursor < total-1 {
 			m.modelCursor++
 		}
-		// Scroll down if cursor passed the last visible item.
 		if m.modelCursor >= m.pickerOffset+m.pickerMaxVisible {
 			m.pickerOffset = m.modelCursor - m.pickerMaxVisible + 1
 		}
 	case tea.KeyEnter:
-		picked := m.curModels[m.modelCursor]
+		if total == 0 {
+			return nil, true
+		}
+		idx := m.modelCursor
+		if m.filteredIndices != nil {
+			idx = m.filteredIndices[idx]
+		}
+		picked := m.curModels[idx]
 		m.rows[m.focusedRow].ref = refFromCacheKey(m.pickedProvider, picked.ID)
 		m.rows[m.focusedRow].changed = true
+		m.filter = ""
+		m.filteredIndices = nil
 		if picked.Reasoning {
 			m.mode = effortSelect
 			m.effortCursor = 0
 		} else {
-			m.mode = rowNav // Effort stays empty (ref freshly built)
+			m.mode = rowNav
 		}
 	case tea.KeyEsc:
-		m.mode = providerSelect
+		if m.filter != "" {
+			m.filter = ""
+			m.filteredIndices = nil
+			m.modelCursor = 0
+			m.pickerOffset = 0
+		} else {
+			m.mode = providerSelect
+		}
+	case tea.KeyBackspace:
+		if m.filter != "" {
+			m.filter = m.filter[:len(m.filter)-1]
+			m.rebuildFilter()
+			m.modelCursor = 0
+			m.pickerOffset = 0
+		}
+	case tea.KeyRunes:
+		for _, r := range key.Runes {
+			if r >= 32 && r <= 126 {
+				m.filter += string(r)
+			}
+		}
+		m.rebuildFilter()
+		m.modelCursor = 0
+		m.pickerOffset = 0
 	}
 	return nil, true
 }
@@ -316,9 +438,9 @@ func (m *modelsTabState) updateFreeForm(key tea.KeyMsg) (tea.Cmd, bool) {
 func (m *modelsTabState) hintLine() string {
 	switch m.mode {
 	case providerSelect:
-		return "↑/↓: choose provider · Enter: next · Esc: cancel"
+		return "↑/↓: choose provider · Enter: next · type to filter · Esc: cancel"
 	case modelSelect:
-		return "↑/↓: choose model · Enter: set · Esc: back"
+		return "↑/↓: choose model · Enter: set · type to filter · Esc: back"
 	case freeForm:
 		return "type provider/model · Enter: set · Esc: cancel"
 	case effortSelect:
@@ -378,8 +500,20 @@ func (m *modelsTabState) renderRow(i int, label, focus, dim lipgloss.Style) stri
 		switch m.mode {
 		case providerSelect:
 			b.WriteString(label.Render(row.label + ":"))
-			b.WriteString(" [pick provider]\n")
-			total := len(m.available)
+			b.WriteString(" [pick provider]")
+			if m.filter != "" {
+				b.WriteString(dim.Render("  filter: " + m.filter))
+			}
+			b.WriteString("\n")
+			total := m.filteredLen()
+			if total == 0 {
+				b.WriteString(dim.Render("  (no matches)"))
+				return strings.TrimRight(b.String(), "\n")
+			}
+			// Clamp cursor to valid range.
+			if m.providerCursor >= total {
+				m.providerCursor = total - 1
+			}
 			end := m.pickerOffset + m.pickerMaxVisible
 			if end > total {
 				end = total
@@ -388,9 +522,13 @@ func (m *modelsTabState) renderRow(i int, label, focus, dim lipgloss.Style) stri
 				b.WriteString(dim.Render(fmt.Sprintf("  ↑ %d more", m.pickerOffset)))
 				b.WriteString("\n")
 			}
-			for j := m.pickerOffset; j < end; j++ {
-				id := m.available[j]
-				if j == m.providerCursor {
+			for visIdx := m.pickerOffset; visIdx < end; visIdx++ {
+				origIdx := visIdx
+				if m.filteredIndices != nil {
+					origIdx = m.filteredIndices[visIdx]
+				}
+				id := m.available[origIdx]
+				if visIdx == m.providerCursor {
 					b.WriteString(focus.Render("▸ " + id))
 				} else {
 					b.WriteString("    " + id)
@@ -404,8 +542,20 @@ func (m *modelsTabState) renderRow(i int, label, focus, dim lipgloss.Style) stri
 
 		case modelSelect:
 			b.WriteString(label.Render(row.label + ":"))
-			b.WriteString(" Provider: " + m.pickedProvider + "\n")
-			total := len(m.curModels)
+			b.WriteString(" Provider: " + m.pickedProvider)
+			if m.filter != "" {
+				b.WriteString(dim.Render("  filter: " + m.filter))
+			}
+			b.WriteString("\n")
+			total := m.filteredLen()
+			if total == 0 {
+				b.WriteString(dim.Render("  (no matches)"))
+				return strings.TrimRight(b.String(), "\n")
+			}
+			// Clamp cursor to valid range.
+			if m.modelCursor >= total {
+				m.modelCursor = total - 1
+			}
 			end := m.pickerOffset + m.pickerMaxVisible
 			if end > total {
 				end = total
@@ -414,13 +564,17 @@ func (m *modelsTabState) renderRow(i int, label, focus, dim lipgloss.Style) stri
 				b.WriteString(dim.Render(fmt.Sprintf("  ↑ %d more", m.pickerOffset)))
 				b.WriteString("\n")
 			}
-			for j := m.pickerOffset; j < end; j++ {
-				mod := m.curModels[j]
+			for visIdx := m.pickerOffset; visIdx < end; visIdx++ {
+				origIdx := visIdx
+				if m.filteredIndices != nil {
+					origIdx = m.filteredIndices[visIdx]
+				}
+				mod := m.curModels[origIdx]
 				name := mod.Name
 				if name == "" {
 					name = mod.ID
 				}
-				if j == m.modelCursor {
+				if visIdx == m.modelCursor {
 					b.WriteString(focus.Render("▸ " + name))
 				} else {
 					b.WriteString("    " + name)
