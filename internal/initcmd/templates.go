@@ -128,6 +128,12 @@ const agentsTemplate = orchestratorSections + `
 - Agent: {{.Agent}}
 - Harness Version: {{.HarnessVersion}}
 
+## Phase Models
+Per-phase models are wired via the opencode.json agent definitions under
+§~/.config/opencode/opencode.json§. Each SDD phase agent (§sdd-<phase>§) carries
+its resolved §provider/model§ ID so opencode uses the correct model per phase
+rather than the orchestrator default.
+
 ## State Management
 State tracked in: openspec/changes/{change-name}/state.yaml
 Transitions validated by harness-workflow skill
@@ -146,6 +152,22 @@ const claudeTemplate = orchestratorSections + `
 - Config: .archon/config.yaml
 - Agent: {{.Agent}}
 - Harness Version: {{.HarnessVersion}}
+
+## Phase Models
+
+Advisory: when delegating an SDD phase, request the model below for that phase by
+passing §model: <id>§ to the Agent/Task delegation tool. This is a preference, not a
+hard gate; if the platform cannot honor per-delegation model selection, proceed with
+the default model.
+
+- explore: opus
+- propose: opus
+- spec: opus
+- design: opus
+- tasks: sonnet
+- apply: sonnet
+- verify: opus
+- archive: haiku
 
 ## State Management
 State tracked in: openspec/changes/{change-name}/state.yaml

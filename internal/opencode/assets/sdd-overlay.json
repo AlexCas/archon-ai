@@ -1,0 +1,85 @@
+{
+  "agent": {
+    "archon-orchestrator": {
+      "mode": "primary",
+      "prompt": "{file:./AGENTS.md}",
+      "permission": {
+        "task": {
+          "__replace__": {
+            "*": "deny",
+            "sdd-init": "allow",
+            "sdd-explore": "allow",
+            "sdd-propose": "allow",
+            "sdd-spec": "allow",
+            "sdd-design": "allow",
+            "sdd-tasks": "allow",
+            "sdd-apply": "allow",
+            "sdd-verify": "allow",
+            "sdd-archive": "allow",
+            "sdd-onboard": "allow"
+          }
+        }
+      }
+    },
+    "sdd-init": {
+      "mode": "subagent",
+      "hidden": true,
+      "prompt": "{file:~/.config/opencode/skills/sdd-init/SKILL.md}",
+      "tools": {}
+    },
+    "sdd-explore": {
+      "mode": "subagent",
+      "hidden": true,
+      "prompt": "{file:~/.config/opencode/skills/sdd-explore/SKILL.md}",
+      "tools": {}
+    },
+    "sdd-propose": {
+      "mode": "subagent",
+      "hidden": true,
+      "prompt": "{file:~/.config/opencode/skills/sdd-propose/SKILL.md}",
+      "tools": {}
+    },
+    "sdd-spec": {
+      "mode": "subagent",
+      "hidden": true,
+      "prompt": "{file:~/.config/opencode/skills/sdd-spec/SKILL.md}",
+      "tools": {}
+    },
+    "sdd-design": {
+      "mode": "subagent",
+      "hidden": true,
+      "prompt": "{file:~/.config/opencode/skills/sdd-design/SKILL.md}",
+      "tools": {}
+    },
+    "sdd-tasks": {
+      "mode": "subagent",
+      "hidden": true,
+      "prompt": "{file:~/.config/opencode/skills/sdd-tasks/SKILL.md}",
+      "tools": {}
+    },
+    "sdd-apply": {
+      "mode": "subagent",
+      "hidden": true,
+      "prompt": "{file:~/.config/opencode/skills/sdd-apply/SKILL.md}",
+      "tools": {}
+    },
+    "sdd-verify": {
+      "mode": "subagent",
+      "hidden": true,
+      "prompt": "{file:~/.config/opencode/skills/sdd-verify/SKILL.md}",
+      "tools": {}
+    },
+    "sdd-archive": {
+      "mode": "subagent",
+      "hidden": true,
+      "prompt": "{file:~/.config/opencode/skills/sdd-archive/SKILL.md}",
+      "tools": {}
+    },
+    "sdd-onboard": {
+      "mode": "subagent",
+      "hidden": true,
+      "prompt": "{file:~/.config/opencode/skills/sdd-onboard/SKILL.md}",
+      "tools": {}
+    }
+  }
+}

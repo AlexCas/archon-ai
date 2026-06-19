@@ -9,6 +9,7 @@ import (
 
 	"github.com/archon-ai/archon/internal/agent"
 	"github.com/archon-ai/archon/internal/config"
+	"github.com/archon-ai/archon/internal/opencode"
 	"github.com/archon-ai/archon/internal/scaffold"
 	"github.com/archon-ai/archon/internal/version"
 )
@@ -71,6 +72,38 @@ func Run(opts Options) (*Result, error) {
 
 	if err := writeTemplate(opts.ProjectDir, agentName, len(extracted)); err != nil {
 		return nil, fmt.Errorf("render template: %w", err)
+	}
+
+	if agentName == "opencode" {
+		// Derive paths from opts.HomeDir so that callers (including tests) that
+		// set a temp HomeDir stay hermetic — Apply never touches the real $HOME.
+		settingsPath := opencode.SettingsPathFor(opts.HomeDir)
+		cachePath := opencode.CachePathFor(opts.HomeDir)
+
+		backupPath, warnings, applyErr := opencode.Apply(opencode.ApplyOptions{
+			SettingsPath: settingsPath,
+			CachePath:    cachePath,
+			DefaultModel: opts.ModelDefault,
+			Phases:       opts.ModelPhases,
+		})
+		for _, w := range warnings {
+			fmt.Fprintf(os.Stderr, "warning: %s\n", w)
+		}
+		if applyErr != nil {
+			return nil, fmt.Errorf("apply opencode overlay: %w", applyErr)
+		}
+		// Always record a FileBackup for opencode.json — even when backupPath is ""
+		// (no prior file). Rollback.Cleanup treats Backup=="" as "remove the created
+		// file", which is correct: there was no user content to preserve.
+		// opencode.json is intentionally NOT added to CreatedPaths (it is a shared
+		// global file that must never be bulk-deleted; only restored or removed here).
+		rollback.FileBackups = append(rollback.FileBackups, config.FileBackup{
+			Target: settingsPath,
+			Backup: backupPath,
+		})
+		if err := rollback.WriteManifest(); err != nil {
+			return nil, fmt.Errorf("update rollback manifest with opencode backup: %w", err)
+		}
 	}
 
 	if err := createOpenSpecDir(opts.ProjectDir); err != nil {

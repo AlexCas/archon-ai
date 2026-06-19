@@ -164,6 +164,155 @@ func TestRollbackManifest_BackupAgentsMD_NoFile(t *testing.T) {
 	}
 }
 
+// --- FileBackups tests (S1-2) ---
+
+func TestRollbackManifest_FileBackup_WithPriorFile(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	target := filepath.Join(tmpDir, "opencode.json")
+	originalContent := []byte(`{"original": true}`)
+	if err := os.WriteFile(target, originalContent, 0o644); err != nil {
+		t.Fatalf("WriteFile original: %v", err)
+	}
+
+	// Create a backup copy.
+	backupPath := filepath.Join(tmpDir, "opencode.json.backup.20240101T120000")
+	if err := os.WriteFile(backupPath, originalContent, 0o644); err != nil {
+		t.Fatalf("WriteFile backup: %v", err)
+	}
+
+	// Write a new (modified) content to the target.
+	if err := os.WriteFile(target, []byte(`{"modified": true}`), 0o644); err != nil {
+		t.Fatalf("WriteFile modified: %v", err)
+	}
+
+	manifest := &RollbackManifest{
+		Version: "1.0.0",
+		FileBackups: []FileBackup{
+			{Target: target, Backup: backupPath},
+		},
+		HomeDir: tmpDir,
+	}
+
+	if err := manifest.WriteManifest(); err != nil {
+		t.Fatalf("WriteManifest: %v", err)
+	}
+	if err := manifest.Cleanup(); err != nil {
+		t.Fatalf("Cleanup: %v", err)
+	}
+
+	restored, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("ReadFile after Cleanup: %v", err)
+	}
+	if string(restored) != string(originalContent) {
+		t.Errorf("Cleanup restored %q, want %q", string(restored), string(originalContent))
+	}
+}
+
+func TestRollbackManifest_FileBackup_NoPriorFile(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Simulate a file created by init (no prior content — Backup is "").
+	target := filepath.Join(tmpDir, "opencode.json")
+	if err := os.WriteFile(target, []byte(`{"created": true}`), 0o644); err != nil {
+		t.Fatalf("WriteFile target: %v", err)
+	}
+
+	manifest := &RollbackManifest{
+		Version: "1.0.0",
+		FileBackups: []FileBackup{
+			{Target: target, Backup: ""},
+		},
+		HomeDir: tmpDir,
+	}
+
+	if err := manifest.WriteManifest(); err != nil {
+		t.Fatalf("WriteManifest: %v", err)
+	}
+	if err := manifest.Cleanup(); err != nil {
+		t.Fatalf("Cleanup: %v", err)
+	}
+
+	if _, err := os.Stat(target); !os.IsNotExist(err) {
+		t.Error("target should have been removed when Backup is empty")
+	}
+}
+
+func TestRollbackManifest_FileBackup_WithCreatedPaths(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	createdFile := filepath.Join(tmpDir, "created.txt")
+	if err := os.WriteFile(createdFile, []byte("created"), 0o644); err != nil {
+		t.Fatalf("WriteFile created: %v", err)
+	}
+
+	target := filepath.Join(tmpDir, "opencode.json")
+	originalContent := []byte(`{"original": true}`)
+	backupFile := filepath.Join(tmpDir, "opencode.json.backup")
+	if err := os.WriteFile(backupFile, originalContent, 0o644); err != nil {
+		t.Fatalf("WriteFile backup: %v", err)
+	}
+	if err := os.WriteFile(target, []byte(`{"modified": true}`), 0o644); err != nil {
+		t.Fatalf("WriteFile target: %v", err)
+	}
+
+	manifest := &RollbackManifest{
+		Version:      "1.0.0",
+		CreatedPaths: []string{createdFile},
+		FileBackups:  []FileBackup{{Target: target, Backup: backupFile}},
+		HomeDir:      tmpDir,
+	}
+
+	if err := manifest.WriteManifest(); err != nil {
+		t.Fatalf("WriteManifest: %v", err)
+	}
+	if err := manifest.Cleanup(); err != nil {
+		t.Fatalf("Cleanup: %v", err)
+	}
+
+	if _, err := os.Stat(createdFile); !os.IsNotExist(err) {
+		t.Error("created file should have been removed by Cleanup")
+	}
+	restored, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("ReadFile after Cleanup: %v", err)
+	}
+	if string(restored) != string(originalContent) {
+		t.Errorf("Cleanup restored %q, want %q", string(restored), string(originalContent))
+	}
+}
+
+func TestRollbackManifest_WriteManifest_RoundTripsFileBackups(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	manifest := &RollbackManifest{
+		Version: "1.0.0",
+		FileBackups: []FileBackup{
+			{Target: "/a/opencode.json", Backup: "/a/opencode.json.backup.20240101"},
+		},
+		HomeDir: tmpDir,
+	}
+
+	if err := manifest.WriteManifest(); err != nil {
+		t.Fatalf("WriteManifest: %v", err)
+	}
+
+	loaded, err := LoadManifest(tmpDir)
+	if err != nil {
+		t.Fatalf("LoadManifest: %v", err)
+	}
+	if len(loaded.FileBackups) != 1 {
+		t.Fatalf("FileBackups length = %d, want 1", len(loaded.FileBackups))
+	}
+	if loaded.FileBackups[0].Target != "/a/opencode.json" {
+		t.Errorf("Target = %q, want %q", loaded.FileBackups[0].Target, "/a/opencode.json")
+	}
+	if loaded.FileBackups[0].Backup != "/a/opencode.json.backup.20240101" {
+		t.Errorf("Backup = %q, want ...", loaded.FileBackups[0].Backup)
+	}
+}
+
 func TestRollbackManifest_Cleanup_NonexistentPaths(t *testing.T) {
 	tmpDir := t.TempDir()
 

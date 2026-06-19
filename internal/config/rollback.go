@@ -3,16 +3,25 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"time"
 )
 
+// FileBackup records a pre-merge backup of a shared file so rollback can
+// restore it without deleting it (opencode.json must never be removed).
+type FileBackup struct {
+	Target string `json:"target"`
+	Backup string `json:"backup"`
+}
+
 type RollbackManifest struct {
-	Version      string   `json:"version"`
-	CreatedPaths []string `json:"paths"`
-	BackupPath   string   `json:"original_agents_md_backup,omitempty"`
-	HomeDir      string   `json:"-"`
+	Version      string       `json:"version"`
+	CreatedPaths []string     `json:"paths"`
+	BackupPath   string       `json:"original_agents_md_backup,omitempty"`
+	FileBackups  []FileBackup `json:"file_backups,omitempty"`
+	HomeDir      string       `json:"-"`
 }
 
 func (m *RollbackManifest) manifestPath() string {
@@ -64,6 +73,22 @@ func (m *RollbackManifest) Cleanup() error {
 		}
 	}
 
+	// Restore FileBackups in reverse order. When Backup is set, copy backup →
+	// target atomically. When Backup is empty (no prior file), remove the
+	// created target so no user content is lost.
+	for i := len(m.FileBackups) - 1; i >= 0; i-- {
+		fb := m.FileBackups[i]
+		if fb.Backup != "" {
+			if err := copyFileAtomic(fb.Backup, fb.Target); err != nil {
+				return fmt.Errorf("restore %s: %w", fb.Target, err)
+			}
+		} else {
+			if err := os.Remove(fb.Target); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("remove %s: %w", fb.Target, err)
+			}
+		}
+	}
+
 	manifestPath := m.manifestPath()
 	if err := os.Remove(manifestPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("remove manifest: %w", err)
@@ -86,6 +111,41 @@ func LoadManifest(homeDir string) (*RollbackManifest, error) {
 	m.HomeDir = homeDir
 
 	return &m, nil
+}
+
+// copyFileAtomic copies src to dst via a temp-file + rename for atomicity.
+func copyFileAtomic(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("open source %s: %w", src, err)
+	}
+	defer in.Close()
+
+	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
+		return fmt.Errorf("create dst dir: %w", err)
+	}
+
+	tmp := dst + ".tmp"
+	out, err := os.OpenFile(tmp, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+	if err != nil {
+		return fmt.Errorf("create temp file %s: %w", tmp, err)
+	}
+
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		os.Remove(tmp)
+		return fmt.Errorf("copy %s → %s: %w", src, tmp, err)
+	}
+	if err := out.Close(); err != nil {
+		os.Remove(tmp)
+		return fmt.Errorf("close temp file: %w", err)
+	}
+
+	if err := os.Rename(tmp, dst); err != nil {
+		os.Remove(tmp)
+		return fmt.Errorf("rename %s → %s: %w", tmp, dst, err)
+	}
+	return nil
 }
 
 func (m *RollbackManifest) BackupAgentsMD() error {

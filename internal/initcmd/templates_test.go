@@ -248,7 +248,10 @@ func TestTemplates_CodeBlockRendering(t *testing.T) {
 	}
 }
 
-func TestTemplates_AgentsAndClaudeIdentical(t *testing.T) {
+// TestTemplates_AgentsAndClaudeShareCommonCore verifies that both templates
+// produce the same orchestrator core sections (persona, preflight, vague guard,
+// human review gate) even though their Phase Models sections intentionally differ.
+func TestTemplates_AgentsAndClaudeShareCommonCore(t *testing.T) {
 	data := TemplateData{
 		Agent:          "test-agent",
 		HarnessVersion: "1.0.0",
@@ -265,9 +268,75 @@ func TestTemplates_AgentsAndClaudeIdentical(t *testing.T) {
 		t.Fatalf("RenderClaudeMD() error = %v", err)
 	}
 
-	if agents != claude {
-		t.Error("agentsTemplate and claudeTemplate are not identical — they may have diverged silently")
+	// The two templates intentionally differ in their Phase Models section:
+	// agentsTemplate describes the opencode.json mechanism; claudeTemplate
+	// describes the advisory model: parameter mechanism for the claude agent.
+	// Verify they differ (a strict equality check would hide future divergence
+	// in the wrong direction).
+	if agents == claude {
+		t.Error("agentsTemplate and claudeTemplate are identical — they should differ in the Phase Models section")
 	}
+
+	// Both must share the common orchestrator core sections.
+	commonSections := []string{
+		"## Leader Persona",
+		"## Phase Order",
+		"## SDD Session Preflight (HARD GATE)",
+		"## Vague Request Guard (MANDATORY)",
+		"## Human Review Gate (MANDATORY)",
+		"## Phase Models",
+	}
+	for _, section := range commonSections {
+		if !strings.Contains(agents, section) {
+			t.Errorf("AGENTS.md missing common section %q", section)
+		}
+		if !strings.Contains(claude, section) {
+			t.Errorf("CLAUDE.md missing common section %q", section)
+		}
+	}
+}
+
+func TestTemplates_PhaseModelsSection(t *testing.T) {
+	data := TemplateData{
+		Agent:          "opencode",
+		HarnessVersion: "1.0.0",
+		SkillCount:     10,
+	}
+
+	// AGENTS.md (opencode): must have Phase Models and must reference opencode.json
+	// because per-phase models are wired via the opencode.json agent definitions.
+	t.Run("AGENTS.md", func(t *testing.T) {
+		content, err := RenderAgentsMD(data)
+		if err != nil {
+			t.Fatalf("render error = %v", err)
+		}
+		if !strings.Contains(content, "## Phase Models") {
+			t.Error("AGENTS.md missing ## Phase Models section")
+		}
+		if !strings.Contains(content, "opencode.json") {
+			t.Error("AGENTS.md Phase Models section must mention opencode.json (opencode wiring mechanism)")
+		}
+	})
+
+	// CLAUDE.md (claude agent): must have Phase Models but must NOT reference
+	// opencode.json — claude uses the advisory §model: <id>§ delegation parameter,
+	// not opencode.json agent definitions.
+	t.Run("CLAUDE.md", func(t *testing.T) {
+		content, err := RenderClaudeMD(data)
+		if err != nil {
+			t.Fatalf("render error = %v", err)
+		}
+		if !strings.Contains(content, "## Phase Models") {
+			t.Error("CLAUDE.md missing ## Phase Models section")
+		}
+		if strings.Contains(content, "opencode.json") {
+			t.Error("CLAUDE.md Phase Models section must NOT mention opencode.json — that is the opencode mechanism, not the claude mechanism")
+		}
+		// Must describe the advisory delegation mechanism instead.
+		if !strings.Contains(content, "model:") {
+			t.Error("CLAUDE.md Phase Models section must describe the model: delegation parameter")
+		}
+	})
 }
 
 func TestTemplates_LeaderPersona(t *testing.T) {

@@ -1,11 +1,14 @@
 package initcmd
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"testing/fstest"
+
+	"github.com/archon-ai/archon/internal/config"
 )
 
 func TestRun(t *testing.T) {
@@ -329,6 +332,127 @@ func TestRun_WithModelFlags(t *testing.T) {
 	if !strings.Contains(content, "gpt-4o") {
 		t.Errorf("config should contain apply phase model, got:\n%s", content)
 	}
+
+	// Hermeticity: opencode.json must be written under homeDir (the temp dir),
+	// NOT under the real $HOME. Verify the file exists at the expected temp path
+	// and that the real home's opencode.json was not touched.
+	expectedSettings := filepath.Join(homeDir, ".config", "opencode", "opencode.json")
+	if _, err := os.Stat(expectedSettings); os.IsNotExist(err) {
+		t.Errorf("opencode.json not created at temp homeDir path %s", expectedSettings)
+	}
+
+	// Parse the settings file and verify model assignments landed correctly.
+	rawSettings, err := os.ReadFile(expectedSettings)
+	if err != nil {
+		t.Fatalf("ReadFile opencode.json: %v", err)
+	}
+	var settings map[string]any
+	if err := json.Unmarshal(rawSettings, &settings); err != nil {
+		t.Fatalf("Unmarshal opencode.json: %v", err)
+	}
+	agents, ok := settings["agent"].(map[string]any)
+	if !ok {
+		t.Fatal("opencode.json: agent key missing or not an object")
+	}
+	sddApply, ok := agents["sdd-apply"].(map[string]any)
+	if !ok {
+		t.Fatal("opencode.json: sdd-apply agent not found")
+	}
+	if sddApply["model"] != "openai/gpt-4o" {
+		t.Errorf("sdd-apply.model = %v, want openai/gpt-4o", sddApply["model"])
+	}
+	sddExplore, ok := agents["sdd-explore"].(map[string]any)
+	if !ok {
+		t.Fatal("opencode.json: sdd-explore agent not found")
+	}
+	if sddExplore["model"] != "anthropic/claude-sonnet-4" {
+		t.Errorf("sdd-explore.model = %v, want anthropic/claude-sonnet-4 (static map fallback with no cache)", sddExplore["model"])
+	}
+}
+
+// TestRun_OpenCodeOverlay_Hermetic verifies that Run never writes to or reads
+// from the real $HOME when opts.HomeDir points to a temp directory. This is
+// the regression test for the non-hermetic Apply defect: previously,
+// opencode.Apply was called with SettingsPath() / CachePath() which resolved
+// against the real os.UserHomeDir(), silently writing to the developer's live
+// ~/.config/opencode/opencode.json during test runs.
+func TestRun_OpenCodeOverlay_Hermetic(t *testing.T) {
+	realHome, err := os.UserHomeDir()
+	if err != nil {
+		t.Skip("cannot determine real home dir; skipping hermeticity check")
+	}
+	realSettings := filepath.Join(realHome, ".config", "opencode", "opencode.json")
+
+	// Record the real settings file state BEFORE the test run.
+	realBefore, _ := os.ReadFile(realSettings)
+	realBackupsBefore := countOpenCodeBackups(t, realHome)
+
+	tmpDir := t.TempDir()
+	homeDir := filepath.Join(tmpDir, "home")
+	projectDir := filepath.Join(tmpDir, "project")
+
+	for _, d := range []string{
+		homeDir,
+		projectDir,
+		filepath.Join(projectDir, ".opencode"),
+	} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatalf("MkdirAll %s: %v", d, err)
+		}
+	}
+
+	embeddedFS := fstest.MapFS{
+		"sdd-init/SKILL.md": &fstest.MapFile{
+			Data: []byte("---\nname: sdd-init\n---\n# Init"),
+		},
+	}
+
+	_, runErr := Run(Options{
+		HomeDir:      homeDir,
+		ProjectDir:   projectDir,
+		EmbeddedFS:   embeddedFS,
+		ModelDefault: "claude-sonnet-4",
+	})
+	if runErr != nil {
+		t.Fatalf("Run() error = %v", runErr)
+	}
+
+	// The overlay MUST appear under the temp homeDir, not the real home.
+	tempSettings := filepath.Join(homeDir, ".config", "opencode", "opencode.json")
+	if _, err := os.Stat(tempSettings); os.IsNotExist(err) {
+		t.Errorf("opencode.json not written to temp homeDir at %s", tempSettings)
+	}
+
+	// The real settings file must be byte-for-byte identical to what it was before.
+	realAfter, _ := os.ReadFile(realSettings)
+	if string(realBefore) != string(realAfter) {
+		t.Errorf("real $HOME opencode.json was modified by test run (hermeticity violation!)")
+	}
+
+	// No new .backup.* files must appear in the real home.
+	realBackupsAfter := countOpenCodeBackups(t, realHome)
+	if realBackupsAfter != realBackupsBefore {
+		t.Errorf("test run created %d new backup file(s) in real $HOME (hermeticity violation!)",
+			realBackupsAfter-realBackupsBefore)
+	}
+}
+
+// countOpenCodeBackups returns the number of opencode.json.backup.* files
+// in the real user's ~/.config/opencode/ directory.
+func countOpenCodeBackups(t *testing.T, homeDir string) int {
+	t.Helper()
+	dir := filepath.Join(homeDir, ".config", "opencode")
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return 0
+	}
+	count := 0
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), "opencode.json.backup.") {
+			count++
+		}
+	}
+	return count
 }
 
 func TestRun_WithoutModelFlags(t *testing.T) {
@@ -375,5 +499,147 @@ func TestRun_WithoutModelFlags(t *testing.T) {
 	content := string(data)
 	if strings.Contains(content, "models:") {
 		t.Errorf("config should not contain models section when no flags set, got:\n%s", content)
+	}
+}
+
+// TestRun_OpenCode_RollbackManifest_FreshFile verifies Fix 3: when opencode.json
+// did not exist before init, the rollback manifest must contain a FileBackup with
+// Backup=="" for that file. Rollback must then remove the file (no prior content).
+func TestRun_OpenCode_RollbackManifest_FreshFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	homeDir := filepath.Join(tmpDir, "home")
+	projectDir := filepath.Join(tmpDir, "project")
+
+	for _, d := range []string{
+		homeDir,
+		projectDir,
+		filepath.Join(projectDir, ".opencode"),
+	} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatalf("MkdirAll %s: %v", d, err)
+		}
+	}
+
+	embeddedFS := fstest.MapFS{
+		"sdd-init/SKILL.md": &fstest.MapFile{
+			Data: []byte("---\nname: sdd-init\n---\n# Init"),
+		},
+	}
+
+	_, err := Run(Options{
+		HomeDir:    homeDir,
+		ProjectDir: projectDir,
+		EmbeddedFS: embeddedFS,
+	})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	settingsPath := filepath.Join(homeDir, ".config", "opencode", "opencode.json")
+
+	// opencode.json must have been created.
+	if _, err := os.Stat(settingsPath); os.IsNotExist(err) {
+		t.Fatalf("opencode.json not created at %s", settingsPath)
+	}
+
+	// Rollback manifest must contain a FileBackup for opencode.json with Backup=="".
+	manifest, err := config.LoadManifest(projectDir)
+	if err != nil {
+		t.Fatalf("LoadManifest: %v", err)
+	}
+	found := false
+	for _, fb := range manifest.FileBackups {
+		if fb.Target == settingsPath {
+			found = true
+			if fb.Backup != "" {
+				t.Errorf("FileBackup.Backup should be empty for a freshly-created opencode.json, got %q", fb.Backup)
+			}
+			break
+		}
+	}
+	if !found {
+		t.Errorf("rollback manifest has no FileBackup for opencode.json target %s", settingsPath)
+	}
+
+	// Calling Cleanup must remove the freshly-created opencode.json.
+	manifest.HomeDir = projectDir
+	if err := manifest.Cleanup(); err != nil {
+		t.Fatalf("Cleanup: %v", err)
+	}
+	if _, err := os.Stat(settingsPath); !os.IsNotExist(err) {
+		t.Error("opencode.json should be removed by rollback when no prior file existed")
+	}
+}
+
+// TestRun_OpenCode_RollbackManifest_PriorFile verifies Fix 3 for the case where
+// opencode.json existed before init: after init, the rollback manifest has a
+// FileBackup with a non-empty Backup path; rollback restores the prior bytes.
+func TestRun_OpenCode_RollbackManifest_PriorFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	homeDir := filepath.Join(tmpDir, "home")
+	projectDir := filepath.Join(tmpDir, "project")
+
+	for _, d := range []string{
+		homeDir,
+		projectDir,
+		filepath.Join(projectDir, ".opencode"),
+		filepath.Join(homeDir, ".config", "opencode"),
+	} {
+		if err := os.MkdirAll(d, 0o755); err != nil {
+			t.Fatalf("MkdirAll %s: %v", d, err)
+		}
+	}
+
+	settingsPath := filepath.Join(homeDir, ".config", "opencode", "opencode.json")
+	priorContent := []byte(`{"prior": true}`)
+	if err := os.WriteFile(settingsPath, priorContent, 0o644); err != nil {
+		t.Fatalf("WriteFile prior opencode.json: %v", err)
+	}
+
+	embeddedFS := fstest.MapFS{
+		"sdd-init/SKILL.md": &fstest.MapFile{
+			Data: []byte("---\nname: sdd-init\n---\n# Init"),
+		},
+	}
+
+	_, err := Run(Options{
+		HomeDir:    homeDir,
+		ProjectDir: projectDir,
+		EmbeddedFS: embeddedFS,
+	})
+	if err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	// Rollback manifest must contain a FileBackup with a non-empty Backup path.
+	manifest, err := config.LoadManifest(projectDir)
+	if err != nil {
+		t.Fatalf("LoadManifest: %v", err)
+	}
+	var fb *config.FileBackup
+	for i := range manifest.FileBackups {
+		if manifest.FileBackups[i].Target == settingsPath {
+			fb = &manifest.FileBackups[i]
+			break
+		}
+	}
+	if fb == nil {
+		t.Fatalf("rollback manifest has no FileBackup for opencode.json target %s", settingsPath)
+	}
+	if fb.Backup == "" {
+		t.Error("FileBackup.Backup must be non-empty when a prior opencode.json existed")
+	}
+
+	// Cleanup must restore the prior bytes.
+	manifest.HomeDir = projectDir
+	if err := manifest.Cleanup(); err != nil {
+		t.Fatalf("Cleanup: %v", err)
+	}
+	restored, err := os.ReadFile(settingsPath)
+	if err != nil {
+		t.Fatalf("ReadFile after Cleanup: %v", err)
+	}
+	if string(restored) != string(priorContent) {
+		t.Errorf("Cleanup restored %q, want %q", string(restored), string(priorContent))
 	}
 }
