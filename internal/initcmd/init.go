@@ -99,7 +99,7 @@ func Run(opts Options) (*Result, error) {
 	// This must run before WriteManifest so the written path is registered for
 	// rollback alongside everything else init created.
 	if agentName == "opencode" {
-		mergedPath, err := mergeOpencodeAgent(opts.ProjectDir, cfg.Models.Leader.FullID())
+		mergedPath, err := mergeOpencodeAgent(opts.ProjectDir, cfg.Models)
 		if err != nil {
 			return nil, fmt.Errorf("merge opencode agent: %w", err)
 		}
