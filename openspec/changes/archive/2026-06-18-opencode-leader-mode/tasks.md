@@ -55,15 +55,15 @@ Chain strategy: stacked-to-main
 
 ## Phase 5: TUI leader field (PR2)
 
-- [ ] 5.1 In `internal/tui/models_tab.go`, add a leader `textinput`, rendered + focus-traversed only when `cfg.Agent == "opencode"`.
-- [ ] 5.2 In `applyToConfig`, set `cfg.Models.Leader` from that input (opencode only).
+- [x] 5.1 In `internal/tui/models_tab.go`, add a leader `textinput`, rendered + focus-traversed only when `cfg.Agent == "opencode"`.
+- [x] 5.2 In `applyToConfig`, set `cfg.Models.Leader` from that input (opencode only).
 
 ## Phase 6: Save-path merge (PR2)
 
-- [ ] 6.1 In `internal/tui/model.go` `saveConfig`, after `cfg.Save()`, call `mergeOpencodeAgent(m.projectDir, cfg.Models.Leader)` when `cfg.Agent == "opencode"`; surface errors. Leave `archon update` untouched.
+- [x] 6.1 In `internal/tui/model.go` `saveConfig`, after `cfg.Save()`, call `mergeOpencodeAgent(m.projectDir, cfg.Models.Leader)` when `cfg.Agent == "opencode"`; surface errors. Leave `archon update` untouched.
 
 ## Phase 7: Parity test + verify (PR2)
 
-- [ ] 7.1 TUI==init parity test: drive `saveConfig`, compare `agent.archon-leader` bytes to a direct `mergeOpencodeAgent` call with the same leader (**S7**).
-- [ ] 7.2 Assert `archon update` leaves an existing `opencode.json` unwritten (mtime/bytes unchanged) (**S8**).
-- [ ] 7.3 `go build ./...` + `go test ./...` green.
+- [x] 7.1 TUI==init parity test: drive `saveConfig`, compare `agent.archon-leader` bytes to a direct `mergeOpencodeAgent` call with the same leader (**S7**).
+- [x] 7.2 Assert `archon update` leaves an existing `opencode.json` unwritten (mtime/bytes unchanged) (**S8**).
+- [x] 7.3 `go build ./...` + `go test ./...` green.

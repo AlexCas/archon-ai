@@ -32,8 +32,41 @@
 - INFO: `archonLeaderAgent.Description` cosmetic value not asserted (sanctioned by design).
 - S7/S8 (TUI parity, update untouched) are PR2 scope.
 
-## State Update
+## State Update (PR1)
 - Phase: judge (PR1 cycle)
 - Status: completed
+
+JUDGMENT: APPROVED
+
+---
+
+# Judge Phase Report — PR2 (TUI), final cycle
+
+**Verdict**: pass (after one confirmed-fix round)
+**Retry**: 1 / 3
+
+## Judgment-Day Result (PR2 diff)
+- Judge A: APPROVED
+- Judge B: ISSUES FOUND → resolved
+- Confirmed (both judges): dead `leaderInput` struct field in `models_tab.go` (written, never read) — latent "edit the wrong copy" trap.
+- WARNING (real, Judge B, verified empirically): the TUI ran `config.Validate` unconditionally on the leader model, showing a spurious advisory warning for legitimate non-Claude `provider/model-id` values (e.g. `openai/gpt-4o`, `deepseek/deepseek-chat`) — inconsistent with the `--leader` CLI flag, which suppresses the warning for `/`-containing values. Directly contradicted the design's CLI/TUI-parity intent.
+
+## Gates
+- Mutation gate: skipped (`mutation_testing.enabled: false`); Playwright gate: skipped (not web).
+
+## Independent verification by both judges
+- S7 (TUI save == init merge byte-identical) and S8 (`archon update` leaves opencode.json untouched, proven non-vacuous) pass at runtime.
+- Single shared writer reused via the thin exported `MergeOpencodeAgent` wrapper — no drift.
+- Focus ring / rendering correct and opencode-gated; non-opencode unaffected; `applyToConfig` non-clobber confirmed.
+- `go build`, `go test ./...`, `go vet`, `gofmt -l` all clean.
+
+## Confirmed fixes applied (this round)
+- `internal/tui/models_tab.go`: leader-model warning now guarded with `!strings.Contains(value, "/")`, mirroring the CLI — no spurious warning for provider/model-ids. Removed the dead `leaderInput` struct field; the input is constructed inline and lives only in `inputs` (no desync).
+- `internal/tui/model_test.go`: added `TestModelsTab_LeaderWarningGuard` — asserts `openai/gpt-4o` renders the leader section with NO warning, and a non-slash unknown value still warns. Closes the SUGGESTION about the parity test value masking the bug.
+- Re-verified: `go build ./...`, `go vet ./...`, `go test ./...`, `gofmt` all green.
+
+## State Update (PR2 / whole change)
+- Phase: judge
+- Status: completed (PR1 + PR2)
 
 JUDGMENT: APPROVED

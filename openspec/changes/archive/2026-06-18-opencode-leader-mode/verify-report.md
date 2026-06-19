@@ -1,95 +1,129 @@
-# Verify Report: opencode-leader-mode (PR1 cycle — core)
+# Verify Report: opencode-leader-mode (FINAL — whole change, PR1 + PR2)
 
 **Change:** opencode-leader-mode
-**Scope:** PR1 (core: config field + writer + init wiring + tests + `--leader` CLI flag). PR2 (TUI, Phases 5-7) is intentionally deferred and NOT verified here.
+**Scope:** FINAL verify covering the WHOLE change. PR1 (core: config field + writer + init wiring + `--leader` CLI flag + tests) was verified + judged PASS and delivered as PR #41 on the parent branch. This cycle adds PR2 (TUI leader field + save-path merge + parity/update tests, Phases 5-7) and confirms all 7 phases complete and all 8 spec scenarios covered by passing tests — i.e. archive readiness.
+**Branch:** `feat/opencode-leader-mode-tui` (stacked on the PR1 branch).
+**Artifact store:** openspec
 **Date:** 2026-06-18
 **Verdict:** PASS
 
 ---
 
-## 1. Task Completeness (PR1: Phases 1-4 + task 3.4)
+## 1. Task Completeness (all 7 phases)
 
 | Task | Description | Status | Evidence |
 |------|-------------|--------|----------|
-| 1.1 | `Leader string \`yaml:"leader,omitempty"\`` on `ModelConfig` | DONE | `internal/config/model.go:11` |
-| 1.2 | `Clone()` copies `Leader` on the `ModelConfig` literal | DONE | `internal/config/config.go:96` (`Leader: c.Models.Leader`) |
-| 1.3 | `TestConfig_CloneRoundtrip` fixture sets `Leader` | DONE | `internal/config/config_test.go:199` (`anthropic/claude-sonnet-4-20250514`) |
-| 2.1 | `leaderAgentName` const + `archonLeaderAgent` struct (json tags, declaration order = output order) | DONE | `internal/initcmd/opencode_mode.go:12,16-21` (Mode, Description, Model, Prompt) |
-| 2.2 | `mergeOpencodeAgent(projectDir, leader)`: empty no-op, map read-modify-write, only `agent.archon-leader`, no `default_agent`, MarshalIndent + `\n`, atomic tmp+Rename | DONE | `internal/initcmd/opencode_mode.go:33-76` |
-| 3.1 | `ModelLeader` in `Options`; threaded into `buildConfig` → `ModelConfig{Leader}` | DONE | `init.go:24, 85, 207, 234` |
-| 3.2 | `Run()` calls merge after `writeTemplate`, opencode-gated, error wrapped `merge opencode agent: %w` | DONE | `init.go:101-109` |
-| 3.3 | Rollback ordering fix: merge path appended to `CreatedPaths` BEFORE `WriteManifest()`; `WriteManifest()` after merge | DONE | `init.go:107, 111` (manifest built at 91, written at 111 after merge) |
-| 3.4 | `--leader` CLI flag, advisory-validated, threaded into `Options.ModelLeader` | DONE | `cmd/archon/main.go:90, 141-143, 153, 195` |
-| 4.1 | Test: merge creates correct shape + manifest registers path (S2) | DONE | `opencode_mode_test.go:46-121` (2 tests) |
-| 4.2 | Test: preserves pre-existing keys/agents, no `default_agent` (S3) | DONE | `opencode_mode_test.go:125-174` |
-| 4.3 | Test: idempotent byte-identical (S4) | DONE | `opencode_mode_test.go:177-199` |
-| 4.4 | Test: non-opencode (S5) + empty leader (S6) write nothing | DONE | `opencode_mode_test.go:201-247` |
-| 4.5 | `go build` + `go test` green | DONE | see §2 |
+| 1.1 | `Leader string \`yaml:"leader,omitempty"\`` on `ModelConfig` | DONE | `internal/config/model.go` |
+| 1.2 | `Clone()` copies `Leader` on the `ModelConfig` literal | DONE | `internal/config/config.go` (`Leader: c.Models.Leader`) |
+| 1.3 | `TestConfig_CloneRoundtrip` fixture sets `Leader` (S1) | DONE | `internal/config/config_test.go` (`anthropic/claude-sonnet-4-20250514`) |
+| 2.1 | `leaderAgentName` const + `archonLeaderAgent` struct (json tags, declaration order = output order) | DONE | `internal/initcmd/opencode_mode.go` (Mode, Description, Model, Prompt) |
+| 2.2 | `mergeOpencodeAgent(projectDir, leader)`: empty no-op, read-modify-write, only `agent.archon-leader`, no `default_agent`, MarshalIndent + `\n`, atomic tmp+Rename | DONE | `internal/initcmd/opencode_mode.go` |
+| 3.1 | `ModelLeader` in `Options`; threaded into `buildConfig` → `ModelConfig{Leader}` | DONE | `internal/initcmd/init.go` |
+| 3.2 | `Run()` calls merge after `writeTemplate`, opencode-gated, error wrapped `merge opencode agent: %w` | DONE | `internal/initcmd/init.go` |
+| 3.3 | Rollback ordering fix: merge path appended to `CreatedPaths` BEFORE `WriteManifest()` | DONE | `internal/initcmd/init.go` |
+| 3.4 | `--leader` CLI flag, advisory-validated, threaded into `Options.ModelLeader` | DONE | `cmd/archon/main.go` |
+| 4.1 | Test: merge creates correct shape + manifest registers path (S2) | DONE | `internal/initcmd/opencode_mode_test.go` |
+| 4.2 | Test: preserves pre-existing keys/agents, no `default_agent` (S3) | DONE | `internal/initcmd/opencode_mode_test.go` |
+| 4.3 | Test: idempotent byte-identical (S4) | DONE | `internal/initcmd/opencode_mode_test.go` |
+| 4.4 | Test: non-opencode (S5) + empty leader (S6) write nothing | DONE | `internal/initcmd/opencode_mode_test.go` |
+| 4.5 | `go build` + `go test ./internal/config/... ./internal/initcmd/...` green | DONE | see §2 |
+| 5.1 | TUI leader `textinput`, rendered + focus-traversed only when `cfg.Agent == "opencode"` | DONE | `internal/tui/models_tab.go` (`leaderInput`, `leaderEnabled`, `leaderInputIndex()`, appended to `inputs` only for opencode) |
+| 5.2 | `applyToConfig` sets `cfg.Models.Leader` from the input (opencode only) | DONE | `internal/tui/models_tab.go` (`applyToConfig`, guarded by `leaderInputIndex() >= 0`) |
+| 6.1 | `saveConfig` calls `mergeOpencodeAgent` (via exported wrapper) when `cfg.Agent == "opencode"`; surfaces errors; `archon update` untouched | DONE | `internal/tui/model.go` (`saveConfig`, calls `initcmd.MergeOpencodeAgent`) |
+| 7.1 | TUI==init parity test (S7) | DONE | `internal/tui/model_test.go` (`TestSaveConfig_OpencodeLeaderMatchesInitMerge`) |
+| 7.2 | `archon update` leaves opencode.json unwritten (mtime/bytes unchanged) (S8) | DONE | `internal/initcmd/update_test.go` (`TestUpdate_LeavesOpencodeJSONUntouched`) |
+| 7.3 | `go build ./...` + `go test ./...` green | DONE | see §2 |
 
-**PR2 (deferred, expected unchecked — NOT a finding):** Phase 5 (5.1, 5.2 TUI leader field), Phase 6 (6.1 save-path merge), Phase 7 (7.1, 7.2, 7.3 parity/update tests). Correctly left `[ ]` for the stacked PR2 cycle.
+**Completeness: 19/19 tasks `[x]` across all 7 phases. No unchecked tasks. Archive-ready.**
 
 ---
 
-## 2. Build / Test / Vet / Gofmt Evidence (real output)
+## 2. Build / Test / Vet / Gofmt Evidence (real runtime output)
 
 **`go build ./...`** → exit 0 (no output).
 
-**`go test ./cmd/... ./internal/config/... ./internal/initcmd/...`** → exit 0
+**`go test ./...`** → exit 0
 ```
-ok  	github.com/archon-ai/archon/cmd/archon	(cached)
-ok  	github.com/archon-ai/archon/internal/config	(cached)
-ok  	github.com/archon-ai/archon/internal/initcmd	(cached)
+ok  	github.com/archon-ai/archon/cmd/archon
+ok  	github.com/archon-ai/archon/internal/agent
+ok  	github.com/archon-ai/archon/internal/config
+ok  	github.com/archon-ai/archon/internal/initcmd
+ok  	github.com/archon-ai/archon/internal/scaffold
+ok  	github.com/archon-ai/archon/internal/status
+ok  	github.com/archon-ai/archon/internal/tui
+ok  	github.com/archon-ai/archon/internal/version
+ok  	github.com/archon-ai/archon/skills
 ```
 
-**Targeted verbose run (PR1 scenario tests)** → exit 0
+**Targeted verbose — S1 (config roundtrip)** → exit 0
 ```
---- PASS: TestMergeOpencodeAgent_CreatesAgent (0.00s)
---- PASS: TestRun_RegistersOpencodeJSONForRollback (0.00s)
---- PASS: TestMergeOpencodeAgent_PreservesExisting (0.00s)
---- PASS: TestMergeOpencodeAgent_Idempotent (0.00s)
---- PASS: TestMergeOpencodeAgent_EmptyLeaderWritesNothing (0.00s)
---- PASS: TestRun_NonOpencodeWritesNoOpencodeJSON (0.00s)
 --- PASS: TestConfig_CloneRoundtrip (0.00s)
+--- PASS: TestConfig_Roundtrip (0.00s)
 ```
 
-**`go vet ./cmd/... ./internal/config/... ./internal/initcmd/...`** → exit 0 (no output).
+**Targeted verbose — initcmd (S2-S6, S8)** → exit 0
+```
+--- PASS: TestMergeOpencodeAgent_CreatesAgent (0.00s)          # S2
+--- PASS: TestRun_RegistersOpencodeJSONForRollback (0.00s)     # S2 (rollback registration)
+--- PASS: TestMergeOpencodeAgent_PreservesExisting (0.00s)     # S3
+--- PASS: TestMergeOpencodeAgent_Idempotent (0.00s)            # S4
+--- PASS: TestMergeOpencodeAgent_EmptyLeaderWritesNothing (0.00s) # S6
+--- PASS: TestRun_NonOpencodeWritesNoOpencodeJSON (0.00s)      # S5
+--- PASS: TestUpdate_LeavesOpencodeJSONUntouched (0.00s)       # S8
+ok  	github.com/archon-ai/archon/internal/initcmd	0.014s
+```
 
-**`gofmt -l cmd/archon/main.go internal/initcmd/opencode_mode.go internal/initcmd/init.go internal/config/model.go internal/config/config.go`** → exit 0, empty list (all formatted).
+**Targeted verbose — TUI (S7)** → exit 0
+```
+--- PASS: TestSaveConfig_OpencodeLeaderMatchesInitMerge (0.00s) # S7
+ok  	github.com/archon-ai/archon/internal/tui	0.003s
+```
+
+**Full TUI / config / cmd suites (non-cached, regression check)** → exit 0
+```
+ok  	github.com/archon-ai/archon/internal/tui	0.540s
+ok  	github.com/archon-ai/archon/internal/config	0.003s
+ok  	github.com/archon-ai/archon/cmd/archon	0.018s
+```
+
+**`go vet ./...`** → exit 0 (no output).
+
+**`gofmt -l internal/tui/models_tab.go internal/tui/model.go internal/tui/model_test.go internal/initcmd/opencode_mode.go internal/initcmd/update_test.go`** → exit 0, empty list (all formatted).
 
 ---
 
-## 3. Spec Compliance Matrix (specs/harness-init/harness-init.feature)
+## 3. Spec Compliance Matrix — ALL 8 scenarios (specs/harness-init/harness-init.feature)
 
-| Scenario | Requirement | Covering test | Result |
-|----------|-------------|---------------|--------|
-| S1 — Leader survives clone/round-trip | `models.leader` verbatim through Clone + serialize/reload | `TestConfig_CloneRoundtrip` (config_test.go:181, DeepEqual incl. Leader) | PASS |
-| S2 — Init writes archon-leader (mode primary, prompt `{file:./AGENTS.md}`, model=leader) + rollback registration | `TestMergeOpencodeAgent_CreatesAgent` + `TestRun_RegistersOpencodeJSONForRollback` | PASS |
-| S3 — Merge preserves other keys/agents, no `default_agent` | `TestMergeOpencodeAgent_PreservesExisting` | PASS |
-| S4 — Idempotent byte-identical | `TestMergeOpencodeAgent_Idempotent` (`bytes.Equal`) | PASS |
-| S5 — Non-opencode agent writes no opencode.json | `TestRun_NonOpencodeWritesNoOpencodeJSON` | PASS |
-| S6 — Empty leader writes nothing | `TestMergeOpencodeAgent_EmptyLeaderWritesNothing` | PASS |
-| S7 — TUI save == init merge | (PR2 scope) | Not yet covered — deferred to PR2 |
-| S8 — `archon update` leaves opencode.json untouched | (PR2 scope) | Not yet covered — deferred to PR2 |
+A scenario is compliant ONLY if a covering test PASSED at runtime. All 8 below passed.
 
-All six PR1-relevant scenarios (S1-S6) map to a test that PASSED at runtime. S7/S8 require the TUI/save path landing in PR2 and are correctly out of scope here.
+| Scenario | Requirement | Covering test (PASSED) |
+|----------|-------------|------------------------|
+| S1 — Leader survives clone/round-trip | `models.leader` verbatim through Clone + serialize/reload | `TestConfig_CloneRoundtrip` (+ `TestConfig_Roundtrip`), `internal/config/config_test.go` |
+| S2 — Init writes archon-leader (mode `primary`, prompt `{file:./AGENTS.md}`, model=leader) + rollback registration | `TestMergeOpencodeAgent_CreatesAgent` + `TestRun_RegistersOpencodeJSONForRollback`, `internal/initcmd/opencode_mode_test.go` |
+| S3 — Merge preserves other keys/agents, no `default_agent` | `TestMergeOpencodeAgent_PreservesExisting`, `internal/initcmd/opencode_mode_test.go` |
+| S4 — Idempotent byte-identical | `TestMergeOpencodeAgent_Idempotent` (`bytes.Equal`), `internal/initcmd/opencode_mode_test.go` |
+| S5 — Non-opencode agent writes no opencode.json | `TestRun_NonOpencodeWritesNoOpencodeJSON`, `internal/initcmd/opencode_mode_test.go` |
+| S6 — Empty leader writes nothing | `TestMergeOpencodeAgent_EmptyLeaderWritesNothing`, `internal/initcmd/opencode_mode_test.go` |
+| S7 — TUI save == init merge | `TestSaveConfig_OpencodeLeaderMatchesInitMerge` (`bytes.Equal` of opencode.json from `saveConfig()` vs direct `initcmd.MergeOpencodeAgent`), `internal/tui/model_test.go` |
+| S8 — `archon update` leaves opencode.json untouched | `TestUpdate_LeavesOpencodeJSONUntouched` (asserts byte AND mtime unchanged after `Update()`), `internal/initcmd/update_test.go` |
+
+**All 8 scenarios map to a test that PASSED at runtime. Full coverage.**
 
 ---
 
-## 4. Design Coherence (vs design.md)
+## 4. Design Coherence (vs design.md — full change, emphasis on PR2 seams)
 
 | Design intent | Implementation | Status |
 |---------------|----------------|--------|
-| Single shared `mergeOpencodeAgent` | One function in `opencode_mode.go`, called from `Run()` (init). TUI call site is PR2. | Coherent (PR1 portion) |
-| Additive / atomic write | Read into `map[string]any`, set only `agent.archon-leader`, `.tmp` + `os.Rename` | Coherent (opencode_mode.go:40-73) |
-| Deterministic struct (declaration order = output) | `archonLeaderAgent{Mode, Description, Model, Prompt}` fixed-field struct; doc via `MarshalIndent` (sorted map keys) + `\n` | Coherent |
-| No `default_agent` | Never written; asserted by S2/S3 tests | Coherent |
-| Rollback ordering fix (WriteManifest AFTER merge) | Manifest built at init.go:91, merge path appended at :107, `WriteManifest()` at :111 | Coherent |
-| Opencode-gated | `if agentName == "opencode"` guards the merge call (init.go:101) | Coherent |
-| No-op on empty leader | `if leader == "" { return "", nil }` (opencode_mode.go:34-36) | Coherent |
-| Description string (cosmetic, fixed) | `"Archon SDD orchestration leader"` | Coherent (matches design open-question suggestion) |
-| `--leader` CLI flag (task 3.4, NOT in original design File Changes) | Added by orchestrator; flag → `modelLeaderFlag` → advisory `config.Validate` → `Options.ModelLeader` → `buildConfig` → `cfg.Models.Leader` → merge. End-to-end wired and advisory-validated. | Coherent extension; correctly wired |
+| Single shared `mergeOpencodeAgent` writer for init AND TUI | TUI calls exported `initcmd.MergeOpencodeAgent`, a thin wrapper that delegates to `mergeOpencodeAgent`. One writer implementation. | Coherent |
+| Exported integration seam | `func MergeOpencodeAgent(projectDir, leader string) (string, error)` in `opencode_mode.go`, documented as the seam for the TUI save path | Coherent |
+| TUI leader input is opencode-only (rendered + focus-traversed only when agent==opencode) | `leaderEnabled := cfg.Agent == "opencode"`; input appended to `inputs` only when enabled; `view()` and `applyToConfig` guard on `leaderInputIndex() >= 0`. Focus ring (`focusNext`/`focusPrev` mod `len(m.inputs)`) naturally includes the leader input only when present. | Coherent |
+| `applyToConfig` sets `cfg.Models.Leader` only for opencode | Guarded by `leaderInputIndex() >= 0`; non-opencode leaves `cfg.Models.Leader` as loaded | Coherent |
+| `saveConfig` produces byte-identical output to init | After `cfg.Save()`, opencode-gated call to the shared writer; S7 parity test proves byte-equality at runtime | Coherent |
+| `archon update` untouched | No merge call added to the update path; S8 test proves opencode.json bytes + mtime unchanged after `Update()` | Coherent |
+| Additive / atomic write, deterministic struct, no `default_agent`, opencode-gated, empty-leader no-op (PR1 invariants, still hold) | Unchanged from PR1; covered by S2-S6 | Coherent |
 
-Deviation note: task 3.4 (`--leader` flag) is an addition beyond design.md's File Changes table, which listed only the config/writer/init files for PR1. The flag is consistent with the existing `--model*` flag pattern, advisory-validated (warns, never rejects, per `config.Validate`), and threads cleanly to `cfg.Models.Leader`. This is a complete, beneficial addition — not a regression.
+No design deviations introduced by PR2. The `--leader` CLI flag (PR1 task 3.4) remains a beneficial addition beyond design.md's original File Changes table, consistent with the existing `--model*` flag pattern and advisory-validated.
 
 ---
 
@@ -102,10 +136,10 @@ None.
 None.
 
 ### SUGGESTION
-- (Non-blocking) There is no direct unit test asserting the `--leader` CLI flag wiring end-to-end (flag value reaching `opencode.json`). The path is exercised indirectly via `Options.ModelLeader` in `TestRun_RegistersOpencodeJSONForRollback`, and the flag binding is trivial cobra plumbing. A `cmd`-level test could be added in PR2 alongside the TUI parity test for completeness.
+- (Non-blocking) No direct `cmd`-level test asserts the `--leader` CLI flag end-to-end (flag value reaching `opencode.json`); the path is exercised indirectly via `Options.ModelLeader` and is trivial cobra plumbing. Optional future hardening.
 
 ---
 
 ## Final Verdict: PASS
 
-All PR1 tasks (Phases 1-4 + task 3.4) are implemented in code and verified. `go build`, `go test`, `go vet`, and `gofmt` all pass with real runtime evidence. Spec scenarios S1-S6 each map to a test that passed at runtime. Design coherence holds across all PR1 invariants (shared writer, additive/atomic write, deterministic struct, no `default_agent`, rollback ordering fix, opencode-gating, empty-leader no-op), and the orchestrator's `--leader` flag is correctly wired and advisory-validated. S7/S8 and Phases 5-7 are intentionally deferred to PR2 and are not blocking.
+The whole change is complete and verified. All 19 tasks across all 7 phases are `[x]`. `go build ./...`, `go test ./...`, `go vet ./...`, and `gofmt -l` (PR2 files) all pass with real runtime evidence. All 8 spec scenarios (S1-S8) map to a test that PASSED at runtime — including the PR2 additions S7 (TUI==init byte parity) and S8 (update leaves opencode.json untouched). Design coherence holds across all PR1 and PR2 invariants, with the exported `MergeOpencodeAgent` wrapper serving as the single shared-writer seam guaranteeing TUI==init byte-identical output. No CRITICAL or WARNING issues. The change is archive-ready.
