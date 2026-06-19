@@ -697,9 +697,9 @@ func TestSaveConfig_OpencodeLeaderMatchesInitMerge(t *testing.T) {
 		t.Fatalf("TUI opencode.json not written: %v", err)
 	}
 
-	// Reference path: a direct merge with the same leader into a fresh dir.
+	// Reference path: a direct merge with the same models config into a fresh dir.
 	initDir := t.TempDir()
-	if _, err := initcmd.MergeOpencodeAgent(initDir, leader); err != nil {
+	if _, err := initcmd.MergeOpencodeAgent(initDir, config.ModelConfig{Leader: config.ParseModelRef(leader)}); err != nil {
 		t.Fatalf("MergeOpencodeAgent() error = %v", err)
 	}
 	initBytes, err := os.ReadFile(filepath.Join(initDir, "opencode.json"))
