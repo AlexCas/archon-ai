@@ -23,6 +23,7 @@ const (
 	JudgeTab
 	MutationTab
 	PlaywrightTab
+	SecurityTab
 	AgentTab
 	tabCount
 )
@@ -44,6 +45,7 @@ type Model struct {
 	judgeTab      judgeTabState
 	mutationTab   mutationTabState
 	playwrightTab playwrightTabState
+	securityTab   securityTabState
 	agentTab      agentTabState
 }
 
@@ -104,6 +106,7 @@ func NewModel(cfg *config.Config, projectDir string) Model {
 		judgeTab:      newJudgeTabState(cfg.Judge),
 		mutationTab:   newMutationTabState(cfg.MutationTesting),
 		playwrightTab: newPlaywrightTabState(cfg.Playwright),
+		securityTab:   newSecurityTabState(cfg.Security),
 		agentTab:      newAgentTabState(cfg.Agent),
 	}
 }
@@ -123,6 +126,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.judgeTab.setWidth(m.width)
 		m.mutationTab.setWidth(m.width)
 		m.playwrightTab.setWidth(m.width)
+		m.securityTab.setWidth(m.width)
 		m.agentTab.setWidth(m.width)
 
 	case tea.KeyMsg:
@@ -167,6 +171,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if cmd != nil {
 				cmds = append(cmds, cmd)
 			}
+		case SecurityTab:
+			cmd, _ := m.securityTab.update(msg)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
 		case AgentTab:
 			cmd, _ := m.agentTab.update(msg)
 			if cmd != nil {
@@ -193,12 +202,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.judgeTab = newJudgeTabState(msg.cfg.Judge)
 		m.mutationTab = newMutationTabState(msg.cfg.MutationTesting)
 		m.playwrightTab = newPlaywrightTabState(msg.cfg.Playwright)
+		m.securityTab = newSecurityTabState(msg.cfg.Security)
 		m.agentTab = newAgentTabState(msg.cfg.Agent)
 		if m.width > 0 {
 			m.modelsTab.setWidth(m.width)
 			m.judgeTab.setWidth(m.width)
 			m.mutationTab.setWidth(m.width)
 			m.playwrightTab.setWidth(m.width)
+			m.securityTab.setWidth(m.width)
 			m.agentTab.setWidth(m.width)
 		}
 		m.statusMsg = msg.summary
@@ -260,7 +271,7 @@ func (m Model) renderTabs() string {
 		BorderForeground(lipgloss.Color("63")).
 		Bold(true)
 
-	tabs := []string{"Models", "Judge", "Mutation Testing", "Playwright", "Agent"}
+	tabs := []string{"Models", "Judge", "Mutation Testing", "Playwright", "Security", "Agent"}
 	var rendered []string
 
 	for i, name := range tabs {
@@ -289,6 +300,8 @@ func (m Model) renderTabContent() string {
 		return style.Render(m.mutationTab.view(m.width, m.height))
 	case PlaywrightTab:
 		return style.Render(m.playwrightTab.view(m.width, m.height))
+	case SecurityTab:
+		return style.Render(m.securityTab.view(m.width, m.height))
 	case AgentTab:
 		return style.Render(m.agentTab.view(m.width, m.height))
 	default:
@@ -326,6 +339,7 @@ func (m Model) saveConfig() tea.Cmd {
 		m.judgeTab.applyToConfig(cfg)
 		m.mutationTab.applyToConfig(cfg)
 		m.playwrightTab.applyToConfig(cfg)
+		m.securityTab.applyToConfig(cfg)
 		m.agentTab.applyToConfig(cfg)
 
 		if err := cfg.Save(); err != nil {
