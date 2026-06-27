@@ -174,6 +174,19 @@ func setConfigValue(cfg *config.Config, key, value string) error {
 		}
 		cfg.MutationTesting.Enabled = b
 		return nil
+	case "security.enabled":
+		b, err := parseBool(key, value)
+		if err != nil {
+			return err
+		}
+		cfg.Security.Enabled = b
+		return nil
+	case "security.profile":
+		if value != "cli" && value != "web" {
+			return fmt.Errorf("invalid profile %q for security.profile (supported: cli, web)", value)
+		}
+		cfg.Security.Profile = value
+		return nil
 	default:
 		if strings.HasPrefix(key, "models.phases.") {
 			phase := strings.TrimPrefix(key, "models.phases.")
@@ -186,7 +199,7 @@ func setConfigValue(cfg *config.Config, key, value string) error {
 			cfg.Models.Phases[phase] = config.ParseModelRef(value)
 			return nil
 		}
-		return fmt.Errorf("unknown config key %q (supported: models.default, models.phases.<phase>, playwright.enabled, playwright.test_dir, playwright.base_url, mutation_testing.enabled)", key)
+		return fmt.Errorf("unknown config key %q (supported: models.default, models.phases.<phase>, playwright.enabled, playwright.test_dir, playwright.base_url, mutation_testing.enabled, security.enabled, security.profile)", key)
 	}
 }
 
@@ -202,6 +215,10 @@ func getConfigValue(cfg *config.Config, key string) (string, error) {
 		return cfg.Playwright.BaseURL, nil
 	case "mutation_testing.enabled":
 		return strconv.FormatBool(cfg.MutationTesting.Enabled), nil
+	case "security.enabled":
+		return strconv.FormatBool(cfg.Security.Enabled), nil
+	case "security.profile":
+		return cfg.Security.Profile, nil
 	default:
 		if strings.HasPrefix(key, "models.phases.") {
 			phase := strings.TrimPrefix(key, "models.phases.")
@@ -210,6 +227,6 @@ func getConfigValue(cfg *config.Config, key string) (string, error) {
 			}
 			return cfg.Models.Phases[phase].FullID(), nil
 		}
-		return "", fmt.Errorf("unknown config key %q (supported: models.default, models.phases.<phase>, playwright.enabled, playwright.test_dir, playwright.base_url, mutation_testing.enabled)", key)
+		return "", fmt.Errorf("unknown config key %q (supported: models.default, models.phases.<phase>, playwright.enabled, playwright.test_dir, playwright.base_url, mutation_testing.enabled, security.enabled, security.profile)", key)
 	}
 }
