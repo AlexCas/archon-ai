@@ -108,6 +108,17 @@ func Run(opts Options) (*Result, error) {
 		}
 	}
 
+	// Write one .claude/agents/archon-<phase>.md per resolvable phase for
+	// claude projects. Must run before WriteManifest so all written paths are
+	// registered for rollback.
+	if agentName == "claude" {
+		paths, err := writeClaudeAgents(opts.ProjectDir, cfg.Models)
+		if err != nil {
+			return nil, fmt.Errorf("write claude agents: %w", err)
+		}
+		rollback.CreatedPaths = append(rollback.CreatedPaths, paths...)
+	}
+
 	if err := rollback.WriteManifest(); err != nil {
 		return nil, fmt.Errorf("write rollback manifest: %w", err)
 	}
