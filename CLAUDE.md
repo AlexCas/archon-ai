@@ -55,9 +55,9 @@ E. Pruebas web (Playwright)
 ```
 
 **Project type & web testing (group E):**
-- El tipo de proyecto (web / no web) se determina en `sdd-explore`. El grupo E mapea a `playwright.enabled` en `.archon/config.yaml`.
-- Para un proyecto NUEVO o en blanco donde explore no puede determinar el tipo, PREGUNTAR el grupo E junto con el ritmo (grupo A) en el preflight.
-- Con `playwright.enabled`, el harness genera pruebas Playwright desde los `.feature` Gherkin y las ejecuta después de verify y jueces.
+- The orchestrator determines whether the project is web during `sdd-explore` (presence of a web framework, package.json, a dev server, browser-facing routes, etc.).
+- For a NEW or blank project where explore cannot determine the type, ASK group E together with the rhythm (group A) during preflight.
+- Group E maps to `playwright.enabled` in `.archon/config.yaml`. The `--playwright` flag at init time or the Playwright tab in `archon tui` set the same value. When enabled, the harness generates Playwright specs from Gherkin scenarios and runs them after the verify and judge phases.
 
 **Hard gate rules:**
 - `openspec/config.yaml`, existing SDD artifacts, or previous `sdd-init` results do NOT satisfy this preflight.
@@ -110,11 +110,13 @@ Apply and verify are execution phases, but the orchestrator must still show the 
 
 ## Session Status (SESSION_STATUS.md) — MANDATORY
 
-On EVERY phase transition, write/update `SESSION_STATUS.md` at the repository root capturing the live session state (active change, current phase + status, preflight choices including the web/Playwright decision, phase history with timestamps, key artifact paths, open questions, next step). This is the fast resume point if the agent is closed mid-session.
+On EVERY phase transition, the orchestrator MUST write a `SESSION_STATUS.md` file at the repository root capturing the live session state, so work can resume without losing context if the agent is closed mid-session.
 
-- Update it at the start and end of each phase.
-- On resume, READ it FIRST to restore context.
-- During `archive`, MOVE it into the archived change folder and remove it from the root.
+Rules:
+- One file per session, kept at the repo ROOT while the session is active.
+- Update it at the START and END of each phase (explore → propose → spec → design → tasks → apply → verify → judge → archive), recording: active change name, current phase + status, preflight choices, completed phases with timestamps, key artifacts/paths, open questions, and the next recommended step.
+- If the agent is closed unexpectedly, `SESSION_STATUS.md` stays at the root. On the next session, READ it FIRST to restore context before doing anything else.
+- During `archive`, MOVE `SESSION_STATUS.md` into the archived change folder alongside the feature artifacts, then remove it from the root.
 - Follow the `session-status-contract` shared module for the exact format.
 
 ## Commit Attribution (HARD RULE)
@@ -122,10 +124,10 @@ On EVERY phase transition, write/update `SESSION_STATUS.md` at the repository ro
 When committing on the user's behalf through the harness or any sub-agent:
 - Commits are authored SOLELY by the user's git account.
 - NEVER add `Co-Authored-By` trailers, "Generated with" lines, agent/assistant names, or any other co-author or tool attribution to commit messages or PR bodies.
-
+- Use conventional commit format for the subject; keep the body about the change, not the tool.
 ## Rules
 1. Check harness-workflow before any phase transition
-2. Delegate each phase to sdd-* sub-agent
+2. Delegate each phase to the `archon-<phase>` subagent; do not pass a per-call model parameter — the subagent's frontmatter model is the gate
 3. Write/update SESSION_STATUS.md at the root on every phase transition
 4. After every phase that produces an editable artifact, run the Human Review Gate
 5. After verify, invoke harness-judge
@@ -137,7 +139,22 @@ When committing on the user's behalf through the harness or any sub-agent:
 - Skills: 24 (embedded via archon init)
 - Config: .archon/config.yaml
 - Agent: claude
-- Harness Version: 0.2.0
+- Harness Version: 0.8.0+phase-model-hard-gate
+
+## Phase Models
+
+Each phase runs in its named `archon-<phase>` subagent. The `model` field in that
+subagent's frontmatter is the binding hard gate — Claude Code selects the model
+from the subagent definition, not from a per-call parameter.
+
+- explore: anthropic/claude-sonnet-4-6
+- propose: anthropic/claude-opus-4-8
+- spec: anthropic/claude-opus-4-8
+- design: anthropic/claude-opus-4-8
+- tasks: anthropic/claude-sonnet-4-6
+- apply: anthropic/claude-sonnet-4-6
+- verify: anthropic/claude-opus-4-8
+- archive: anthropic/claude-haiku-4-5-20251001
 
 ## State Management
 Phase state tracked in: openspec/changes/{change-name}/state.yaml
