@@ -19,16 +19,23 @@ Feature: Claude per-phase subagent hard gate
     And no agent file is written for any phase ResolvePhaseModels omits
 
   @happy
-  Scenario: Frontmatter model matches the resolved FullID
+  Scenario: Frontmatter model strips the provider prefix
     Given models.phases.spec is provider "anthropic" model "claude-opus-4-8"
     When init writes the claude agents
-    Then ".claude/agents/archon-spec.md" frontmatter "model" equals "anthropic/claude-opus-4-8"
+    Then ".claude/agents/archon-spec.md" frontmatter "model" equals "claude-opus-4-8"
+    And the model value contains no "/" provider prefix
 
   @edge
   Scenario: Phase falls back to the default model
     Given models.phases.tasks is empty and models.default is provider "anthropic" model "claude-sonnet-4-6"
     When init writes the claude agents
-    Then ".claude/agents/archon-tasks.md" frontmatter "model" equals "anthropic/claude-sonnet-4-6"
+    Then ".claude/agents/archon-tasks.md" frontmatter "model" equals "claude-sonnet-4-6"
+
+  @edge
+  Scenario: Bare alias is passed through unchanged
+    Given models.phases.spec is the bare alias "opus" with no provider
+    When init writes the claude agents
+    Then ".claude/agents/archon-spec.md" frontmatter "model" equals "opus"
 
   @happy
   Scenario: Body points the executor at the phase skill

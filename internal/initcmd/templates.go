@@ -159,7 +159,7 @@ const orchestratorTrailerHead = `
 // subagent's frontmatter model is the hard gate).
 const orchestratorRulesClaude = `## Rules
 1. Check harness-workflow before any phase transition
-2. Delegate each phase to the §archon-<phase>§ subagent; do not pass a per-call model parameter — the subagent's frontmatter model is the gate
+2. You MUST delegate each phase by invoking its §archon-<phase>§ subagent via your delegation tool — never execute the phase inline on your own model; do not pass a per-call model parameter (the subagent's frontmatter model is the gate)
 3. Write/update SESSION_STATUS.md at the root on every phase transition
 4. After every phase that produces an editable artifact, run the Human Review Gate
 5. After verify, invoke harness-judge
@@ -172,7 +172,7 @@ const orchestratorRulesClaude = `## Rules
 // Rule 2 names the archon-<phase> subagent as the per-phase delegation target.
 const orchestratorRulesOpencode = `## Rules
 1. Check harness-workflow before any phase transition
-2. Delegate each phase to the §archon-<phase>§ subagent
+2. You MUST delegate each phase by invoking its §archon-<phase>§ subagent via your delegation tool — never execute the phase inline on your own model (the subagent's configured model in opencode.json is the gate)
 3. Write/update SESSION_STATUS.md at the root on every phase transition
 4. After every phase that produces an editable artifact, run the Human Review Gate
 5. After verify, invoke harness-judge

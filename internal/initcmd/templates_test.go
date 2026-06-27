@@ -172,12 +172,12 @@ func TestTemplates_FiveRules(t *testing.T) {
 		{
 			name:      "AGENTS.md",
 			render:    RenderAgentsMD,
-			rule2Want: "2. Delegate each phase to the `archon-<phase>` subagent",
+			rule2Want: "2. You MUST delegate each phase by invoking its `archon-<phase>` subagent via your delegation tool — never execute the phase inline on your own model",
 		},
 		{
 			name:      "CLAUDE.md",
 			render:    RenderClaudeMD,
-			rule2Want: "2. Delegate each phase to the `archon-<phase>` subagent; do not pass a per-call model parameter",
+			rule2Want: "2. You MUST delegate each phase by invoking its `archon-<phase>` subagent via your delegation tool — never execute the phase inline on your own model; do not pass a per-call model parameter",
 		},
 	}
 

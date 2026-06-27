@@ -117,13 +117,14 @@ func TestWriteClaudeAgents_OmitsPhaseWithNoModel(t *testing.T) {
 	}
 }
 
-// 5.2: Frontmatter model field matches the resolved FullID.
-func TestWriteClaudeAgents_FrontmatterModelMatchesResolvedFullID(t *testing.T) {
+// 5.2: Frontmatter model is the resolved model id WITHOUT the provider prefix.
+// Claude Code rejects "<provider>/<model>" in a subagent's model field, so the
+// claude writer must drop the opencode-style provider prefix.
+func TestWriteClaudeAgents_FrontmatterModelStripsProvider(t *testing.T) {
 	dir := t.TempDir()
 
-	const specModel = "anthropic/claude-opus-4-8"
 	models := config.ModelConfig{
-		Phases: map[string]config.ModelRef{"spec": config.ParseModelRef(specModel)},
+		Phases: map[string]config.ModelRef{"spec": config.ParseModelRef("anthropic/claude-opus-4-8")},
 	}
 
 	if _, err := writeClaudeAgents(dir, models); err != nil {
@@ -133,18 +134,22 @@ func TestWriteClaudeAgents_FrontmatterModelMatchesResolvedFullID(t *testing.T) {
 	data := readAgentFile(t, dir, "spec")
 	fm := parseFrontmatter(t, data)
 
-	if fm["model"] != specModel {
-		t.Errorf("archon-spec.md frontmatter model = %q, want %q", fm["model"], specModel)
+	const want = "claude-opus-4-8"
+	if fm["model"] != want {
+		t.Errorf("archon-spec.md frontmatter model = %q, want %q (bare id, no provider)", fm["model"], want)
+	}
+	if strings.Contains(fm["model"], "/") {
+		t.Errorf("archon-spec.md frontmatter model %q still contains a provider prefix", fm["model"])
 	}
 }
 
-// 5.3: A phase falls back to the default model when no per-phase model is set.
+// 5.3: A phase falls back to the default model when no per-phase model is set,
+// also emitted as the bare model id.
 func TestWriteClaudeAgents_PhaseFallsBackToDefault(t *testing.T) {
 	dir := t.TempDir()
 
-	const defaultModel = "anthropic/claude-sonnet-4-6"
 	models := config.ModelConfig{
-		Default: config.ParseModelRef(defaultModel),
+		Default: config.ParseModelRef("anthropic/claude-sonnet-4-6"),
 		// No phases.tasks entry — should fall back to Default.
 	}
 
@@ -155,8 +160,27 @@ func TestWriteClaudeAgents_PhaseFallsBackToDefault(t *testing.T) {
 	data := readAgentFile(t, dir, "tasks")
 	fm := parseFrontmatter(t, data)
 
-	if fm["model"] != defaultModel {
-		t.Errorf("archon-tasks.md frontmatter model = %q, want %q", fm["model"], defaultModel)
+	const want = "claude-sonnet-4-6"
+	if fm["model"] != want {
+		t.Errorf("archon-tasks.md frontmatter model = %q, want %q (bare id, no provider)", fm["model"], want)
+	}
+}
+
+// 5.2b: A bare alias (no provider) is passed through unchanged.
+func TestWriteClaudeAgents_BareAliasModelUnchanged(t *testing.T) {
+	dir := t.TempDir()
+
+	models := config.ModelConfig{
+		Phases: map[string]config.ModelRef{"spec": config.ParseModelRef("opus")},
+	}
+
+	if _, err := writeClaudeAgents(dir, models); err != nil {
+		t.Fatalf("writeClaudeAgents() error = %v", err)
+	}
+
+	fm := parseFrontmatter(t, readAgentFile(t, dir, "spec"))
+	if fm["model"] != "opus" {
+		t.Errorf("archon-spec.md frontmatter model = %q, want %q", fm["model"], "opus")
 	}
 }
 

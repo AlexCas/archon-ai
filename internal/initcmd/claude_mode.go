@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/archon-ai/archon/internal/config"
 )
@@ -61,10 +62,23 @@ func renderClaudeAgent(pm config.PhaseModel) []byte {
 	content := "---\n"
 	content += "name: archon-" + pm.Phase + "\n"
 	content += "description: Archon SDD " + pm.Phase + " phase executor\n"
-	content += "model: " + pm.Model + "\n"
+	content += "model: " + claudeFrontmatterModel(pm.Model) + "\n"
 	content += "---\n"
 	content += "\n"
 	content += "You are the Archon SDD " + pm.Phase + " executor. Follow `skills/sdd-" + pm.Phase + "/SKILL.md`\n"
 	content += "for this phase. Do NOT delegate; execute the phase yourself.\n"
 	return []byte(content)
+}
+
+// claudeFrontmatterModel converts a resolved FullID into the value Claude Code
+// accepts in a subagent's `model:` frontmatter. ResolvePhaseModels emits the
+// opencode-style "<provider>/<model>" FullID, but Claude Code's model field
+// expects a bare model id (e.g. "claude-opus-4-8") or alias — a provider prefix
+// makes it reject the model. We therefore drop everything up to and including
+// the last "/". A bare alias (no "/") is returned unchanged.
+func claudeFrontmatterModel(fullID string) string {
+	if i := strings.LastIndex(fullID, "/"); i >= 0 {
+		return fullID[i+1:]
+	}
+	return fullID
 }
