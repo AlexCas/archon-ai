@@ -224,6 +224,10 @@ func TestConfig_CloneRoundtrip(t *testing.T) {
 			TestDir: "e2e",
 			BaseURL: "http://localhost:3000",
 		},
+		Security: Security{
+			Enabled: true,
+			Profile: "web",
+		},
 		Models: ModelConfig{
 			Default: ModelRef{Provider: "anthropic", Model: "claude-sonnet-4-20250514"},
 			Leader:  ModelRef{Provider: "anthropic", Model: "claude-opus-4-8"},
@@ -380,6 +384,26 @@ func TestConfig_FlatStringRoundtripByteIdentical(t *testing.T) {
 	}
 	if strings.Contains(string(savedBytes), "models:") {
 		t.Errorf("saved minimal config contains unexpected 'models:' block:\n%s", savedBytes)
+	}
+}
+
+// TestSecurity_DefaultOff asserts that loading a config with no security block
+// yields Security{Enabled:false, Profile:""} — the zero value, default-off.
+func TestSecurity_DefaultOff(t *testing.T) {
+	fs := fstest.MapFS{
+		".archon/config.yaml": &fstest.MapFile{
+			Data: []byte("harness_version: \"1.0.0\"\nagent: claude\n"),
+		},
+	}
+	var cfg Config
+	if err := cfg.Load(fs); err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Security.Enabled {
+		t.Error("Security.Enabled = true; want false when block is absent")
+	}
+	if cfg.Security.Profile != "" {
+		t.Errorf("Security.Profile = %q; want empty when block is absent", cfg.Security.Profile)
 	}
 }
 
