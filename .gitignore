@@ -2,6 +2,9 @@
 archon
 archon.exe
 archon-test
+# Cross-platform release builds (archon-linux-amd64, archon-darwin-arm64, ...)
+archon-*-amd64
+archon-*-arm64
 
 # Local directories
 .archon/
