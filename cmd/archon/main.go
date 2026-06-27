@@ -86,6 +86,7 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 		modelTasksFlag   string
 		modelApplyFlag   string
 		modelVerifyFlag  string
+		modelJudgeFlag   string
 		modelArchiveFlag string
 		modelLeaderFlag  string
 	)
@@ -128,6 +129,11 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 				"apply":   modelApplyFlag,
 				"verify":  modelVerifyFlag,
 				"archive": modelArchiveFlag,
+			}
+			if modelJudgeFlag != "" {
+				modelFlags["judge"] = modelJudgeFlag
+			} else {
+				modelFlags["judge"] = modelVerifyFlag
 			}
 
 			for _, v := range modelFlags {
@@ -197,6 +203,7 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 	cmd.Flags().StringVar(&modelTasksFlag, "model-tasks", "", "Model for the tasks phase")
 	cmd.Flags().StringVar(&modelApplyFlag, "model-apply", "", "Model for the apply phase")
 	cmd.Flags().StringVar(&modelVerifyFlag, "model-verify", "", "Model for the verify phase")
+	cmd.Flags().StringVar(&modelJudgeFlag, "model-judge", "", "Model for the judge phase")
 	cmd.Flags().StringVar(&modelArchiveFlag, "model-archive", "", "Model for the archive phase")
 	cmd.Flags().StringVar(&modelLeaderFlag, "leader", "", "Opencode leader model (provider/model-id) for the archon-leader primary agent")
 

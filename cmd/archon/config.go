@@ -178,7 +178,7 @@ func setConfigValue(cfg *config.Config, key, value string) error {
 		if strings.HasPrefix(key, "models.phases.") {
 			phase := strings.TrimPrefix(key, "models.phases.")
 			if !config.ValidPhases[phase] {
-				return fmt.Errorf("unknown phase %q (valid: explore, propose, spec, design, tasks, apply, verify, archive)", phase)
+				return fmt.Errorf("unknown phase %q (valid: explore, propose, spec, design, tasks, apply, verify, judge, archive)", phase)
 			}
 			if cfg.Models.Phases == nil {
 				cfg.Models.Phases = make(map[string]config.ModelRef)
@@ -206,7 +206,7 @@ func getConfigValue(cfg *config.Config, key string) (string, error) {
 		if strings.HasPrefix(key, "models.phases.") {
 			phase := strings.TrimPrefix(key, "models.phases.")
 			if !config.ValidPhases[phase] {
-				return "", fmt.Errorf("unknown phase %q (valid: explore, propose, spec, design, tasks, apply, verify, archive)", phase)
+				return "", fmt.Errorf("unknown phase %q (valid: explore, propose, spec, design, tasks, apply, verify, judge, archive)", phase)
 			}
 			return cfg.Models.Phases[phase].FullID(), nil
 		}

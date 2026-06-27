@@ -278,8 +278,8 @@ func TestRun_NonOpencodeWritesNoOpencodeJSON(t *testing.T) {
 }
 
 // W3-4: _WritesSubagentPerResolvablePhase — default set and a phase override →
-// archon-<phase> for every phase ResolvePhaseModels returns; archon-judge must
-// not be written (judge is not in PhaseOrder).
+// archon-<phase> for every phase ResolvePhaseModels returns, including archon-judge
+// (judge is now in PhaseOrder).
 func TestMergeOpencodeAgent_WritesSubagentPerResolvablePhase(t *testing.T) {
 	dir := t.TempDir()
 
@@ -306,9 +306,9 @@ func TestMergeOpencodeAgent_WritesSubagentPerResolvablePhase(t *testing.T) {
 		}
 	}
 
-	// archon-judge must never be written.
-	if _, ok := agents["archon-judge"]; ok {
-		t.Error("agent.archon-judge must not be written")
+	// archon-judge must be written (judge is in PhaseOrder and Default model resolves it).
+	if _, ok := agents["archon-judge"]; !ok {
+		t.Error("agent.archon-judge must be written when judge resolves via Default model")
 	}
 
 	// archon-leader must not be written (leader FullID is empty).

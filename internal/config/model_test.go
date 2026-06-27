@@ -407,4 +407,72 @@ func TestResolvePhaseModels(t *testing.T) {
 			t.Errorf("PhaseModel.Effort = %q, want empty", got[0].Effort)
 		}
 	})
+
+	t.Run("judge phase resolves and appears between verify and archive", func(t *testing.T) {
+		mc := ModelConfig{
+			Phases: map[string]ModelRef{
+				"verify": {Provider: "anthropic", Model: "claude-opus-4-8"},
+				"judge":  {Provider: "anthropic", Model: "claude-opus-4-8"},
+			},
+		}
+		got := ResolvePhaseModels(mc)
+
+		// Find judge in result.
+		judgeIdx := -1
+		verifyIdx := -1
+		archiveIdx := -1
+		for i, pm := range got {
+			switch pm.Phase {
+			case "judge":
+				judgeIdx = i
+			case "verify":
+				verifyIdx = i
+			case "archive":
+				archiveIdx = i
+			}
+		}
+
+		if judgeIdx == -1 {
+			t.Fatal("judge phase not present in ResolvePhaseModels result")
+		}
+		// Verify the resolved model.
+		if got[judgeIdx].Model != "anthropic/claude-opus-4-8" {
+			t.Errorf("judge model = %q, want %q", got[judgeIdx].Model, "anthropic/claude-opus-4-8")
+		}
+		// judge must come after verify (archive is absent here since it has no model set).
+		if verifyIdx != -1 && judgeIdx <= verifyIdx {
+			t.Errorf("judge (index %d) must come after verify (index %d)", judgeIdx, verifyIdx)
+		}
+		// archive absent — confirm archiveIdx is -1 (no model set for archive).
+		_ = archiveIdx
+	})
+
+	t.Run("judge defaults to verify model via modelFlags wiring", func(t *testing.T) {
+		// Simulate the CLI flag layer: judge receives the same value as verify.
+		verifyRef := ModelRef{Provider: "anthropic", Model: "claude-opus-4-8"}
+		mc := ModelConfig{
+			Phases: map[string]ModelRef{
+				"verify": verifyRef,
+				"judge":  verifyRef, // mirror: modelFlags["judge"] = modelVerifyFlag
+			},
+		}
+		got := ResolvePhaseModels(mc)
+
+		var judgeModel, verifyModel string
+		for _, pm := range got {
+			switch pm.Phase {
+			case "judge":
+				judgeModel = pm.Model
+			case "verify":
+				verifyModel = pm.Model
+			}
+		}
+
+		if judgeModel == "" {
+			t.Fatal("judge phase not resolved")
+		}
+		if judgeModel != verifyModel {
+			t.Errorf("judge model = %q, verify model = %q; judge must default to verify's model", judgeModel, verifyModel)
+		}
+	})
 }

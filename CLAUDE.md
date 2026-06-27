@@ -127,7 +127,7 @@ When committing on the user's behalf through the harness or any sub-agent:
 - Use conventional commit format for the subject; keep the body about the change, not the tool.
 ## Rules
 1. Check harness-workflow before any phase transition
-2. Delegate each phase to the `archon-<phase>` subagent; do not pass a per-call model parameter — the subagent's frontmatter model is the gate
+2. You MUST delegate each phase by invoking its `archon-<phase>` subagent via your delegation tool — never execute the phase inline on your own model; do not pass a per-call model parameter (the subagent's frontmatter model is the gate)
 3. Write/update SESSION_STATUS.md at the root on every phase transition
 4. After every phase that produces an editable artifact, run the Human Review Gate
 5. After verify, invoke harness-judge
@@ -139,7 +139,7 @@ When committing on the user's behalf through the harness or any sub-agent:
 - Skills: 24 (embedded via archon init)
 - Config: .archon/config.yaml
 - Agent: claude
-- Harness Version: 0.8.0+phase-model-hard-gate
+- Harness Version: dev
 
 ## Phase Models
 
@@ -154,6 +154,7 @@ from the subagent definition, not from a per-call parameter.
 - tasks: anthropic/claude-sonnet-4-6
 - apply: anthropic/claude-sonnet-4-6
 - verify: anthropic/claude-opus-4-8
+- judge: anthropic/claude-opus-4-8
 - archive: anthropic/claude-haiku-4-5-20251001
 
 ## State Management
