@@ -26,6 +26,7 @@ The FIRST action on activation is to read the judge flag (Step 0). If the judge 
 - ALWAYS invoke `sdd-verify` after each re-apply before re-judging.
 - Mutation testing is OPT-IN. Read `.archon/config.yaml` → `mutation_testing.enabled`. Default: `false`. Skip entirely when disabled.
 - Playwright E2E is OPT-IN and runs only for web projects. ALWAYS read `.archon/config.yaml` → `playwright.enabled` to decide whether to run it. Default: `false`. Skip entirely when disabled. These tests run AFTER verify and after `judgment-day` passes.
+- Security gate is OPT-IN. Read `.archon/config.yaml` → `security.enabled`. Default: `false`. When `security.enabled` is true, treat any unresolved `@security` CRITICAL coverage gap (reported by `sdd-verify`) as a failing gate — do NOT advance to archive. When `security.enabled` is false, skip this check entirely and count it as `pass`.
 - Maximum 3 retry cycles. The 4th failure returns `blocked` with `max_retries_exceeded: true`.
 - NEVER skip the re-verify step between re-apply and re-judge.
 - Accumulate all issues across retry cycles in the feedback block.
