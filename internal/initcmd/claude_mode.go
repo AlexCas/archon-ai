@@ -65,6 +65,14 @@ func renderClaudeAgent(pm config.PhaseModel) []byte {
 	content += "model: " + claudeFrontmatterModel(pm.Model) + "\n"
 	content += "---\n"
 	content += "\n"
+	if pm.Phase == "judge" {
+		content += "You are the Archon SDD judge executor. There is no sdd-judge skill: your job is the\n"
+		content += "dual adversarial review. Run the `judgment-day` skill against the current change\n"
+		content += "(all files modified by the change), then report its verdict (APPROVED or ESCALATED,\n"
+		content += "with confirmed/suspect issues) back to `harness-judge`. Do NOT apply fixes or\n"
+		content += "re-verify yourself — harness-judge owns the re-apply loop and the gates.\n"
+		return []byte(content)
+	}
 	content += "You are the Archon SDD " + pm.Phase + " executor. Follow `skills/sdd-" + pm.Phase + "/SKILL.md`\n"
 	content += "for this phase. Do NOT delegate; execute the phase yourself.\n"
 	return []byte(content)

@@ -101,7 +101,7 @@ func newModelsTabState(cfg *config.Config, providers map[string]opencode.Provide
 
 	rows := make([]modelRow, 0, 1+len(config.PhaseOrder)+1)
 	rows = append(rows, modelRow{label: "Default", kind: rowDefault, ref: cfg.Models.Default})
-	for _, phase := range config.PhaseOrder { // deterministic order, 8 phases
+	for _, phase := range config.PhaseOrder { // deterministic order, 9 phases
 		var ref config.ModelRef
 		if cfg.Models.Phases != nil {
 			ref = cfg.Models.Phases[phase] // zero ModelRef when unset

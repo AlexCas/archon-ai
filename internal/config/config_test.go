@@ -230,6 +230,7 @@ func TestConfig_CloneRoundtrip(t *testing.T) {
 			Phases: map[string]ModelRef{
 				"apply":  {Model: "claude-sonnet-4-6"},
 				"verify": {Model: "claude-haiku-4-5"},
+				"judge":  {Model: "claude-opus-4-8"},
 			},
 		},
 		SkillInventory: []SkillInventory{

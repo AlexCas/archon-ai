@@ -21,7 +21,7 @@ The FIRST action on activation is to read the judge flag (Step 0). If the judge 
 ## Hard Rules
 
 - The judge phase is configurable. ALWAYS read `.archon/config.yaml` → `judge.enabled` BEFORE doing anything else. Default: `true` (run when the section is absent). When `judge.enabled: false`, SKIP the entire judge phase — do NOT invoke `judgment-day`, mutation testing, or Playwright — and return `skipped` so the orchestrator advances from verify straight to archive.
-- ALWAYS invoke `judgment-day` skill for dual review. Do NOT perform review inline.
+- ALWAYS delegate the dual review to the archon-judge subagent. Do NOT invoke judgment-day inline on the orchestrator's model.
 - ALWAYS invoke `sdd-apply` for re-fixes. Do NOT apply fixes inline.
 - ALWAYS invoke `sdd-verify` after each re-apply before re-judging.
 - Mutation testing is OPT-IN. Read `.archon/config.yaml` → `mutation_testing.enabled`. Default: `false`. Skip entirely when disabled.
@@ -72,13 +72,15 @@ playwright:
 - `judge.enabled` controls whether the whole phase runs (see Step 0). Default: `true`.
 - If the file or either gate section is missing, default that gate to `enabled: false`.
 
-### Step 2: Invoke Judgment-Day
+### Step 2: Delegate Dual Review to archon-judge
 
-Delegate to the `judgment-day` skill:
+Delegate the dual adversarial review to the `archon-judge` subagent (whose
+frontmatter `model:` is the binding hard gate):
 - Target: the current change (all files modified by the change)
 - Criteria: spec compliance, design coherence, code quality
 
-Capture the verdict:
+The archon-judge subagent invokes `judgment-day` internally and reports its verdict.
+Capture the verdict from the subagent's output:
 - `pass` → both judges approve with no confirmed CRITICAL or real WARNING issues
 - `fail` → one or more confirmed issues found
 

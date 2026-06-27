@@ -48,7 +48,7 @@ func readAgentFile(t *testing.T, dir, phase string) []byte {
 	return data
 }
 
-// 5.1: Init writes one file per resolvable phase; archon-judge.md must not be written.
+// 5.1: Init writes one file per resolvable phase; archon-judge.md must be written when judge resolves.
 func TestWriteClaudeAgents_WritesOneFilePerResolvablePhase(t *testing.T) {
 	dir := t.TempDir()
 
@@ -75,10 +75,10 @@ func TestWriteClaudeAgents_WritesOneFilePerResolvablePhase(t *testing.T) {
 		}
 	}
 
-	// archon-judge.md must not be written (judge is not in PhaseOrder).
+	// archon-judge.md must be written (judge is now in PhaseOrder).
 	judgePath := filepath.Join(dir, ".claude", "agents", "archon-judge.md")
-	if _, err := os.Stat(judgePath); !os.IsNotExist(err) {
-		t.Errorf("archon-judge.md must not be written; stat err = %v", err)
+	if _, err := os.Stat(judgePath); err != nil {
+		t.Errorf("archon-judge.md must be written; stat err = %v", err)
 	}
 }
 
@@ -185,6 +185,7 @@ func TestWriteClaudeAgents_BareAliasModelUnchanged(t *testing.T) {
 }
 
 // 5.4: Body references "skills/sdd-<phase>/SKILL.md" and is non-empty after frontmatter.
+// Judge is exempt from the generic sdd-skill-ref rule.
 func TestWriteClaudeAgents_BodyPointsAtPhaseSkill(t *testing.T) {
 	dir := t.TempDir()
 
@@ -213,6 +214,79 @@ func TestWriteClaudeAgents_BodyPointsAtPhaseSkill(t *testing.T) {
 	wantRef := "skills/sdd-design/SKILL.md"
 	if !strings.Contains(body, wantRef) {
 		t.Errorf("archon-design.md body missing %q; body = %q", wantRef, body)
+	}
+}
+
+// 5.7: All non-judge phases have the generic sdd-<phase>/SKILL.md reference;
+// judge is exempt (its body must NOT contain that pattern).
+func TestWriteClaudeAgents_JudgeExemptFromSkillRef(t *testing.T) {
+	dir := t.TempDir()
+
+	// Use a Default model so all phases resolve.
+	models := config.ModelConfig{
+		Default: config.ParseModelRef("anthropic/claude-opus-4-8"),
+	}
+
+	if _, err := writeClaudeAgents(dir, models); err != nil {
+		t.Fatalf("writeClaudeAgents() error = %v", err)
+	}
+
+	for _, phase := range config.PhaseOrder {
+		data := readAgentFile(t, dir, phase)
+		content := string(data)
+		genericRef := "skills/sdd-" + phase + "/SKILL.md"
+
+		if phase == "judge" {
+			// Judge must NOT contain the generic reference.
+			if strings.Contains(content, genericRef) {
+				t.Errorf("archon-judge.md must not contain %q (judge uses wrapper body)", genericRef)
+			}
+		} else {
+			// Every other phase must contain the generic reference.
+			if !strings.Contains(content, genericRef) {
+				t.Errorf("archon-%s.md missing %q in body", phase, genericRef)
+			}
+		}
+	}
+}
+
+// 5.6: Judge body is a wrapper — references judgment-day and harness-judge, not sdd-judge.
+func TestWriteClaudeAgents_JudgeBodyIsWrapper(t *testing.T) {
+	dir := t.TempDir()
+
+	models := config.ModelConfig{
+		Phases: map[string]config.ModelRef{"judge": config.ParseModelRef("anthropic/claude-opus-4-8")},
+	}
+
+	if _, err := writeClaudeAgents(dir, models); err != nil {
+		t.Fatalf("writeClaudeAgents() error = %v", err)
+	}
+
+	data := readAgentFile(t, dir, "judge")
+	content := string(data)
+
+	// Frontmatter model must be bare (no provider prefix).
+	fm := parseFrontmatter(t, data)
+	if fm["model"] != "claude-opus-4-8" {
+		t.Errorf("archon-judge.md frontmatter model = %q, want %q", fm["model"], "claude-opus-4-8")
+	}
+
+	// Body must reference judgment-day and harness-judge.
+	if !strings.Contains(content, "judgment-day") {
+		t.Errorf("archon-judge.md body missing %q", "judgment-day")
+	}
+	if !strings.Contains(content, "harness-judge") {
+		t.Errorf("archon-judge.md body missing %q", "harness-judge")
+	}
+
+	// Body must NOT reference skills/sdd-judge/SKILL.md.
+	if strings.Contains(content, "skills/sdd-judge/SKILL.md") {
+		t.Errorf("archon-judge.md body must not contain %q", "skills/sdd-judge/SKILL.md")
+	}
+
+	// Body must NOT contain the generic "Do NOT delegate" line.
+	if strings.Contains(content, "Do NOT delegate") {
+		t.Errorf("archon-judge.md body must not contain %q", "Do NOT delegate")
 	}
 }
 

@@ -158,13 +158,13 @@ var ValidPhases = map[string]bool{
 	"tasks":   true,
 	"apply":   true,
 	"verify":  true,
+	"judge":   true,
 	"archive": true,
 }
 
-// PhaseOrder is the canonical, delegated SDD phase order. It excludes judge,
-// which is not delegated to an sdd-* sub-agent. Iterating this slice (rather
-// than a map) gives deterministic, byte-identical output across runs.
-var PhaseOrder = []string{"explore", "propose", "spec", "design", "tasks", "apply", "verify", "archive"}
+// PhaseOrder is the canonical, delegated SDD phase order. Iterating this slice
+// (rather than a map) gives deterministic, byte-identical output across runs.
+var PhaseOrder = []string{"explore", "propose", "spec", "design", "tasks", "apply", "verify", "judge", "archive"}
 
 // claudeFamilies are the Claude model family aliases the delegation tool
 // accepts. NormalizeModel collapses display strings and full IDs down to one
