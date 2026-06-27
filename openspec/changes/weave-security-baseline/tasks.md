@@ -53,9 +53,9 @@
 
 ## Phase 3 — Slice 3: TUI (PR 3, depends on PR 1 merged)
 
-- [ ] **[S3-1] Create `internal/tui/security_tab.go`** — mirror `playwright_tab.go`; `enabled` bool toggle; `profile` cycle-selector cycling `cli` → `web` → `cli` (not free text, enforces the two-value enum at the UI layer); implement `view`, `update`, `applyToConfig`, `setWidth`.
-- [ ] **[S3-2] Wire Security tab into `internal/tui/model.go`** — add `SecurityTab` iota after `PlaywrightTab` (:26); add `securityTab` field (:47); update `init` (:106), `setWidth` (:125), `update` (:165), `view` (:290), `apply` (:328), `reload` (:195); add `"Security"` to tab names (:263).
-- [ ] **[S3-3] Optional: add teatest for `security_tab.go` `applyToConfig`** — assert toggle + cycle sets `enabled`/`profile` correctly; assert invalid profile cannot be selected via the cycle.
+- [x] **[S3-1] Create `internal/tui/security_tab.go`** — mirror `playwright_tab.go`; `enabled` bool toggle; `profile` cycle-selector cycling `cli` → `web` → `cli` (not free text, enforces the two-value enum at the UI layer); implement `view`, `update`, `applyToConfig`, `setWidth`.
+- [x] **[S3-2] Wire Security tab into `internal/tui/model.go`** — add `SecurityTab` iota after `PlaywrightTab` (:26); add `securityTab` field (:47); update `init` (:106), `setWidth` (:125), `update` (:165), `view` (:290), `apply` (:328), `reload` (:195); add `"Security"` to tab names (:263).
+- [x] **[S3-3] Optional: add teatest for `security_tab.go` `applyToConfig`** — assert toggle + cycle sets `enabled`/`profile` correctly; assert invalid profile cannot be selected via the cycle.
 
 ---
 
