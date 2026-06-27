@@ -39,19 +39,22 @@ Scenario: A phase with no resolvable model is omitted
   And no agent file is written for any phase ResolvePhaseModels omits
 ```
 
-### Requirement: Frontmatter model is the resolved FullID
+### Requirement: Frontmatter model is the resolved model id without provider prefix
 
 Each `archon-<phase>.md` file MUST carry YAML frontmatter whose `model` field equals the
-`PhaseModel.Model` (FullID) that `ResolvePhaseModels` produces for that phase — identical
-to the value the `CLAUDE.md` "Phase Models" section names for that phase.
+model `ResolvePhaseModels` produces for that phase with any `<provider>/` prefix removed.
+Claude Code rejects a provider-qualified id (e.g. `anthropic/claude-opus-4-8`) in a
+subagent's `model` field, so the claude writer MUST emit the bare model id
+(e.g. `claude-opus-4-8`) or a bare alias unchanged.
 
-#### Scenario: Frontmatter model matches the resolved FullID
+#### Scenario: Frontmatter model strips the provider prefix
 
 ```gherkin
-Scenario: Frontmatter model matches the resolved FullID
+Scenario: Frontmatter model strips the provider prefix
   Given models.phases.spec is provider "anthropic" model "claude-opus-4-8"
   When init writes the claude agents
-  Then ".claude/agents/archon-spec.md" frontmatter "model" equals "anthropic/claude-opus-4-8"
+  Then ".claude/agents/archon-spec.md" frontmatter "model" equals "claude-opus-4-8"
+  And the model value contains no "/" provider prefix
 ```
 
 #### Scenario: Phase falls back to the default model
@@ -61,7 +64,17 @@ Scenario: Frontmatter model matches the resolved FullID
 Scenario: Phase falls back to the default model
   Given models.phases.tasks is empty and models.default is provider "anthropic" model "claude-sonnet-4-6"
   When init writes the claude agents
-  Then ".claude/agents/archon-tasks.md" frontmatter "model" equals "anthropic/claude-sonnet-4-6"
+  Then ".claude/agents/archon-tasks.md" frontmatter "model" equals "claude-sonnet-4-6"
+```
+
+#### Scenario: Bare alias is passed through unchanged
+
+```gherkin
+@edge
+Scenario: Bare alias is passed through unchanged
+  Given models.phases.spec is the bare alias "opus" with no provider
+  When init writes the claude agents
+  Then ".claude/agents/archon-spec.md" frontmatter "model" equals "opus"
 ```
 
 ### Requirement: Functional agent body
