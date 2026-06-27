@@ -41,6 +41,11 @@ The orchestrator should provide structured status from `skills/_shared/sdd-statu
 - Scenarios are authored in formal Gherkin (`.feature` files beside each `spec.md`). Map EACH Gherkin scenario to its covering test by matching scenario name.
 - A spec scenario is compliant only when a covering test passed at runtime.
 - For web projects with `playwright.enabled: true`: confirm that Playwright specs were generated for `@web` scenarios (the source of truth is the `.feature` files). Do NOT execute the Playwright suite here — that runs in the judge phase (`harness-judge` Playwright gate), after verify. Report any `@web` scenario lacking a generated spec as CRITICAL.
+- **Security coverage check (conditional)**: If `security.enabled` is true, confirm
+  that every `@security`-tagged scenario in the `.feature` files maps to a covering
+  test or scanner execution. Report any gap — a `@security` scenario with no
+  covering test or scanner step — as CRITICAL. When `security.enabled` is false,
+  skip this check entirely — no change to verify behavior.
 - Compare specs first, design second, task completion third.
 - Do not fix issues; report them for the orchestrator/user.
 - Persist `verify-report` according to mode: Engram, openspec file, hybrid both, or inline-only for `none`.

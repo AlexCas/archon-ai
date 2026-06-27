@@ -25,6 +25,8 @@ type Options struct {
 	ModelPhases  map[string]string
 	// Playwright enables generation and execution of Playwright E2E tests.
 	Playwright bool
+	// Security enables the security-baseline gate across the SDD phases.
+	Security bool
 	// OverwriteTemplate, when true, replaces an existing orchestrator file
 	// (CLAUDE.md / AGENTS.md) without prompting. When false and the file
 	// already exists, Run aborts with ErrTemplateExists so the caller can
@@ -82,7 +84,7 @@ func Run(opts Options) (*Result, error) {
 	projectSkillsDir := res.ProjectSkillsDir
 	extracted := res.Extracted
 
-	cfg := buildConfig(agentName, extracted, res.Inventory, opts.ModelDefault, opts.ModelLeader, opts.ModelPhases, opts.Playwright)
+	cfg := buildConfig(agentName, extracted, res.Inventory, opts.ModelDefault, opts.ModelLeader, opts.ModelPhases, opts.Playwright, opts.Security)
 	cfg.HomeDir = opts.ProjectDir
 	if err := cfg.Save(); err != nil {
 		return nil, fmt.Errorf("save config: %w", err)
@@ -215,7 +217,7 @@ func createSymlinks(globalDir, projectDir string, skills []string) error {
 	return nil
 }
 
-func buildConfig(agentName string, extracted []string, inventory []config.SkillInventory, modelDefault string, modelLeader string, modelPhases map[string]string, playwright bool) *config.Config {
+func buildConfig(agentName string, extracted []string, inventory []config.SkillInventory, modelDefault string, modelLeader string, modelPhases map[string]string, playwright bool, security bool) *config.Config {
 	var phases map[string]config.ModelRef
 	for k, v := range modelPhases {
 		if v != "" {
@@ -239,6 +241,9 @@ func buildConfig(agentName string, extracted []string, inventory []config.SkillI
 		},
 		Playwright: config.Playwright{
 			Enabled: playwright,
+		},
+		Security: config.Security{
+			Enabled: security,
 		},
 		Models: config.ModelConfig{
 			Default: config.ParseModelRef(modelDefault),

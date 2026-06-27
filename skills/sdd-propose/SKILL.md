@@ -198,6 +198,12 @@ Ready for specs (sdd-spec) or design (sdd-design).
 - Every proposal MUST have success criteria
 - Use concrete file paths in "Affected Areas" when possible
 - Apply any `rules.proposal` from `openspec/config.yaml`
+- **Security Risk row (conditional)**: If `security.enabled` is true, load
+  `skills/_shared/security-baseline.md` and add a MANDATORY Security Risk row to
+  the proposal's Risks table. Select the risk category from the module's Risk
+  Taxonomy that best fits the change (or list multiple rows if the change crosses
+  categories). When `security.enabled` is false, skip this row entirely — no
+  change to proposal behavior.
 - **ALWAYS fill in the Capabilities section** — this is the contract with sdd-spec. Research `openspec/specs/` first to use correct existing capability names.
 - New Capabilities → each will become `openspec/specs/<name>/spec.md` (new full spec)
 - Modified Capabilities → each will become a delta spec in the change folder
