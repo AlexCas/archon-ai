@@ -122,9 +122,9 @@ func TestEdgeCases_QuickTabSwitching(t *testing.T) {
 		m = newModel.(Model)
 	}
 
-	// A whole number of full cycles must land back on ModelsTab.
-	if m.activeTab != ModelsTab {
-		t.Errorf("activeTab after %d tabs = %d, want %d", cycles, m.activeTab, ModelsTab)
+	// A whole number of full cycles must land back on AgentTab.
+	if m.activeTab != AgentTab {
+		t.Errorf("activeTab after %d tabs = %d, want %d", cycles, m.activeTab, AgentTab)
 	}
 }
 
