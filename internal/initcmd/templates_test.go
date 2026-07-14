@@ -139,13 +139,44 @@ func TestTemplates_ContainSDDSessionPreflight(t *testing.T) {
 				"## SDD Session Preflight (HARD GATE)",
 				"## Vague Request Guard (MANDATORY)",
 				"## Human Review Gate (MANDATORY)",
-				"Antes de continuar con SDD",
 				"¿Quieres ajustar algo en esta fase antes de continuar?",
+				"AskUserQuestion",
+				"A. Ritmo",
+				"B. Artefactos",
+				"C. PRs",
+				"D. Revisión",
+				"E. Pruebas web (Playwright)",
+				"Interactivo (recomendado)",
+				"OpenSpec (recomendado)",
+				"Preguntarme (recomendado)",
+				"400 líneas (recomendado)",
+				"No (recomendado)",
+				"pregunta de texto libre",
 			}
 
 			for _, req := range required {
 				if !strings.Contains(content, req) {
 					t.Errorf("%s missing %q", tt.name, req)
+				}
+			}
+
+			// Legacy fenced-prompt strings must be fully removed (@error scenario).
+			// These check for the old answer-code PATTERN ("A1 Interactivo",
+			// "B1 OpenSpec", the instruction to type "usar recomendado" as a
+			// literal reply) — not incidental mentions of the substrings, since
+			// the new prose intentionally quotes "A1"/"B1"/"usar recomendado"
+			// as examples of what NOT to answer.
+			legacy := []string{
+				"Antes de continuar con SDD",
+				`Responda con "usar recomendado"`,
+				"```text",
+				"A1 Interactivo",
+				"B1 OpenSpec",
+			}
+
+			for _, old := range legacy {
+				if strings.Contains(content, old) {
+					t.Errorf("%s still contains legacy preflight string %q", tt.name, old)
 				}
 			}
 		})
@@ -235,7 +266,7 @@ func TestTemplates_BacktickRendering(t *testing.T) {
 	}
 }
 
-func TestTemplates_CodeBlockRendering(t *testing.T) {
+func TestTemplates_NoPreflightCodeBlock(t *testing.T) {
 	data := TemplateData{
 		Agent:          "opencode",
 		HarnessVersion: "1.0.0",
@@ -247,9 +278,10 @@ func TestTemplates_CodeBlockRendering(t *testing.T) {
 		t.Fatalf("RenderAgentsMD() error = %v", err)
 	}
 
-	// Verify the Spanish prompt code block is properly rendered with triple backticks
-	if !strings.Contains(content, "```text") {
-		t.Error("RenderAgentsMD() missing ```text code block opening")
+	// The legacy fenced Spanish preflight prompt has been replaced by per-group
+	// AskUserQuestion prose; no ```text code block should remain.
+	if strings.Contains(content, "```text") {
+		t.Error("RenderAgentsMD() contains legacy ```text preflight code block — should be removed")
 	}
 }
 

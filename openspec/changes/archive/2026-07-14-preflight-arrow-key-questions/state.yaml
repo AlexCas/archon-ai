@@ -1,0 +1,38 @@
+change: preflight-arrow-key-questions
+phase: archive
+status: completed
+judge_verdict: APPROVED
+archive_verdict: completed
+preflight:
+  execution_mode: interactive
+  artifact_store: openspec
+  chained_pr_strategy: force-chained
+  review_budget: 400
+  playwright: disabled
+chained_pr_context: "PR 2 of 3"
+spec_artifacts:
+  - openspec/changes/preflight-arrow-key-questions/specs/sdd-preflight/spec.md
+  - openspec/changes/preflight-arrow-key-questions/specs/sdd-preflight/sdd-preflight.feature
+design_artifacts:
+  - openspec/changes/preflight-arrow-key-questions/design.md
+tasks_artifacts:
+  - openspec/changes/preflight-arrow-key-questions/tasks.md
+verify_artifacts:
+  - openspec/changes/preflight-arrow-key-questions/verify-report.md
+judge_artifacts:
+  - openspec/changes/preflight-arrow-key-questions/judge-report.md
+apply_artifacts:
+  - internal/initcmd/templates.go
+  - CLAUDE.md
+  - internal/initcmd/templates_test.go
+  - internal/tui/model_test.go
+history:
+  - {phase: explore, status: completed, ts: "2026-07-13T16:05:00Z"}
+  - {phase: propose, status: completed, ts: "2026-07-13T16:20:00Z"}
+  - {phase: spec, status: completed, ts: "2026-07-13T17:00:00Z"}
+  - {phase: design, status: completed, ts: "2026-07-13T17:30:00Z"}
+  - {phase: tasks, status: completed, ts: "2026-07-14T00:00:00Z"}
+  - {phase: apply, status: completed, ts: "2026-07-14T00:30:00Z"}
+  - {phase: verify, status: completed, ts: "2026-07-14T00:00:00Z", verdict: PASS}
+  - {phase: judge, status: completed, ts: "2026-07-14T01:00:00Z", verdict: APPROVED}
+  - {phase: archive, status: completed, ts: "2026-07-14T02:15:00Z", verdict: completed}
