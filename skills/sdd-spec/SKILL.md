@@ -107,7 +107,8 @@ Rules for `.feature` files:
 - Steps use the real Gherkin keywords `Given`, `When`, `Then`, `And`, `But` —
   capitalized as keywords, NOT in all-caps prose, NOT as Markdown bullets.
 - Tag scenarios for traceability and selective execution, e.g. `@happy`, `@edge`,
-  `@error`, and `@web` for browser-facing flows that Playwright will exercise.
+  `@error`, `@web` for browser-facing flows that Playwright will exercise, and
+  `@security` for abuse-case scenarios when `security.enabled` is true.
 - Every requirement in `spec.md` MUST map to at least one scenario in the
   `.feature` file. Keep the scenario names identical in both files.
 
@@ -290,7 +291,13 @@ Ready for design (sdd-design). If design already exists, ready for tasks (sdd-ta
 
 - ALWAYS author scenarios in FORMAL Gherkin (`Feature:`, `Scenario:`, `Given/When/Then/And/But`, optional `Background:`, `Scenario Outline:` + `Examples:`) — not all-caps prose or Markdown bullets
 - ALWAYS produce a `{domain}.feature` file per domain alongside `spec.md`, with every requirement mapped to at least one scenario and matching scenario names
-- Tag scenarios (`@happy`, `@edge`, `@error`, `@web`) so verify and Playwright generation can select them
+- Tag scenarios (`@happy`, `@edge`, `@error`, `@web`, `@security`) so verify and Playwright generation can select them
+- **Security abuse cases (conditional)**: If `security.enabled` is true, derive at
+  least one `@security`-tagged abuse-case scenario per MUST requirement. Each abuse
+  case MUST describe the malicious or prohibited action and use RFC 2119 `MUST NOT`
+  for the prohibition. Example: `Then the system MUST NOT process the command`.
+  When `security.enabled` is false, do not emit `@security` tags — no change to
+  spec behavior.
 - ALWAYS use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY) for requirement strength
 - Read the proposal's **Capabilities section** first — it tells you exactly which spec files to create
 - If existing specs exist, write DELTA specs (ADDED/MODIFIED/REMOVED sections)

@@ -1,0 +1,8 @@
+phase: design
+status: in_progress
+history:
+  - {phase: explore, status: completed, ts: "2026-06-19T10:42:00Z"}
+  - {phase: propose, status: completed, ts: "2026-06-19T11:00:00Z"}
+  - {phase: spec, status: in_progress, ts: "2026-06-19T12:00:00Z"}
+  - {phase: spec, status: completed, ts: "2026-06-19T12:30:00Z"}
+  - {phase: design, status: in_progress, ts: "2026-06-19T13:00:00Z"}

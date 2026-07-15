@@ -78,6 +78,7 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 		forceFlag        bool
 		dryRunFlag       bool
 		playwrightFlag   bool
+		securityFlag     bool
 		modelFlag        string
 		modelExploreFlag string
 		modelProposeFlag string
@@ -86,6 +87,7 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 		modelTasksFlag   string
 		modelApplyFlag   string
 		modelVerifyFlag  string
+		modelJudgeFlag   string
 		modelArchiveFlag string
 		modelLeaderFlag  string
 	)
@@ -129,6 +131,11 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 				"verify":  modelVerifyFlag,
 				"archive": modelArchiveFlag,
 			}
+			if modelJudgeFlag != "" {
+				modelFlags["judge"] = modelJudgeFlag
+			} else {
+				modelFlags["judge"] = modelVerifyFlag
+			}
 
 			for _, v := range modelFlags {
 				if w := config.Validate(v); w != "" {
@@ -158,6 +165,7 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 				ModelPhases:       modelFlags,
 				ModelLeader:       modelLeaderFlag,
 				Playwright:        playwrightFlag,
+				Security:          securityFlag,
 				OverwriteTemplate: forceFlag,
 			}
 
@@ -189,6 +197,7 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&forceFlag, "force", false, "Force re-initialization, replacing an existing orchestrator file without prompting")
 	cmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Show what would happen without making changes")
 	cmd.Flags().BoolVar(&playwrightFlag, "playwright", false, "Enable Playwright E2E test generation and execution for web projects")
+	cmd.Flags().BoolVar(&securityFlag, "security", false, "Enable the security-baseline gate (propose/spec/tasks/verify/judge hooks)")
 	cmd.Flags().StringVar(&modelFlag, "model", "", "Default AI model for all SDD phases")
 	cmd.Flags().StringVar(&modelExploreFlag, "model-explore", "", "Model for the explore phase")
 	cmd.Flags().StringVar(&modelProposeFlag, "model-propose", "", "Model for the propose phase")
@@ -197,6 +206,7 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 	cmd.Flags().StringVar(&modelTasksFlag, "model-tasks", "", "Model for the tasks phase")
 	cmd.Flags().StringVar(&modelApplyFlag, "model-apply", "", "Model for the apply phase")
 	cmd.Flags().StringVar(&modelVerifyFlag, "model-verify", "", "Model for the verify phase")
+	cmd.Flags().StringVar(&modelJudgeFlag, "model-judge", "", "Model for the judge phase")
 	cmd.Flags().StringVar(&modelArchiveFlag, "model-archive", "", "Model for the archive phase")
 	cmd.Flags().StringVar(&modelLeaderFlag, "leader", "", "Opencode leader model (provider/model-id) for the archon-leader primary agent")
 

@@ -525,6 +525,32 @@ func TestRun_StillWritesTemplateConfigRollback(t *testing.T) {
 	}
 }
 
+// TestBuildConfig_SecurityFlag covers spec scenario "Init flag enables the gate"
+// and "Init without flag leaves security off". Same for the pre-existing
+// Playwright gap: both flags must be faithfully forwarded to the config.
+func TestBuildConfig_SecurityFlag(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		security   bool
+		playwright bool
+	}{
+		{"security on, playwright on", true, true},
+		{"security off, playwright off", false, false},
+		{"security on, playwright off", true, false},
+		{"security off, playwright on", false, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := buildConfig("opencode", nil, nil, "", "", nil, tt.playwright, tt.security)
+			if cfg.Security.Enabled != tt.security {
+				t.Errorf("Security.Enabled = %v, want %v", cfg.Security.Enabled, tt.security)
+			}
+			if cfg.Playwright.Enabled != tt.playwright {
+				t.Errorf("Playwright.Enabled = %v, want %v", cfg.Playwright.Enabled, tt.playwright)
+			}
+		})
+	}
+}
+
 // TestRun_RecordsRealFrontmatterVersions backs the harness-init spec
 // "Init records real frontmatter versions": the inventory must carry each
 // skill's real metadata.version, never the legacy hardcoded "1.0".

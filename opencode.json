@@ -1,0 +1,76 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "agent": {
+    "archon-apply": {
+      "mode": "subagent",
+      "hidden": true,
+      "model": "opencode-go/deepseek-v4-pro",
+      "variant": "medium",
+      "description": "Archon SDD apply phase",
+      "prompt": "{file:./AGENTS.md}"
+    },
+    "archon-archive": {
+      "mode": "subagent",
+      "hidden": true,
+      "model": "opencode-go/deepseek-v4-flash",
+      "variant": "medium",
+      "description": "Archon SDD archive phase",
+      "prompt": "{file:./AGENTS.md}"
+    },
+    "archon-design": {
+      "mode": "subagent",
+      "hidden": true,
+      "model": "opencode-go/deepseek-v4-pro",
+      "variant": "medium",
+      "description": "Archon SDD design phase",
+      "prompt": "{file:./AGENTS.md}"
+    },
+    "archon-explore": {
+      "mode": "subagent",
+      "hidden": true,
+      "model": "opencode-go/deepseek-v4-pro",
+      "variant": "medium",
+      "description": "Archon SDD explore phase",
+      "prompt": "{file:./AGENTS.md}"
+    },
+    "archon-leader": {
+      "mode": "primary",
+      "description": "Archon SDD orchestration leader",
+      "model": "opencode-go/kimi-k2.6",
+      "variant": "medium",
+      "prompt": "{file:./AGENTS.md}"
+    },
+    "archon-propose": {
+      "mode": "subagent",
+      "hidden": true,
+      "model": "opencode-go/glm-5.1",
+      "variant": "medium",
+      "description": "Archon SDD propose phase",
+      "prompt": "{file:./AGENTS.md}"
+    },
+    "archon-spec": {
+      "mode": "subagent",
+      "hidden": true,
+      "model": "opencode-go/deepseek-v4-pro",
+      "variant": "medium",
+      "description": "Archon SDD spec phase",
+      "prompt": "{file:./AGENTS.md}"
+    },
+    "archon-tasks": {
+      "mode": "subagent",
+      "hidden": true,
+      "model": "opencode-go/kimi-k2.7-code",
+      "variant": "medium",
+      "description": "Archon SDD tasks phase",
+      "prompt": "{file:./AGENTS.md}"
+    },
+    "archon-verify": {
+      "mode": "subagent",
+      "hidden": true,
+      "model": "opencode-go/deepseek-v4-pro",
+      "variant": "low",
+      "description": "Archon SDD verify phase",
+      "prompt": "{file:./AGENTS.md}"
+    }
+  }
+}

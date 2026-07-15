@@ -9,6 +9,7 @@ import (
 
 	"github.com/archon-ai/archon/internal/config"
 	"github.com/archon-ai/archon/internal/initcmd"
+	"github.com/archon-ai/archon/internal/opencode"
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -16,9 +17,9 @@ func TestNewModel(t *testing.T) {
 	cfg := &config.Config{
 		Agent: "opencode",
 		Models: config.ModelConfig{
-			Default: "gpt-4",
-			Phases: map[string]string{
-				"explore": "claude-sonnet-4",
+			Default: config.ModelRef{Model: "gpt-4"},
+			Phases: map[string]config.ModelRef{
+				"explore": {Model: "claude-sonnet-4"},
 			},
 		},
 		MutationTesting: config.MutationTesting{
@@ -40,8 +41,8 @@ func TestNewModel(t *testing.T) {
 	if m.quitting {
 		t.Error("quitting should be false")
 	}
-	if m.modelsTab.inputs[modelInputDefault].Value() != "gpt-4" {
-		t.Errorf("default model input = %q, want %q", m.modelsTab.inputs[modelInputDefault].Value(), "gpt-4")
+	if m.modelsTab.rows[0].ref.FullID() != "gpt-4" {
+		t.Errorf("default model row ref = %q, want %q", m.modelsTab.rows[0].ref.FullID(), "gpt-4")
 	}
 	if !m.mutationTab.enabled {
 		t.Error("mutation enabled should be true")
@@ -104,7 +105,7 @@ func TestModel_Update_TabNavigation(t *testing.T) {
 
 // TestModel_Update_ShiftTabWrapsFromAgent verifies that a single Shift+Tab
 // from a freshly-constructed model (default AgentTab) wraps around to the
-// last tab, PlaywrightTab.
+// last tab, SecurityTab.
 func TestModel_Update_ShiftTabWrapsFromAgent(t *testing.T) {
 	m := NewModel(&config.Config{}, "")
 
@@ -116,8 +117,8 @@ func TestModel_Update_ShiftTabWrapsFromAgent(t *testing.T) {
 	newModel, _ := m.Update(msg)
 	model := newModel.(Model)
 
-	if model.activeTab != PlaywrightTab {
-		t.Errorf("activeTab after Shift+Tab from AgentTab = %d, want %d", model.activeTab, PlaywrightTab)
+	if model.activeTab != SecurityTab {
+		t.Errorf("activeTab after Shift+Tab from AgentTab = %d, want %d", model.activeTab, SecurityTab)
 	}
 }
 
@@ -140,7 +141,7 @@ func TestModel_Update_Save(t *testing.T) {
 	cfg := &config.Config{
 		HomeDir: t.TempDir(),
 		Models: config.ModelConfig{
-			Default: "gpt-4",
+			Default: config.ModelRef{Model: "gpt-4"},
 		},
 	}
 	m := NewModel(cfg, cfg.HomeDir)
@@ -289,80 +290,45 @@ func TestCheckTerminal(t *testing.T) {
 	// We don't assert failure because it depends on the test environment
 }
 
-func TestModelsTabState_AutoFill(t *testing.T) {
-	cfg := &config.Config{
-		Models: config.ModelConfig{
-			Default: "gpt-4",
-		},
-	}
-	state := newModelsTabState(cfg, config.StaticModels())
-
-	// Check that placeholder includes default
-	placeholder := state.inputs[modelInputExplore].Placeholder
-	if !contains(placeholder, "gpt-4") {
-		t.Errorf("placeholder = %q, should contain default model", placeholder)
-	}
-
-	// Update default model
-	state.inputs[modelInputDefault].SetValue("claude-sonnet-4")
-	state.updateAutoFill()
-
-	placeholder = state.inputs[modelInputExplore].Placeholder
-	if !contains(placeholder, "claude-sonnet-4") {
-		t.Errorf("updated placeholder = %q, should contain new default model", placeholder)
-	}
-}
-
-func TestModelsTabState_LockOnEdit(t *testing.T) {
-	cfg := &config.Config{
-		Models: config.ModelConfig{
-			Default: "gpt-4",
-		},
-	}
-	state := newModelsTabState(cfg, config.StaticModels())
-
-	// Simulate user typing in explore field
-	state.focusedInput = modelInputExplore
-	state.inputs[modelInputExplore].SetValue("custom-model")
-	state.update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
-
-	// Should be locked
-	if !state.autoFillLocks[modelInputExplore] {
-		t.Error("autoFillLocks should be set after editing")
-	}
-
-	// Change default model
-	state.inputs[modelInputDefault].SetValue("claude-sonnet-4")
-	state.updateAutoFill()
-
-	// Explore should keep its value
-	if state.inputs[modelInputExplore].Value() != "custom-model" {
-		t.Errorf("explore value = %q, want %q", state.inputs[modelInputExplore].Value(), "custom-model")
-	}
-}
-
 func TestModelsTabState_ApplyToConfig(t *testing.T) {
 	cfg := &config.Config{
 		Models: config.ModelConfig{
-			Default: "gpt-4",
-			Phases:  make(map[string]string),
+			Default: config.ModelRef{Model: "gpt-4"},
+			Phases: map[string]config.ModelRef{
+				"explore": config.ParseModelRef("gpt-4o"),
+				"propose": config.ParseModelRef("claude-opus-4-8"),
+			},
 		},
 	}
-	state := newModelsTabState(cfg, config.StaticModels())
+	state := newModelsTabState(cfg, map[string]opencode.Provider{}, nil)
 
-	state.inputs[modelInputDefault].SetValue("claude-sonnet-4")
-	state.inputs[modelInputExplore].SetValue("gpt-4o")
-	state.inputs[modelInputPropose].SetValue("")
+	// Set default via picker (direct ref mutation, as if user picked/free-formed)
+	state.rows[0].ref = config.ParseModelRef("claude-sonnet-4")
+	state.rows[0].changed = true
 
-	state.applyToConfig(cfg)
-
-	if cfg.Models.Default != "claude-sonnet-4" {
-		t.Errorf("default = %q, want %q", cfg.Models.Default, "claude-sonnet-4")
+	// Find and set explore row
+	for i, r := range state.rows {
+		if r.phase == "explore" {
+			state.rows[i].ref = config.ParseModelRef("gpt-4o")
+			state.rows[i].changed = true
+		}
+		if r.phase == "propose" {
+			// Clear propose → should be deleted
+			state.rows[i].ref = config.ModelRef{}
+			state.rows[i].changed = true
+		}
 	}
-	if cfg.Models.Phases["explore"] != "gpt-4o" {
-		t.Errorf("explore = %q, want %q", cfg.Models.Phases["explore"], "gpt-4o")
+
+	outCfg := &config.Config{Models: config.ModelConfig{Phases: map[string]config.ModelRef{}}}
+	state.applyToConfig(outCfg)
+
+	if outCfg.Models.Default.FullID() != "claude-sonnet-4" {
+		t.Errorf("default = %q, want %q", outCfg.Models.Default.FullID(), "claude-sonnet-4")
 	}
-	if _, exists := cfg.Models.Phases["propose"]; exists {
+	if outCfg.Models.Phases["explore"].FullID() != "gpt-4o" {
+		t.Errorf("explore = %q, want %q", outCfg.Models.Phases["explore"].FullID(), "gpt-4o")
+	}
+	if _, exists := outCfg.Models.Phases["propose"]; exists {
 		t.Error("propose should be deleted when empty")
 	}
 }
@@ -586,7 +552,8 @@ func TestSaveConfig_FailureDoesNotMutateInMemoryConfig(t *testing.T) {
 	m.height = 24
 
 	// Set some tab values that would be applied
-	m.modelsTab.inputs[modelInputDefault].SetValue("gpt-4")
+	m.modelsTab.rows[0].ref = config.ParseModelRef("gpt-4")
+	m.modelsTab.rows[0].changed = true
 
 	// Make the directory read-only so Save fails
 	if err := os.Chmod(tmpDir, 0o555); err != nil {
@@ -603,8 +570,8 @@ func TestSaveConfig_FailureDoesNotMutateInMemoryConfig(t *testing.T) {
 	}
 
 	// Verify in-memory config was NOT mutated
-	if m.config.Models.Default != "" {
-		t.Errorf("in-memory config was mutated: Models.Default = %q", m.config.Models.Default)
+	if m.config.Models.Default.FullID() != "" {
+		t.Errorf("in-memory config was mutated: Models.Default = %q", m.config.Models.Default.FullID())
 	}
 	if m.config.Agent != "opencode" {
 		t.Errorf("in-memory config was mutated: Agent = %q", m.config.Agent)
@@ -725,7 +692,7 @@ func TestSaveConfig_OpencodeLeaderMatchesInitMerge(t *testing.T) {
 		Agent:      "opencode",
 		Version:    "1.0.0",
 		SkillCount: 10,
-		Models:     config.ModelConfig{Leader: leader},
+		Models:     config.ModelConfig{Leader: config.ParseModelRef(leader)},
 	}
 	m := NewModel(cfg, tuiDir)
 
@@ -739,9 +706,9 @@ func TestSaveConfig_OpencodeLeaderMatchesInitMerge(t *testing.T) {
 		t.Fatalf("TUI opencode.json not written: %v", err)
 	}
 
-	// Reference path: a direct merge with the same leader into a fresh dir.
+	// Reference path: a direct merge with the same models config into a fresh dir.
 	initDir := t.TempDir()
-	if _, err := initcmd.MergeOpencodeAgent(initDir, leader); err != nil {
+	if _, err := initcmd.MergeOpencodeAgent(initDir, config.ModelConfig{Leader: config.ParseModelRef(leader)}); err != nil {
 		t.Fatalf("MergeOpencodeAgent() error = %v", err)
 	}
 	initBytes, err := os.ReadFile(filepath.Join(initDir, "opencode.json"))
@@ -754,27 +721,28 @@ func TestSaveConfig_OpencodeLeaderMatchesInitMerge(t *testing.T) {
 	}
 }
 
-// TestModelsTab_LeaderWarningGuard verifies the leader-model field does NOT show
-// the Claude-oriented advisory warning for a legitimate provider/model-id (which
-// contains "/"), matching the `--leader` CLI flag's guard — while a non-slash
-// unknown value still warns. This pins the CLI/TUI consistency fix.
+// TestModelsTab_LeaderWarningGuard verifies the leader row is present for opencode
+// agents and absent for non-opencode agents. The per-row Validate advisory is
+// dropped (D2); this test asserts leader-row presence/absence, not the ⚠ guard.
 func TestModelsTab_LeaderWarningGuard(t *testing.T) {
-	// Provider/model-id form: no warning, but the leader section still renders.
-	cfg := &config.Config{Agent: "opencode", Models: config.ModelConfig{Leader: "openai/gpt-4o"}}
-	state := newModelsTabState(cfg, config.StaticModels())
+	// opencode agent: leader row renders.
+	cfg := &config.Config{Agent: "opencode", Models: config.ModelConfig{Leader: config.ParseModelRef("openai/gpt-4o")}}
+	state := newModelsTabState(cfg, map[string]opencode.Provider{}, nil)
 	view := state.view(80, 24)
-	if !contains(view, "Leader Model (opencode)") {
-		t.Fatal("leader section should render for opencode")
+	if !contains(view, "Leader") {
+		t.Fatalf("leader row should render for opencode; view:\n%s", view)
 	}
+	// No per-row advisory ⚠ in the new picker (D2 drop).
 	if contains(view, "⚠") {
-		t.Errorf("provider/model-id leader %q should not warn; view:\n%s", cfg.Models.Leader, view)
+		t.Errorf("new picker should not emit per-row ⚠ advisory; view:\n%s", view)
 	}
 
-	// Non-slash unknown value: the advisory warning still shows.
-	cfg2 := &config.Config{Agent: "opencode", Models: config.ModelConfig{Leader: "notarealmodel"}}
-	state2 := newModelsTabState(cfg2, config.StaticModels())
-	if view2 := state2.view(80, 24); !contains(view2, "⚠") {
-		t.Errorf("non-slash unknown leader %q should still warn; view:\n%s", cfg2.Models.Leader, view2)
+	// Non-opencode agent: no leader row.
+	cfg2 := &config.Config{Agent: "claude", Models: config.ModelConfig{Leader: config.ParseModelRef("openai/gpt-4o")}}
+	state2 := newModelsTabState(cfg2, map[string]opencode.Provider{}, nil)
+	view2 := state2.view(80, 24)
+	if contains(view2, "Leader") {
+		t.Errorf("leader row should NOT render for non-opencode; view:\n%s", view2)
 	}
 }
 

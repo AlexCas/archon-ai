@@ -195,6 +195,9 @@ Phase 4: Testing
   └─ Verify against Gherkin scenarios in the .feature files
   └─ Web + playwright.enabled: a task to generate Playwright specs from the
      @web Gherkin scenarios (execution happens in the judge phase)
+  └─ security.enabled: a @security CI task — run SAST, secret detection, and
+     dependency vulnerability scans; fail CI on any HIGH or CRITICAL finding;
+     do NOT name a specific vendor tool in the task description
 
 Phase 5: Cleanup (if needed)
   └─ Documentation, remove dead code, polish
@@ -248,6 +251,12 @@ Return to the orchestrator:
 - Tasks MUST be ordered by dependency — Phase 1 tasks shouldn't depend on Phase 2
 - Testing tasks should reference specific Gherkin scenarios from the `.feature` files
 - For web projects with `playwright.enabled`, include an explicit task to generate Playwright specs from the `@web` Gherkin scenarios (execution is handled later by the judge phase)
+- **Security scanning task (conditional)**: If `security.enabled` is true, emit a
+  tool-agnostic `@security` CI task in Phase 4: run SAST, secret detection, and
+  dependency vulnerability scans; fail CI on any HIGH or CRITICAL finding. Do NOT
+  name a specific vendor tool (e.g., do not write "run gosec" or "run trivy" —
+  write "run SAST scan" and "run dependency vulnerability scan"). When
+  `security.enabled` is false, omit this task entirely — no change to task behavior.
 - Each task should be completable in ONE session (if a task feels too big, split it)
 - Use hierarchical numbering: 1.1, 1.2, 2.1, 2.2, etc.
 - NEVER include vague tasks like "implement feature" or "add tests"
