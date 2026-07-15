@@ -34,6 +34,15 @@ type Playwright struct {
 	BaseURL string `yaml:"base_url,omitempty"`
 }
 
+// Security controls the security-baseline opt-in gate. When enabled, the
+// harness injects security-review hooks across the propose, spec, tasks,
+// verify, and judge phases. Profiles are restricted to "cli" and "web".
+// Defaults to disabled (Enabled:false) when the block is absent.
+type Security struct {
+	Enabled bool   `yaml:"enabled"`
+	Profile string `yaml:"profile,omitempty"` // "cli" | "web"
+}
+
 type SkillInventory struct {
 	Name    string `yaml:"name"`
 	Version string `yaml:"version"`
@@ -48,6 +57,7 @@ type Config struct {
 	MutationTesting MutationTesting  `yaml:"mutation_testing"`
 	Judge           Judge            `yaml:"judge"`
 	Playwright      Playwright       `yaml:"playwright"`
+	Security        Security         `yaml:"security"`
 	Models          ModelConfig      `yaml:"models,omitempty"`
 	SkillInventory  []SkillInventory `yaml:"skill_inventory"`
 	HomeDir         string           `yaml:"-"`
@@ -93,7 +103,8 @@ func (c *Config) Clone() *Config {
 		MutationTesting: c.MutationTesting,
 		Judge:           c.Judge,
 		Playwright:      c.Playwright,
-		Models:          ModelConfig{Default: c.Models.Default, Leader: c.Models.Leader, Phases: make(map[string]string, len(c.Models.Phases))},
+		Security:        c.Security,
+		Models:          ModelConfig{Default: c.Models.Default, Leader: c.Models.Leader, Phases: make(map[string]ModelRef, len(c.Models.Phases))},
 		SkillInventory:  make([]SkillInventory, len(c.SkillInventory)),
 	}
 	for k, v := range c.Models.Phases {

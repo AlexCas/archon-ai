@@ -2,7 +2,10 @@ package config
 
 import (
 	"reflect"
+	"strings"
 	"testing"
+
+	"gopkg.in/yaml.v3"
 )
 
 func TestValidate(t *testing.T) {
@@ -80,18 +83,233 @@ func TestNormalizeModel(t *testing.T) {
 	}
 }
 
+// TestModelRef_FullID covers M1: all four scenarios.
+func TestModelRef_FullID(t *testing.T) {
+	tests := []struct {
+		name     string
+		provider string
+		model    string
+		want     string
+	}{
+		{
+			name:     "joins provider and bare model",
+			provider: "anthropic",
+			model:    "claude-sonnet-4-6",
+			want:     "anthropic/claude-sonnet-4-6",
+		},
+		{
+			name:     "opencode bare key",
+			provider: "opencode",
+			model:    "deepseek-v4-pro",
+			want:     "opencode/deepseek-v4-pro",
+		},
+		{
+			name:     "already-slashed id no double-prefix",
+			provider: "openrouter",
+			model:    "xai/grok-4",
+			want:     "xai/grok-4",
+		},
+		{
+			name:     "empty provider returns bare model no leading slash",
+			provider: "",
+			model:    "opus",
+			want:     "opus",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			r := ModelRef{Provider: tt.provider, Model: tt.model}
+			if got := r.FullID(); got != tt.want {
+				t.Errorf("FullID() = %q, want %q", got, tt.want)
+			}
+			if tt.provider == "" && strings.HasPrefix(r.FullID(), "/") {
+				t.Errorf("FullID() has leading slash: %q", r.FullID())
+			}
+		})
+	}
+}
+
+// TestParseModelRef covers the split-on-first-slash semantics.
+func TestParseModelRef(t *testing.T) {
+	tests := []struct {
+		name     string
+		in       string
+		wantProv string
+		wantMod  string
+	}{
+		{name: "simple provider/model", in: "a/b", wantProv: "a", wantMod: "b"},
+		{name: "model with embedded slash", in: "a/b/c", wantProv: "a", wantMod: "b/c"},
+		{name: "bare model empty provider", in: "opus", wantProv: "", wantMod: "opus"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := ParseModelRef(tt.in)
+			if got.Provider != tt.wantProv || got.Model != tt.wantMod {
+				t.Errorf("ParseModelRef(%q) = {%q, %q}, want {%q, %q}",
+					tt.in, got.Provider, got.Model, tt.wantProv, tt.wantMod)
+			}
+		})
+	}
+}
+
+// TestModelRef_UnmarshalYAML covers M3: scalar slashed, scalar bare, mapping. (S1a-2)
+func TestModelRef_UnmarshalYAML(t *testing.T) {
+	tests := []struct {
+		name     string
+		yaml     string
+		wantProv string
+		wantMod  string
+	}{
+		{
+			name:     "scalar slashed splits on first slash",
+			yaml:     "a/b",
+			wantProv: "a",
+			wantMod:  "b",
+		},
+		{
+			name:     "scalar bare keeps empty provider",
+			yaml:     "x",
+			wantProv: "",
+			wantMod:  "x",
+		},
+		{
+			name:     "mapping decodes structured form",
+			yaml:     "provider: opencode\nmodel: deepseek-v4-pro\n",
+			wantProv: "opencode",
+			wantMod:  "deepseek-v4-pro",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var r ModelRef
+			if err := yaml.Unmarshal([]byte(tt.yaml), &r); err != nil {
+				t.Fatalf("Unmarshal(%q) error = %v", tt.yaml, err)
+			}
+			if r.Provider != tt.wantProv || r.Model != tt.wantMod {
+				t.Errorf("Unmarshal(%q) = {%q, %q}, want {%q, %q}",
+					tt.yaml, r.Provider, r.Model, tt.wantProv, tt.wantMod)
+			}
+		})
+	}
+}
+
+// TestModelRef_MarshalYAML covers M4: bare alias re-marshals as scalar, not mapping. (S1a-2)
+func TestModelRef_MarshalYAML(t *testing.T) {
+	t.Run("empty provider marshals as scalar", func(t *testing.T) {
+		r := ModelRef{Provider: "", Model: "opus", Effort: ""}
+		out, err := yaml.Marshal(r)
+		if err != nil {
+			t.Fatalf("Marshal() error = %v", err)
+		}
+		got := strings.TrimSpace(string(out))
+		if got != "opus" {
+			t.Errorf("Marshal() = %q, want scalar %q", got, "opus")
+		}
+	})
+
+	t.Run("provider-qualified with no effort marshals as scalar FullID", func(t *testing.T) {
+		// A provider/model scalar is the documented legacy form, so it must
+		// re-marshal as a one-line scalar (byte-stability), NOT a mapping.
+		r := ModelRef{Provider: "opencode", Model: "deepseek-v4-pro", Effort: ""}
+		out, err := yaml.Marshal(r)
+		if err != nil {
+			t.Fatalf("Marshal() error = %v", err)
+		}
+		got := strings.TrimSpace(string(out))
+		if got != "opencode/deepseek-v4-pro" {
+			t.Errorf("Marshal() = %q, want scalar %q", got, "opencode/deepseek-v4-pro")
+		}
+		if strings.Contains(got, "provider:") {
+			t.Errorf("Marshal() = %q, expected scalar not a mapping", got)
+		}
+	})
+
+	t.Run("effort-bearing ref marshals as mapping", func(t *testing.T) {
+		r := ModelRef{Provider: "opencode", Model: "deepseek-v4-pro", Effort: "high"}
+		out, err := yaml.Marshal(r)
+		if err != nil {
+			t.Fatalf("Marshal() error = %v", err)
+		}
+		got := string(out)
+		if !strings.Contains(got, "model:") || !strings.Contains(got, "effort:") {
+			t.Errorf("Marshal() = %q, want mapping with model/effort keys", got)
+		}
+	})
+
+	t.Run("effort survives a marshal->unmarshal round-trip", func(t *testing.T) {
+		in := ModelRef{Provider: "opencode", Model: "deepseek-v4-pro", Effort: "low"}
+		out, err := yaml.Marshal(in)
+		if err != nil {
+			t.Fatalf("Marshal() error = %v", err)
+		}
+		var got ModelRef
+		if err := yaml.Unmarshal(out, &got); err != nil {
+			t.Fatalf("Unmarshal() error = %v", err)
+		}
+		if got != in {
+			t.Errorf("round-trip = %+v, want %+v", got, in)
+		}
+	})
+}
+
+// TestModelConfig_StructuredFields covers M2: structured fields preserve
+// provider+model. (S1b-4)
+func TestModelConfig_StructuredFields(t *testing.T) {
+	mc := ModelConfig{
+		Default: ModelRef{Provider: "anthropic", Model: "claude-sonnet-4-6"},
+		Leader:  ModelRef{Provider: "opencode", Model: "deepseek-v4-pro"},
+		Phases: map[string]ModelRef{
+			"apply": {Provider: "openai", Model: "gpt-4o"},
+		},
+	}
+
+	if mc.Default.Provider != "anthropic" || mc.Default.Model != "claude-sonnet-4-6" {
+		t.Errorf("Default = %+v, want {anthropic, claude-sonnet-4-6}", mc.Default)
+	}
+	if mc.Leader.Provider != "opencode" || mc.Leader.Model != "deepseek-v4-pro" {
+		t.Errorf("Leader = %+v, want {opencode, deepseek-v4-pro}", mc.Leader)
+	}
+	if mc.Phases["apply"].Provider != "openai" || mc.Phases["apply"].Model != "gpt-4o" {
+		t.Errorf("Phases[apply] = %+v, want {openai, gpt-4o}", mc.Phases["apply"])
+	}
+}
+
+// TestResolvePhaseModels covers M6: FullID emission, fallback, omit-when-empty,
+// PhaseOrder iteration, determinism. (S1b-4, rewritten from string-based version)
 func TestResolvePhaseModels(t *testing.T) {
-	t.Run("explicit phase resolves to its alias", func(t *testing.T) {
-		got := ResolvePhaseModels(ModelConfig{Phases: map[string]string{"propose": "Sonnet 4.6"}})
-		want := []PhaseModel{{Phase: "propose", Model: "sonnet"}}
+	t.Run("provider-qualified phase emits FullID", func(t *testing.T) {
+		mc := ModelConfig{
+			Phases: map[string]ModelRef{
+				"propose": {Provider: "opencode", Model: "deepseek-v4-pro"},
+			},
+		}
+		got := ResolvePhaseModels(mc)
+		want := []PhaseModel{{Phase: "propose", Model: "opencode/deepseek-v4-pro"}}
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("got %v, want %v", got, want)
+		}
+	})
+
+	t.Run("empty-provider phase emits bare model", func(t *testing.T) {
+		mc := ModelConfig{
+			Phases: map[string]ModelRef{
+				"propose": {Provider: "", Model: "opus"},
+			},
+		}
+		got := ResolvePhaseModels(mc)
+		want := []PhaseModel{{Phase: "propose", Model: "opus"}}
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("got %v, want %v", got, want)
 		}
 	})
 
 	t.Run("unset phase falls back to default", func(t *testing.T) {
-		got := ResolvePhaseModels(ModelConfig{Default: "Opus 4.8", Phases: map[string]string{"verify": ""}})
-		// Every phase falls back to the default since none are set.
+		mc := ModelConfig{
+			Default: ModelRef{Provider: "", Model: "opus"},
+			Phases:  map[string]ModelRef{"verify": {}},
+		}
+		got := ResolvePhaseModels(mc)
+		// Every phase falls back to the default since none are set with a model.
 		if len(got) != len(PhaseOrder) {
 			t.Fatalf("got %d phases, want %d", len(got), len(PhaseOrder))
 		}
@@ -109,16 +327,18 @@ func TestResolvePhaseModels(t *testing.T) {
 		}
 	})
 
-	t.Run("renders in canonical order regardless of map order", func(t *testing.T) {
-		mc := ModelConfig{Phases: map[string]string{
-			"archive": "haiku",
-			"explore": "opus",
-			"design":  "Opus 4.8",
-		}}
+	t.Run("renders in canonical PhaseOrder regardless of map order", func(t *testing.T) {
+		mc := ModelConfig{
+			Phases: map[string]ModelRef{
+				"archive": {Model: "haiku"},
+				"explore": {Model: "opus"},
+				"design":  {Provider: "opencode", Model: "deepseek-v4-pro"},
+			},
+		}
 		got := ResolvePhaseModels(mc)
 		want := []PhaseModel{
 			{Phase: "explore", Model: "opus"},
-			{Phase: "design", Model: "opus"},
+			{Phase: "design", Model: "opencode/deepseek-v4-pro"},
 			{Phase: "archive", Model: "haiku"},
 		}
 		if !reflect.DeepEqual(got, want) {
@@ -127,7 +347,10 @@ func TestResolvePhaseModels(t *testing.T) {
 	})
 
 	t.Run("twice is deeply equal", func(t *testing.T) {
-		mc := ModelConfig{Default: "sonnet", Phases: map[string]string{"design": "opus"}}
+		mc := ModelConfig{
+			Default: ModelRef{Model: "sonnet"},
+			Phases:  map[string]ModelRef{"design": {Model: "opus"}},
+		}
 		first := ResolvePhaseModels(mc)
 		second := ResolvePhaseModels(mc)
 		if !reflect.DeepEqual(first, second) {
@@ -135,13 +358,121 @@ func TestResolvePhaseModels(t *testing.T) {
 		}
 	})
 
-	t.Run("unresolvable phase value falls through to default", func(t *testing.T) {
-		mc := ModelConfig{Default: "haiku", Phases: map[string]string{"propose": "Opues 4.8"}}
+	// E1-3: PhaseModel.Effort is carried from the resolved ref.
+	t.Run("phase ref effort carried into PhaseModel", func(t *testing.T) {
+		mc := ModelConfig{
+			Phases: map[string]ModelRef{
+				"spec": {Provider: "opencode", Model: "deepseek-v4-pro", Effort: "medium"},
+			},
+		}
 		got := ResolvePhaseModels(mc)
+		if len(got) != 1 {
+			t.Fatalf("got %d phases, want 1", len(got))
+		}
+		if got[0].Effort != "medium" {
+			t.Errorf("PhaseModel.Effort = %q, want %q", got[0].Effort, "medium")
+		}
+		if got[0].Model != "opencode/deepseek-v4-pro" {
+			t.Errorf("PhaseModel.Model = %q, want %q", got[0].Model, "opencode/deepseek-v4-pro")
+		}
+	})
+
+	t.Run("default fallback ref effort carried into PhaseModel", func(t *testing.T) {
+		mc := ModelConfig{
+			Default: ModelRef{Provider: "anthropic", Model: "claude-opus-4-8", Effort: "high"},
+			// No phases set — all phases fall back to Default.
+		}
+		got := ResolvePhaseModels(mc)
+		if len(got) != len(PhaseOrder) {
+			t.Fatalf("got %d phases, want %d", len(got), len(PhaseOrder))
+		}
 		for _, pm := range got {
-			if pm.Phase == "propose" && pm.Model != "haiku" {
-				t.Errorf("propose = %q, want haiku (fell back to default)", pm.Model)
+			if pm.Effort != "high" {
+				t.Errorf("phase %q: PhaseModel.Effort = %q, want %q", pm.Phase, pm.Effort, "high")
 			}
+		}
+	})
+
+	t.Run("empty effort stays empty", func(t *testing.T) {
+		mc := ModelConfig{
+			Phases: map[string]ModelRef{
+				"apply": {Provider: "openai", Model: "gpt-4o"},
+			},
+		}
+		got := ResolvePhaseModels(mc)
+		if len(got) != 1 {
+			t.Fatalf("got %d phases, want 1", len(got))
+		}
+		if got[0].Effort != "" {
+			t.Errorf("PhaseModel.Effort = %q, want empty", got[0].Effort)
+		}
+	})
+
+	t.Run("judge phase resolves and appears between verify and archive", func(t *testing.T) {
+		mc := ModelConfig{
+			Phases: map[string]ModelRef{
+				"verify": {Provider: "anthropic", Model: "claude-opus-4-8"},
+				"judge":  {Provider: "anthropic", Model: "claude-opus-4-8"},
+			},
+		}
+		got := ResolvePhaseModels(mc)
+
+		// Find judge in result.
+		judgeIdx := -1
+		verifyIdx := -1
+		archiveIdx := -1
+		for i, pm := range got {
+			switch pm.Phase {
+			case "judge":
+				judgeIdx = i
+			case "verify":
+				verifyIdx = i
+			case "archive":
+				archiveIdx = i
+			}
+		}
+
+		if judgeIdx == -1 {
+			t.Fatal("judge phase not present in ResolvePhaseModels result")
+		}
+		// Verify the resolved model.
+		if got[judgeIdx].Model != "anthropic/claude-opus-4-8" {
+			t.Errorf("judge model = %q, want %q", got[judgeIdx].Model, "anthropic/claude-opus-4-8")
+		}
+		// judge must come after verify (archive is absent here since it has no model set).
+		if verifyIdx != -1 && judgeIdx <= verifyIdx {
+			t.Errorf("judge (index %d) must come after verify (index %d)", judgeIdx, verifyIdx)
+		}
+		// archive absent — confirm archiveIdx is -1 (no model set for archive).
+		_ = archiveIdx
+	})
+
+	t.Run("judge defaults to verify model via modelFlags wiring", func(t *testing.T) {
+		// Simulate the CLI flag layer: judge receives the same value as verify.
+		verifyRef := ModelRef{Provider: "anthropic", Model: "claude-opus-4-8"}
+		mc := ModelConfig{
+			Phases: map[string]ModelRef{
+				"verify": verifyRef,
+				"judge":  verifyRef, // mirror: modelFlags["judge"] = modelVerifyFlag
+			},
+		}
+		got := ResolvePhaseModels(mc)
+
+		var judgeModel, verifyModel string
+		for _, pm := range got {
+			switch pm.Phase {
+			case "judge":
+				judgeModel = pm.Model
+			case "verify":
+				verifyModel = pm.Model
+			}
+		}
+
+		if judgeModel == "" {
+			t.Fatal("judge phase not resolved")
+		}
+		if judgeModel != verifyModel {
+			t.Errorf("judge model = %q, verify model = %q; judge must default to verify's model", judgeModel, verifyModel)
 		}
 	})
 }

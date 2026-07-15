@@ -1,0 +1,20 @@
+phase: archive
+status: completed
+history:
+  - {phase: explore, status: in_progress, ts: "2026-06-27T05:49:41Z"}
+  - {phase: explore, status: completed, ts: "2026-06-27T06:00:00Z"}
+  - {phase: propose, status: in_progress, ts: "2026-06-27T06:05:00Z"}
+  - {phase: propose, status: completed, ts: "2026-06-27T06:20:00Z"}
+  - {phase: spec, status: in_progress, ts: "2026-06-27T06:25:00Z"}
+  - {phase: spec, status: completed, ts: "2026-06-27T06:40:00Z"}
+  - {phase: design, status: in_progress, ts: "2026-06-27T06:45:00Z"}
+  - {phase: design, status: completed, ts: "2026-06-27T07:00:00Z"}
+  - {phase: tasks, status: in_progress, ts: "2026-06-27T07:15:00Z"}
+  - {phase: tasks, status: completed, ts: "2026-06-27T07:30:00Z"}
+  - {phase: apply, status: in_progress, ts: "2026-06-27T07:35:00Z"}
+  - {phase: apply, status: completed, ts: "2026-06-27T08:05:00Z"}
+  - {phase: verify, status: in_progress, ts: "2026-06-27T08:05:00Z"}
+  - {phase: verify, status: completed, ts: "2026-06-27T08:25:00Z"}
+  - {phase: judge, status: in_progress, ts: "2026-06-27T08:35:00Z"}
+  - {phase: judge, status: completed, ts: "2026-06-27T08:50:00Z"}
+  - {phase: archive, status: in_progress, ts: "2026-06-27T08:55:00Z"}
