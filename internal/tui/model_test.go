@@ -35,8 +35,8 @@ func TestNewModel(t *testing.T) {
 	if m.projectDir != "/tmp/test" {
 		t.Errorf("projectDir = %q, want %q", m.projectDir, "/tmp/test")
 	}
-	if m.activeTab != ModelsTab {
-		t.Errorf("activeTab = %d, want %d", m.activeTab, ModelsTab)
+	if m.activeTab != AgentTab {
+		t.Errorf("activeTab = %d, want %d", m.activeTab, AgentTab)
 	}
 	if m.quitting {
 		t.Error("quitting should be false")
@@ -89,8 +89,8 @@ func TestModel_Update_TabNavigation(t *testing.T) {
 	newModel, _ := m.Update(msg)
 	model := newModel.(Model)
 
-	if model.activeTab != JudgeTab {
-		t.Errorf("activeTab after Tab = %d, want %d", model.activeTab, JudgeTab)
+	if model.activeTab != ModelsTab {
+		t.Errorf("activeTab after Tab = %d, want %d", model.activeTab, ModelsTab)
 	}
 
 	// Test Shift+Tab key
@@ -98,8 +98,27 @@ func TestModel_Update_TabNavigation(t *testing.T) {
 	newModel, _ = model.Update(msg)
 	model = newModel.(Model)
 
-	if model.activeTab != ModelsTab {
-		t.Errorf("activeTab after Shift+Tab = %d, want %d", model.activeTab, ModelsTab)
+	if model.activeTab != AgentTab {
+		t.Errorf("activeTab after Shift+Tab = %d, want %d", model.activeTab, AgentTab)
+	}
+}
+
+// TestModel_Update_ShiftTabWrapsFromAgent verifies that a single Shift+Tab
+// from a freshly-constructed model (default AgentTab) wraps around to the
+// last tab, SecurityTab.
+func TestModel_Update_ShiftTabWrapsFromAgent(t *testing.T) {
+	m := NewModel(&config.Config{}, "")
+
+	if m.activeTab != AgentTab {
+		t.Fatalf("precondition failed: activeTab = %d, want %d", m.activeTab, AgentTab)
+	}
+
+	msg := tea.KeyMsg{Type: tea.KeyShiftTab}
+	newModel, _ := m.Update(msg)
+	model := newModel.(Model)
+
+	if model.activeTab != SecurityTab {
+		t.Errorf("activeTab after Shift+Tab from AgentTab = %d, want %d", model.activeTab, SecurityTab)
 	}
 }
 
@@ -187,6 +206,29 @@ func TestModel_renderTabs(t *testing.T) {
 	rendered := m.renderTabs()
 	if rendered == "" {
 		t.Error("renderTabs() should not be empty")
+	}
+}
+
+// TestModel_renderTabs_Order verifies the tab header renders the labels in
+// the order Agent, Models, Judge, Mutation Testing, Playwright — i.e. that
+// Agent is now the first tab. Robust to styling/ANSI: it only asserts the
+// relative order of the substrings within the rendered string.
+func TestModel_renderTabs_Order(t *testing.T) {
+	m := NewModel(&config.Config{}, "")
+	m.width = 80
+	rendered := m.renderTabs()
+
+	labels := []string{"Agent", "Models", "Judge", "Mutation Testing", "Playwright"}
+	lastIndex := -1
+	for _, label := range labels {
+		idx := strings.Index(rendered, label)
+		if idx == -1 {
+			t.Fatalf("renderTabs() output missing label %q; rendered:\n%s", label, rendered)
+		}
+		if idx <= lastIndex {
+			t.Errorf("label %q at index %d is not after previous label (index %d); order broken; rendered:\n%s", label, idx, lastIndex, rendered)
+		}
+		lastIndex = idx
 	}
 }
 

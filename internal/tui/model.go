@@ -19,12 +19,12 @@ import (
 type Tab int
 
 const (
-	ModelsTab Tab = iota
+	AgentTab Tab = iota
+	ModelsTab
 	JudgeTab
 	MutationTab
 	PlaywrightTab
 	SecurityTab
-	AgentTab
 	tabCount
 )
 
@@ -99,7 +99,7 @@ func NewModel(cfg *config.Config, projectDir string) Model {
 	return Model{
 		config:        cfg,
 		projectDir:    projectDir,
-		activeTab:     ModelsTab,
+		activeTab:     AgentTab,
 		providers:     providers,
 		cacheErr:      cacheErr,
 		modelsTab:     newModelsTabState(cfg, providers, cacheErr),
@@ -271,7 +271,7 @@ func (m Model) renderTabs() string {
 		BorderForeground(lipgloss.Color("63")).
 		Bold(true)
 
-	tabs := []string{"Models", "Judge", "Mutation Testing", "Playwright", "Security", "Agent"}
+	tabs := []string{"Agent", "Models", "Judge", "Mutation Testing", "Playwright", "Security"}
 	var rendered []string
 
 	for i, name := range tabs {

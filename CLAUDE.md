@@ -157,6 +157,22 @@ from the subagent definition, not from a per-call parameter.
 - judge: anthropic/claude-opus-4-8
 - archive: anthropic/claude-haiku-4-5-20251001
 
+## Phase Models
+
+Each phase runs in its named `archon-<phase>` subagent. The `model` field in that
+subagent's frontmatter is the binding hard gate — Claude Code selects the model
+from the subagent definition, not from a per-call parameter.
+
+- explore: anthropic/claude-opus-4-8
+- propose: anthropic/claude-opus-4-8
+- spec: anthropic/claude-sonnet-4-6
+- design: anthropic/claude-opus-4-8
+- tasks: anthropic/claude-sonnet-4-6
+- apply: anthropic/claude-sonnet-5
+- verify: anthropic/claude-opus-4-8
+- judge: anthropic/claude-sonnet-4-6
+- archive: anthropic/claude-haiku-4-5-20251001
+
 ## State Management
 Phase state tracked in: openspec/changes/{change-name}/state.yaml
 Session state tracked in: SESSION_STATUS.md (repo root, archived with the change)

@@ -1,0 +1,42 @@
+phase: archive
+status: completed
+retrofit: false
+preflight:
+  execution_mode: interactive
+  artifact_store: openspec
+  chained_pr: force-chained
+  review_budget_lines: 400
+  playwright: disabled  # Go CLI/TUI, not a web project
+chained_pr_context: "PR 1 of 3 chained changes"
+artifacts:
+  spec:
+    - openspec/changes/tui-agent-tab-first/specs/tui-tabs/spec.md
+    - openspec/changes/tui-agent-tab-first/specs/tui-tabs/tui-tabs.feature
+  design:
+    - openspec/changes/tui-agent-tab-first/design.md
+  tasks:
+    - openspec/changes/tui-agent-tab-first/tasks.md
+  verify:
+    - openspec/changes/tui-agent-tab-first/verify-report.md
+history:
+  - {phase: explore, status: in_progress, ts: "2026-07-13T18:11:33Z"}
+  - {phase: explore, status: completed, ts: "2026-07-13T18:13:00Z"}
+  - {phase: propose, status: in_progress, ts: "2026-07-13T18:14:44Z"}
+  - {phase: propose, status: completed, ts: "2026-07-13T18:16:00Z"}
+  - {phase: spec, status: in_progress, ts: "2026-07-13T18:18:12Z"}
+  - {phase: spec, status: completed, ts: "2026-07-13T18:35:00Z"}
+  - {phase: design, status: in_progress, ts: "2026-07-13T18:20:41Z"}
+  - {phase: design, status: completed, ts: "2026-07-13T18:38:00Z"}
+  - {phase: tasks, status: in_progress, ts: "2026-07-13T18:26:04Z"}
+  - {phase: tasks, status: completed, ts: "2026-07-13T18:55:00Z"}
+  - {phase: apply, status: in_progress, ts: "2026-07-13T19:13:49Z"}
+  - {phase: apply, status: completed, ts: "2026-07-13T19:45:00Z"}
+  - {phase: verify, status: in_progress, ts: "2026-07-13T19:29:17Z"}
+  - {phase: apply, status: in_progress, ts: "2026-07-13T19:41:41Z"}  # re-apply: add 2 tests for uncovered Gherkin scenarios
+  - {phase: apply, status: completed, ts: "2026-07-13T19:45:32Z"}  # re-apply complete: 5/5 coverage
+  - {phase: verify, status: in_progress, ts: "2026-07-13T19:45:32Z"}  # re-verify
+  - {phase: verify, status: completed, ts: "2026-07-13T19:52:00Z"}  # re-verify PASS: 5/5 Gherkin coverage
+  - {phase: judge, status: in_progress, ts: "2026-07-13T19:48:39Z"}
+  - {phase: judge, status: completed, ts: "2026-07-13T20:05:00Z"}
+  - {phase: archive, status: in_progress, ts: "2026-07-13T19:52:41Z"}
+  - {phase: archive, status: completed, ts: "2026-07-13T20:15:00Z"}
