@@ -2,7 +2,7 @@
 
 **One command. Zero manual config.**
 
-`archon init` scaffolds the complete SDD workflow (Spec → Hard Spec → Gherkin → TDD → Judge) into any project. It auto-detects your AI agent, installs 24 skills, and writes the orchestrator instructions so you can run `sdd-explore`, `sdd-apply`, and `judgment-day` without touching a single config file.
+`archon init` scaffolds the complete SDD workflow (Spec → Hard Spec → Gherkin → TDD → Judge) into any project. It auto-detects your AI agent, installs 25 skills, and writes the orchestrator instructions so you can run `sdd-explore`, `sdd-apply`, and `judgment-day` without touching a single config file.
 
 ---
 
@@ -76,6 +76,7 @@ go install github.com/archon-ai/archon/cmd/archon@latest
 | `archon update` | Refresh installed skills from the embedded set without touching your config or orchestrator file |
 | `archon status` | Show current harness status (agent, version, skills) |
 | `archon tui` | Interactive terminal UI for configuration |
+| `archon config` | Get/set/list config values (`archon config set`, `get`, `list`) |
 | `archon rollback` | Remove all files created by `archon init` |
 | `archon version` | Print version |
 
@@ -87,7 +88,7 @@ archon init
 
 What it does:
 1. Detects your AI agent (Claude, OpenCode, etc.) — and **creates the agent folder if it doesn't exist yet**, so you can bootstrap a blank project
-2. Extracts 24 embedded skills into `~/.config/<agent>/skills/`
+2. Extracts 25 embedded skills into `~/.config/<agent>/skills/`
 3. Creates `.archon/config.yaml` with harness metadata
 4. Writes `CLAUDE.md` or `AGENTS.md` with orchestrator instructions
 5. Creates `openspec/` directory structure
@@ -156,13 +157,23 @@ in sync with your config.
 
 #### Sections
 
-**🧠 Models** — Set the default AI model and an optional override per SDD phase
-(explore, propose, spec, design, tasks, apply, verify, archive).
-- Cycle the built-in catalog with `Ctrl+N` / `Ctrl+P`:
-  - **Claude:** `claude-opus-4-8`, `claude-sonnet-4-6`, `claude-haiku-4-5`
-  - **Opencode Go:** `deepseek-v4-flash`, `deepseek-v4-pro`, `glm-5`, `glm-5.1`, `kimi-k2.5`, `kimi-k2.6`, `qwen3.6-plus`, `qwen3.7-plus`
-- Or type any model name freely — unknown models are accepted with a warning.
+The TUI opens on the **Agent** tab. Tabs, in order: **Agent · Models · Judge ·
+Mutation Testing · Playwright · Security**.
+
+**🤖 Agent** — Choose the AI agent (`opencode`, `claude`, `codex`, `agents`) and
+run/re-run initialization. Selecting an agent creates its folder if missing; if an
+orchestrator file already exists, the TUI asks before replacing it.
+
+**🧠 Models** — Set the default (and optional leader) model plus an optional override
+per SDD phase (explore, propose, spec, design, tasks, apply, verify, **judge**,
+archive). Each row is a structured `provider/model` reference with an optional
+reasoning **effort** (`default`, `low`, `medium`, `high`) for reasoning-capable models.
+- Providers and models are sourced from your opencode catalog; pick a provider, then a
+  model, then an effort — or drop into free-form entry to type any `provider/model`
+  string. A live search filter narrows long model lists as you type.
 - Empty phase fields inherit the default model.
+
+**⚖️ Judge** — Toggle the judgment-day review gate that runs after `verify`.
 
 **🧬 Mutation Testing** — Toggle mutation testing on/off and set the kill-rate
 threshold with the slider. When enabled, the **judge** phase runs mutation testing
@@ -172,19 +183,17 @@ as a quality gate (must meet the threshold to pass).
 base URL. When enabled on a web project, the harness generates Playwright specs from
 your Gherkin scenarios and runs them after the **verify** and **judge** phases.
 
-**🤖 Agent** — Choose the AI agent (`opencode`, `claude`, `codex`, `agents`) and
-run/re-run initialization. Selecting an agent creates its folder if missing; if an
-orchestrator file already exists, the TUI asks before replacing it.
+**🛡️ Security** — Toggle the opt-in security baseline and pick a profile (`cli` or
+`web`). When enabled, the security baseline is woven into the SDD phases.
 
 #### Key bindings
 
 | Key | Action |
 |-----|--------|
 | `Tab` / `Shift+Tab` | Next / previous section |
-| `↑` / `↓` | Move between fields |
+| `↑` / `↓` | Move between fields / list entries |
 | `←` / `→` | Adjust the slider (Mutation Testing) |
-| `Enter` / `Space` | Toggle a switch / confirm |
-| `Ctrl+N` / `Ctrl+P` | Cycle the model catalog (Models) |
+| `Enter` / `Space` | Open a picker, confirm a choice, or toggle a switch |
 | `Ctrl+S` | Save (regenerates the orchestrator file) |
 | `Ctrl+Q` | Quit |
 
@@ -226,46 +235,59 @@ Edit it the easy way with [`archon tui`](#tui--interactive-configuration-recomme
 or by hand. `.archon/config.yaml` (auto-generated):
 
 ```yaml
-harness_version: "0.3.0"
+harness_version: "0.9.0"
 agent: claude
-skill_count: 24
+skill_count: 25
 created_at: "2026-06-11T00:00:00Z"
 mutation_testing:
   enabled: false
   threshold: 0.80
+judge:
+  enabled: true          # run the judgment-day review gate after verify
 playwright:
-  enabled: false        # generate + run Playwright E2E from Gherkin (web projects)
+  enabled: false         # generate + run Playwright E2E from Gherkin (web projects)
   test_dir: e2e
   base_url: http://localhost:3000
+security:
+  enabled: false         # weave the opt-in security baseline into the SDD phases
+  profile: cli           # "cli" | "web"
 models:
-  default: "claude-sonnet-4-6"
+  default:               # structured provider/model with optional reasoning effort
+    provider: anthropic
+    model: claude-sonnet-4-6
   phases:
-    explore: "claude-sonnet-4-6"
-    propose: "claude-sonnet-4-6"
-    spec: "claude-sonnet-4-6"
-    design: "claude-sonnet-4-6"
-    tasks: "claude-sonnet-4-6"
-    apply: "claude-sonnet-4-6"
-    verify: "claude-sonnet-4-6"
-    archive: "claude-sonnet-4-6"
+    explore:  { provider: anthropic, model: claude-opus-4-8 }
+    propose:  { provider: anthropic, model: claude-opus-4-8 }
+    spec:     { provider: anthropic, model: claude-sonnet-4-6 }
+    design:   { provider: anthropic, model: claude-opus-4-8 }
+    tasks:    { provider: anthropic, model: claude-sonnet-4-6 }
+    apply:    { provider: anthropic, model: claude-sonnet-5 }
+    verify:   { provider: anthropic, model: claude-opus-4-8 }
+    judge:    { provider: anthropic, model: claude-sonnet-4-6 }
+    archive:  { provider: anthropic, model: claude-haiku-4-5 }
 skill_inventory:
   - name: sdd-init
     version: "1.0"
     source: embedded
-  # ... 23 more
+  # ... 24 more
 ```
 
 You can also set individual values from the CLI, e.g.
-`archon config set playwright.enabled true` or `archon config set models.default claude-opus-4-8`.
+`archon config set playwright.enabled true` or `archon config set models.default claude-opus-4-8`,
+and inspect the model configuration with `archon config list`.
 
 ## Architecture
 
 ```
 archon CLI → cobra root
-  ├── internal/init (orchestrator)
+  ├── internal/initcmd (orchestrator + per-phase subagents)
   ├── internal/agent (detect: scan .opencode/, .claude/, etc.)
   ├── internal/scaffold (embed.FS → skill directories)
   ├── internal/config (read/write .archon/config.yaml)
+  ├── internal/models (structured provider/model refs)
+  ├── internal/opencode (read the opencode model catalog cache)
+  ├── internal/status (harness status reporting)
+  ├── internal/version (build version)
   └── internal/tui (interactive terminal UI)
 ```
 
