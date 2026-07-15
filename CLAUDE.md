@@ -10,6 +10,20 @@
 
 **Behavior**: Seek clarification and ask for context when the user's request is unclear. Guide them toward understanding rather than pushing back or making evasive comments. Never say "I didn't do this because you didn't ask me to" — instead, proactively suggest what you could do. When you make a mistake, acknowledge it with evidence and correct it.
 
+## Concise Chat Output
+
+Your chat replies to the user are concise by DEFAULT: lead with the actionable point,
+prefer a tight bullet list or 1–3 short paragraphs, and drop narration, preamble, and
+recap of work already visible. This applies ONLY to chat output — never to subagent
+handoff prompts or SDD artifact bodies. See the `concise-output` skill for the full
+contract.
+
+PRESERVE VERBATIM, always complete (never trim): the Human Review Gate question
+"¿Quieres ajustar algo en esta fase antes de continuar?", decision tables, risks and
+open-question lists, and the substantive content of SDD artifacts shown to the user.
+Concise must NOT weaken the Leader Persona language/tone rules or any gate. When in
+doubt, keep it.
+
 ## Phase Order
 explore → propose → spec → design → tasks → apply → verify → judge → archive
 
@@ -23,47 +37,42 @@ Required choices:
 3. **Chained PR strategy**: `ask-always`, `single-pr-default`, `force-chained`, or `auto-forecast`.
 4. **Review budget**: maximum changed lines before stopping for approval.
 
-**User-facing prompt (Spanish):**
+**Preflight questions (Spanish, arrow-key):**
 
-```text
-Antes de continuar con SDD, elija una opción por grupo.
-Responda con "usar recomendado" o con códigos como: A1, B1, C1, D1.
+Ask each group A–E as its OWN separate arrow-key `AskUserQuestion` — never a single
+text block, never answer codes like "A1"/"B1", never a global "usar recomendado"
+shortcut. Pre-select the recommended option as the default in each question. Ask all
+five every SDD session.
 
-A. Ritmo
-   A1 Interactivo (recomendado): mostrar cada fase y esperar confirmación antes de continuar.
-   A2 Automático: ejecutar las fases seguidas y frenar solo ante riesgo alto.
-
-B. Artefactos
-   B1 OpenSpec (recomendado): archivos en el repo, trazables en revisión.
-   B2 Engram: más rápido, sin archivos de especificación en el repo.
-   B3 Ambos: archivos OpenSpec más copia en Engram.
-
-C. PRs
-   C1 Preguntarme (recomendado): frenar y preguntar si la estimación supera el presupuesto.
-   C2 Un solo PR: intentar mantener el cambio en un PR.
-   C3 Encadenados: separar en PRs encadenados desde el inicio.
-   C4 Auto: decidir según la estimación de tamaño.
-
-D. Revisión
-   D1 400 líneas (recomendado): frenar si la estimación supera 400 líneas cambiadas.
-   D2 800 líneas: más permisivo; útil para cambios medianos.
-   D3 Otro: preguntar el número después.
-
-E. Pruebas web (Playwright)
-   E1 No (recomendado para proyectos no web): no generar ni ejecutar pruebas Playwright.
-   E2 Sí: generar pruebas Playwright desde los escenarios Gherkin y ejecutarlas tras verify y jueces.
-```
+- **A. Ritmo** — "¿Qué ritmo quieres para las fases?"
+  - Interactivo (recomendado): mostrar cada fase y esperar confirmación antes de continuar.
+  - Automático: ejecutar las fases seguidas y frenar solo ante riesgo alto.
+- **B. Artefactos** — "¿Dónde guardamos los artefactos?"
+  - OpenSpec (recomendado): archivos en el repo, trazables en revisión.
+  - Engram: más rápido, sin archivos de especificación en el repo.
+  - Ambos: archivos OpenSpec más copia en Engram.
+- **C. PRs** — "¿Qué estrategia de PRs?"
+  - Preguntarme (recomendado): frenar y preguntar si la estimación supera el presupuesto.
+  - Un solo PR: intentar mantener el cambio en un PR.
+  - Encadenados: separar en PRs encadenados desde el inicio.
+  - Auto: decidir según la estimación de tamaño.
+- **D. Revisión** — "¿Presupuesto de líneas por revisión?"
+  - 400 líneas (recomendado): frenar si la estimación supera 400 líneas cambiadas.
+  - 800 líneas: más permisivo; útil para cambios medianos.
+  - Otro: al elegir esta opción, hacer UNA pregunta de texto libre pidiendo el número
+    de líneas y usar ese valor como presupuesto.
+- **E. Pruebas web (Playwright)** — "¿Generar y correr pruebas Playwright?"
+  - No (recomendado): no generar ni ejecutar pruebas Playwright.
+  - Sí: generar pruebas Playwright desde los escenarios Gherkin y ejecutarlas tras verify y jueces.
 
 **Project type & web testing (group E):**
-- The orchestrator determines whether the project is web during `sdd-explore` (presence of a web framework, package.json, a dev server, browser-facing routes, etc.).
-- For a NEW or blank project where explore cannot determine the type, ASK group E together with the rhythm (group A) during preflight.
 - Group E maps to `playwright.enabled` in `.archon/config.yaml`. The `--playwright` flag at init time or the Playwright tab in `archon tui` set the same value. When enabled, the harness generates Playwright specs from Gherkin scenarios and runs them after the verify and judge phases.
 
 **Hard gate rules:**
 - `openspec/config.yaml`, existing SDD artifacts, or previous `sdd-init` results do NOT satisfy this preflight.
-- If the session has no preflight block, ask the prompt above and **STOP**. Do not run init, delegate phases, or apply tasks in the same turn.
-- Cache the choices for this session and include them in later phase prompts.
-- If the user explicitly provided all four choices in the current conversation, summarize them as the session preflight block and continue.
+- If the session has no preflight decision, ask the five per-group questions above and **STOP**. Do not run init, delegate phases, or apply tasks in the same turn.
+- Cache the choices for this session and echo them into later phase prompts.
+- If the user explicitly provided all five choices in the current conversation, summarize them as the session preflight block and continue.
 
 ## Vague Request Guard (MANDATORY)
 
