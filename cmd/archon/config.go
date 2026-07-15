@@ -116,13 +116,13 @@ func newConfigListCmd(stdout, stderr io.Writer) *cobra.Command {
 				return fmt.Errorf("load config: %w", err)
 			}
 
-			if cfg.Models.Default == "" && len(cfg.Models.Phases) == 0 {
+			if cfg.Models.Default.FullID() == "" && len(cfg.Models.Phases) == 0 {
 				fmt.Fprintln(stdout, "(none configured)")
 				return nil
 			}
 
-			if cfg.Models.Default != "" {
-				fmt.Fprintf(stdout, "models.default = %s\n", cfg.Models.Default)
+			if cfg.Models.Default.FullID() != "" {
+				fmt.Fprintf(stdout, "models.default = %s\n", cfg.Models.Default.FullID())
 			}
 
 			if len(cfg.Models.Phases) > 0 {
@@ -132,7 +132,7 @@ func newConfigListCmd(stdout, stderr io.Writer) *cobra.Command {
 				}
 				sort.Strings(phases)
 				for _, phase := range phases {
-					fmt.Fprintf(stdout, "models.phases.%s = %s\n", phase, cfg.Models.Phases[phase])
+					fmt.Fprintf(stdout, "models.phases.%s = %s\n", phase, cfg.Models.Phases[phase].FullID())
 				}
 			}
 
@@ -152,7 +152,7 @@ func parseBool(key, value string) (bool, error) {
 func setConfigValue(cfg *config.Config, key, value string) error {
 	switch key {
 	case "models.default":
-		cfg.Models.Default = value
+		cfg.Models.Default = config.ParseModelRef(value)
 		return nil
 	case "playwright.enabled":
 		b, err := parseBool(key, value)
@@ -174,26 +174,39 @@ func setConfigValue(cfg *config.Config, key, value string) error {
 		}
 		cfg.MutationTesting.Enabled = b
 		return nil
+	case "security.enabled":
+		b, err := parseBool(key, value)
+		if err != nil {
+			return err
+		}
+		cfg.Security.Enabled = b
+		return nil
+	case "security.profile":
+		if value != "cli" && value != "web" {
+			return fmt.Errorf("invalid profile %q for security.profile (supported: cli, web)", value)
+		}
+		cfg.Security.Profile = value
+		return nil
 	default:
 		if strings.HasPrefix(key, "models.phases.") {
 			phase := strings.TrimPrefix(key, "models.phases.")
 			if !config.ValidPhases[phase] {
-				return fmt.Errorf("unknown phase %q (valid: explore, propose, spec, design, tasks, apply, verify, archive)", phase)
+				return fmt.Errorf("unknown phase %q (valid: explore, propose, spec, design, tasks, apply, verify, judge, archive)", phase)
 			}
 			if cfg.Models.Phases == nil {
-				cfg.Models.Phases = make(map[string]string)
+				cfg.Models.Phases = make(map[string]config.ModelRef)
 			}
-			cfg.Models.Phases[phase] = value
+			cfg.Models.Phases[phase] = config.ParseModelRef(value)
 			return nil
 		}
-		return fmt.Errorf("unknown config key %q (supported: models.default, models.phases.<phase>, playwright.enabled, playwright.test_dir, playwright.base_url, mutation_testing.enabled)", key)
+		return fmt.Errorf("unknown config key %q (supported: models.default, models.phases.<phase>, playwright.enabled, playwright.test_dir, playwright.base_url, mutation_testing.enabled, security.enabled, security.profile)", key)
 	}
 }
 
 func getConfigValue(cfg *config.Config, key string) (string, error) {
 	switch key {
 	case "models.default":
-		return cfg.Models.Default, nil
+		return cfg.Models.Default.FullID(), nil
 	case "playwright.enabled":
 		return strconv.FormatBool(cfg.Playwright.Enabled), nil
 	case "playwright.test_dir":
@@ -202,14 +215,18 @@ func getConfigValue(cfg *config.Config, key string) (string, error) {
 		return cfg.Playwright.BaseURL, nil
 	case "mutation_testing.enabled":
 		return strconv.FormatBool(cfg.MutationTesting.Enabled), nil
+	case "security.enabled":
+		return strconv.FormatBool(cfg.Security.Enabled), nil
+	case "security.profile":
+		return cfg.Security.Profile, nil
 	default:
 		if strings.HasPrefix(key, "models.phases.") {
 			phase := strings.TrimPrefix(key, "models.phases.")
 			if !config.ValidPhases[phase] {
-				return "", fmt.Errorf("unknown phase %q (valid: explore, propose, spec, design, tasks, apply, verify, archive)", phase)
+				return "", fmt.Errorf("unknown phase %q (valid: explore, propose, spec, design, tasks, apply, verify, judge, archive)", phase)
 			}
-			return cfg.Models.Phases[phase], nil
+			return cfg.Models.Phases[phase].FullID(), nil
 		}
-		return "", fmt.Errorf("unknown config key %q (supported: models.default, models.phases.<phase>, playwright.enabled, playwright.test_dir, playwright.base_url, mutation_testing.enabled)", key)
+		return "", fmt.Errorf("unknown config key %q (supported: models.default, models.phases.<phase>, playwright.enabled, playwright.test_dir, playwright.base_url, mutation_testing.enabled, security.enabled, security.profile)", key)
 	}
 }

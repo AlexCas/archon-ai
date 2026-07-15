@@ -330,3 +330,84 @@ func TestInitCommand_WithAgentFlag(t *testing.T) {
 		t.Errorf("init output = %q, want contains 'opencode'", output)
 	}
 }
+
+// TestInitCommand_JudgeDefaultsToVerifyModel exercises the flag-assembly branch
+// in newInitCmd (main.go) where --model-judge is absent: the judge phase must
+// inherit the --model-verify value. It is an integration test that runs a real
+// init into a temp dir and reads the generated .claude/agents/archon-judge.md.
+//
+// Non-tautology proof: if the line
+//
+//	modelFlags["judge"] = modelVerifyFlag
+//
+// is removed from newInitCmd, modelFlags will have no "judge" entry, buildConfig
+// will not populate Models.Phases["judge"], ResolvePhaseModels will find no judge
+// model (no default is set either), writeClaudeAgents will omit archon-judge.md,
+// and os.ReadFile below will return an error — making this test fail.
+func TestInitCommand_JudgeDefaultsToVerifyModel(t *testing.T) {
+	origDir, _ := os.Getwd()
+	tmpDir := t.TempDir()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	homeDir := filepath.Join(tmpDir, "home")
+	if err := os.MkdirAll(homeDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	t.Setenv("HOME", homeDir)
+
+	// Create the .claude dir so the claude agent is accepted.
+	if err := os.MkdirAll(filepath.Join(tmpDir, ".claude"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	const verifyModel = "claude-opus-4-8"
+
+	var stdout, stderr bytes.Buffer
+	root := newRootCmd(&stdout, &stderr)
+	// --model-verify is set; --model-judge is intentionally absent.
+	root.SetArgs([]string{
+		"init", "--agent", "claude",
+		"--model-verify", verifyModel,
+	})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v, stderr = %s", err, stderr.String())
+	}
+
+	// Read the generated archon-judge.md. If the defaulting wiring is absent,
+	// the file won't exist and ReadFile returns an error here.
+	judgeAgentPath := filepath.Join(tmpDir, ".claude", "agents", "archon-judge.md")
+	data, err := os.ReadFile(judgeAgentPath)
+	if err != nil {
+		t.Fatalf("archon-judge.md not generated (missing --model-judge defaulting wiring?): %v", err)
+	}
+
+	// Parse the YAML frontmatter to extract the model field.
+	content := string(data)
+	frontmatterModel := ""
+	inFrontmatter := false
+	for _, line := range strings.Split(content, "\n") {
+		if line == "---" {
+			if !inFrontmatter {
+				inFrontmatter = true
+				continue
+			}
+			break // closing ---
+		}
+		if inFrontmatter && strings.HasPrefix(line, "model: ") {
+			frontmatterModel = strings.TrimPrefix(line, "model: ")
+		}
+	}
+
+	if frontmatterModel == "" {
+		t.Fatalf("archon-judge.md frontmatter has no 'model:' field; content:\n%s", content)
+	}
+
+	// claudeFrontmatterModel strips the provider prefix, so "anthropic/claude-opus-4-8"
+	// becomes "claude-opus-4-8". The bare id we passed is already stripped.
+	if frontmatterModel != verifyModel {
+		t.Errorf("archon-judge.md model = %q, want %q (should default to --model-verify when --model-judge is absent)",
+			frontmatterModel, verifyModel)
+	}
+}

@@ -143,41 +143,78 @@ When committing on the user's behalf through the harness or any sub-agent:
 - Use conventional commit format for the subject; keep the body about the change, not the tool.
 `
 
-const orchestratorTrailer = `
-## Rules
+// orchestratorTrailerHead is the shared leading content of the trailer,
+// preceding the per-harness Rules and Phase Models blocks.
+const orchestratorTrailerHead = `
+## Configuration
+- Skills: {{.SkillCount}} (embedded via archon init)
+- Config: .archon/config.yaml
+- Agent: {{.Agent}}
+- Harness Version: {{.HarnessVersion}}
+`
+
+// orchestratorRulesClaude is the Rules block for the claude harness.
+// Rule 2 names the archon-<phase> subagent as the per-phase delegation target
+// and instructs the leader not to pass a per-call model parameter (the
+// subagent's frontmatter model is the hard gate).
+const orchestratorRulesClaude = `## Rules
 1. Check harness-workflow before any phase transition
-2. Delegate each phase to sdd-* sub-agent
+2. You MUST delegate each phase by invoking its §archon-<phase>§ subagent via your delegation tool — never execute the phase inline on your own model; do not pass a per-call model parameter (the subagent's frontmatter model is the gate)
 3. Write/update SESSION_STATUS.md at the root on every phase transition
 4. After every phase that produces an editable artifact, run the Human Review Gate
 5. After verify, invoke harness-judge
 6. When playwright.enabled, run the generated Playwright tests after verify and judge pass
 7. On judge fail: re-apply with feedback (max 3 retries)
 8. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution
+`
 
-## Configuration
-- Skills: {{.SkillCount}} (embedded via archon init)
-- Config: .archon/config.yaml
-- Agent: {{.Agent}}
-- Harness Version: {{.HarnessVersion}}
-{{if .PhaseModels}}
+// orchestratorRulesOpencode is the Rules block for the opencode harness.
+// Rule 2 names the archon-<phase> subagent as the per-phase delegation target.
+const orchestratorRulesOpencode = `## Rules
+1. Check harness-workflow before any phase transition
+2. You MUST delegate each phase by invoking its §archon-<phase>§ subagent via your delegation tool — never execute the phase inline on your own model (the subagent's configured model in opencode.json is the gate)
+3. Write/update SESSION_STATUS.md at the root on every phase transition
+4. After every phase that produces an editable artifact, run the Human Review Gate
+5. After verify, invoke harness-judge
+6. When playwright.enabled, run the generated Playwright tests after verify and judge pass
+7. On judge fail: re-apply with feedback (max 3 retries)
+8. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution
+`
+
+// phaseModelsClaude is the Phase Models block for CLAUDE.md. The archon-<phase>
+// subagent definitions are the binding hard gate — the model in each subagent's
+// frontmatter is what Claude Code uses, not an advisory preference.
+const phaseModelsClaude = `{{if .PhaseModels}}
 ## Phase Models
 
-Advisory: when delegating an SDD phase, request the model below for that phase by
-passing §model: <id>§ to the Agent/Task delegation tool. This is a preference, not a
-hard gate; if the platform cannot honor per-delegation model selection, proceed with
-the default model.
+Each phase runs in its named §archon-<phase>§ subagent. The §model§ field in that
+subagent's frontmatter is the binding hard gate — Claude Code selects the model
+from the subagent definition, not from a per-call parameter.
 
 {{range .PhaseModels}}- {{.Phase}}: {{.Model}}
-{{end}}{{end}}
+{{end}}{{end}}`
+
+// phaseModelsOpencode is the Phase Models block for AGENTS.md. The binding
+// lives in opencode.json under agent.archon-<phase>.model.
+const phaseModelsOpencode = `{{if .PhaseModels}}
+## Phase Models
+
+Each phase runs in its named §archon-<phase>§ subagent. The binding lives in
+§opencode.json§ under §agent.archon-<phase>.model§.
+
+{{range .PhaseModels}}- {{.Phase}}: {{.Model}}
+{{end}}{{end}}`
+
+const orchestratorStateManagement = `
 ## State Management
 Phase state tracked in: openspec/changes/{change-name}/state.yaml
 Session state tracked in: SESSION_STATUS.md (repo root, archived with the change)
 Transitions validated by harness-workflow skill
 `
 
-const agentsTemplate = orchestratorSections + orchestratorTrailer
+const agentsTemplate = orchestratorSections + orchestratorRulesOpencode + orchestratorTrailerHead + phaseModelsOpencode + orchestratorStateManagement
 
-const claudeTemplate = orchestratorSections + orchestratorTrailer
+const claudeTemplate = orchestratorSections + orchestratorRulesClaude + orchestratorTrailerHead + phaseModelsClaude + orchestratorStateManagement
 
 type TemplateData struct {
 	ProjectName    string

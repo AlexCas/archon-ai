@@ -139,7 +139,23 @@ When committing on the user's behalf through the harness or any sub-agent:
 - Skills: 24 (embedded via archon init)
 - Config: .archon/config.yaml
 - Agent: claude
-- Harness Version: 0.2.0
+- Harness Version: dev
+
+## Phase Models
+
+Each phase runs in its named `archon-<phase>` subagent. The `model` field in that
+subagent's frontmatter is the binding hard gate — Claude Code selects the model
+from the subagent definition, not from a per-call parameter.
+
+- explore: anthropic/claude-sonnet-4-6
+- propose: anthropic/claude-opus-4-8
+- spec: anthropic/claude-opus-4-8
+- design: anthropic/claude-opus-4-8
+- tasks: anthropic/claude-sonnet-4-6
+- apply: anthropic/claude-sonnet-4-6
+- verify: anthropic/claude-opus-4-8
+- judge: anthropic/claude-opus-4-8
+- archive: anthropic/claude-haiku-4-5-20251001
 
 ## Phase Models
 

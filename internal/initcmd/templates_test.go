@@ -153,46 +153,59 @@ func TestTemplates_ContainSDDSessionPreflight(t *testing.T) {
 }
 
 func TestTemplates_FiveRules(t *testing.T) {
-	data := TemplateData{
-		Agent:          "opencode",
-		HarnessVersion: "1.0.0",
-		SkillCount:     10,
+	// Rules shared across both harnesses (rules 1, 3-8).
+	sharedRules := []string{
+		"1. Check harness-workflow before any phase transition",
+		"3. Write/update SESSION_STATUS.md at the root on every phase transition",
+		"4. After every phase that produces an editable artifact, run the Human Review Gate",
+		"5. After verify, invoke harness-judge",
+		"6. When playwright.enabled, run the generated Playwright tests after verify and judge pass",
+		"7. On judge fail: re-apply with feedback (max 3 retries)",
+		"8. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution",
 	}
 
 	tests := []struct {
-		name   string
-		render func(TemplateData) (string, error)
+		name      string
+		render    func(TemplateData) (string, error)
+		rule2Want string
 	}{
-		{"AGENTS.md", RenderAgentsMD},
-		{"CLAUDE.md", RenderClaudeMD},
+		{
+			name:      "AGENTS.md",
+			render:    RenderAgentsMD,
+			rule2Want: "2. You MUST delegate each phase by invoking its `archon-<phase>` subagent via your delegation tool — never execute the phase inline on your own model",
+		},
+		{
+			name:      "CLAUDE.md",
+			render:    RenderClaudeMD,
+			rule2Want: "2. You MUST delegate each phase by invoking its `archon-<phase>` subagent via your delegation tool — never execute the phase inline on your own model; do not pass a per-call model parameter",
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			data := TemplateData{
+				Agent:          "opencode",
+				HarnessVersion: "1.0.0",
+				SkillCount:     10,
+			}
 			content, err := tt.render(data)
 			if err != nil {
 				t.Fatalf("render error = %v", err)
 			}
 
-			// Check all orchestrator rules are present
-			rules := []string{
-				"1. Check harness-workflow before any phase transition",
-				"2. Delegate each phase to sdd-* sub-agent",
-				"3. Write/update SESSION_STATUS.md at the root on every phase transition",
-				"4. After every phase that produces an editable artifact, run the Human Review Gate",
-				"5. After verify, invoke harness-judge",
-				"6. When playwright.enabled, run the generated Playwright tests after verify and judge pass",
-				"7. On judge fail: re-apply with feedback (max 3 retries)",
-				"8. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution",
-			}
-
-			for _, rule := range rules {
+			// Check shared rules are present in both harness docs.
+			for _, rule := range sharedRules {
 				if !strings.Contains(content, rule) {
 					t.Errorf("%s missing rule %q", tt.name, rule)
 				}
 			}
 
-			// Ensure there is no rule 9 (exactly 8 rules)
+			// Check the per-harness Rule 2 wording.
+			if !strings.Contains(content, tt.rule2Want) {
+				t.Errorf("%s missing rule 2 %q", tt.name, tt.rule2Want)
+			}
+
+			// Ensure there is no rule 9 (exactly 8 rules).
 			if strings.Contains(content, "9. ") {
 				t.Errorf("%s should have exactly 8 rules, found rule 9", tt.name)
 			}
@@ -253,7 +266,10 @@ func TestTemplates_CodeBlockRendering(t *testing.T) {
 	}
 }
 
-func TestTemplates_AgentsAndClaudeIdentical(t *testing.T) {
+// TestTemplates_AgentsAndClaudeSharedSections verifies that both harness docs
+// share the common orchestratorSections content while allowing per-harness
+// differences in the Rules and Phase Models blocks.
+func TestTemplates_AgentsAndClaudeSharedSections(t *testing.T) {
 	data := TemplateData{
 		Agent:          "test-agent",
 		HarnessVersion: "1.0.0",
@@ -270,8 +286,28 @@ func TestTemplates_AgentsAndClaudeIdentical(t *testing.T) {
 		t.Fatalf("RenderClaudeMD() error = %v", err)
 	}
 
-	if agents != claude {
-		t.Error("agentsTemplate and claudeTemplate are not identical — they may have diverged silently")
+	// Both docs must share the SDD Session Preflight, Vague Request Guard, and
+	// Human Review Gate sections from orchestratorSections.
+	sharedSections := []string{
+		"## SDD Session Preflight (HARD GATE)",
+		"## Vague Request Guard (MANDATORY)",
+		"## Human Review Gate (MANDATORY)",
+		"## Leader Persona",
+		"## Session Status (SESSION_STATUS.md) — MANDATORY",
+		"## Commit Attribution (HARD RULE)",
+	}
+	for _, section := range sharedSections {
+		if !strings.Contains(agents, section) {
+			t.Errorf("AGENTS.md missing shared section %q", section)
+		}
+		if !strings.Contains(claude, section) {
+			t.Errorf("CLAUDE.md missing shared section %q", section)
+		}
+	}
+
+	// Templates must differ in their Rule 2 wording (by design).
+	if agents == claude {
+		t.Error("agentsTemplate and claudeTemplate are identical — per-harness Rule 2 divergence is missing")
 	}
 }
 
@@ -281,10 +317,10 @@ func TestTemplates_PhaseModelsBlock(t *testing.T) {
 		HarnessVersion: "1.0.0",
 		SkillCount:     10,
 		PhaseModels: config.ResolvePhaseModels(config.ModelConfig{
-			Phases: map[string]string{
-				"explore": "Opus 4.8",
-				"propose": "sonnet",
-				"design":  "claude-opus-4-8",
+			Phases: map[string]config.ModelRef{
+				"explore": {Model: "opus"},
+				"propose": {Model: "sonnet"},
+				"design":  {Model: "opus"},
 			},
 		}),
 	}
@@ -320,7 +356,7 @@ func TestTemplates_PhaseModelsNonClaudeDefault(t *testing.T) {
 		Agent:          "claude",
 		HarnessVersion: "1.0.0",
 		SkillCount:     10,
-		PhaseModels:    config.ResolvePhaseModels(config.ModelConfig{Default: "gemini-2.5-pro"}),
+		PhaseModels:    config.ResolvePhaseModels(config.ModelConfig{Default: config.ModelRef{Model: "gemini-2.5-pro"}}),
 	}
 
 	content, err := RenderClaudeMD(data)
@@ -359,11 +395,11 @@ func TestTemplates_PhaseModelsBlockMatchesAcrossPaths(t *testing.T) {
 	// across-paths byte-identity check exercises a non-Claude default too
 	// (spec scenario: "Non-Claude default renders an identical block across paths").
 	mc := config.ModelConfig{
-		Default: "gemini-2.5-pro",
-		Phases: map[string]string{
-			"explore": "Opus 4.8",
-			"tasks":   "gpt-4o",
-			"verify":  "haiku",
+		Default: config.ModelRef{Model: "gemini-2.5-pro"},
+		Phases: map[string]config.ModelRef{
+			"explore": {Model: "opus"},
+			"tasks":   {Model: "gpt-4o"},
+			"verify":  {Model: "haiku"},
 		},
 	}
 
@@ -480,5 +516,110 @@ func TestTemplates_LeaderPersona(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// 5.8a: CLAUDE.md names subagents as the hard gate (not advisory).
+func TestTemplates_ClaudePhaseModelsIsHardGate(t *testing.T) {
+	data := TemplateData{
+		Agent:          "claude",
+		HarnessVersion: "1.0.0",
+		SkillCount:     10,
+		PhaseModels: config.ResolvePhaseModels(config.ModelConfig{
+			Default: config.ParseModelRef("anthropic/claude-sonnet-4-6"),
+		}),
+	}
+
+	content, err := RenderClaudeMD(data)
+	if err != nil {
+		t.Fatalf("RenderClaudeMD() error = %v", err)
+	}
+
+	if !strings.Contains(content, "## Phase Models") {
+		t.Error("CLAUDE.md missing ## Phase Models block")
+	}
+
+	// Must reference archon-<phase> subagents as the binding.
+	if !strings.Contains(content, "archon-<phase>") {
+		t.Error("CLAUDE.md Phase Models block does not name archon-<phase> subagents")
+	}
+
+	// Must not call model selection "advisory".
+	if strings.Contains(content, "advisory") {
+		t.Error("CLAUDE.md Phase Models block must not use the word \"advisory\"")
+	}
+
+	// Must not leak platform precedence noise into the generated doc.
+	if strings.Contains(content, "CLAUDE_CODE_SUBAGENT_MODEL") {
+		t.Error("CLAUDE.md must not mention CLAUDE_CODE_SUBAGENT_MODEL (implementation noise)")
+	}
+}
+
+// 5.8b: AGENTS.md Phase Models block states the binding lives in opencode.json.
+func TestTemplates_AgentsPhaseModelsPointsAtOpencodeJSON(t *testing.T) {
+	data := TemplateData{
+		Agent:          "opencode",
+		HarnessVersion: "1.0.0",
+		SkillCount:     10,
+		PhaseModels: config.ResolvePhaseModels(config.ModelConfig{
+			Default: config.ParseModelRef("anthropic/claude-sonnet-4-6"),
+		}),
+	}
+
+	content, err := RenderAgentsMD(data)
+	if err != nil {
+		t.Fatalf("RenderAgentsMD() error = %v", err)
+	}
+
+	if !strings.Contains(content, "## Phase Models") {
+		t.Error("AGENTS.md missing ## Phase Models block")
+	}
+
+	if !strings.Contains(content, "opencode.json") {
+		t.Error("AGENTS.md Phase Models block must state that the binding lives in opencode.json")
+	}
+}
+
+// 5.8c: CLAUDE.md routes delegation to the named subagent and instructs no
+// per-call model parameter.
+func TestTemplates_ClaudeDelegationRuleNamesSubagentAndNoPerCallModel(t *testing.T) {
+	data := TemplateData{
+		Agent:          "claude",
+		HarnessVersion: "1.0.0",
+		SkillCount:     10,
+	}
+
+	content, err := RenderClaudeMD(data)
+	if err != nil {
+		t.Fatalf("RenderClaudeMD() error = %v", err)
+	}
+
+	// Rule 2 must name archon-<phase> as the delegation target.
+	if !strings.Contains(content, "archon-<phase>") {
+		t.Error("CLAUDE.md delegation rule does not name archon-<phase> as the delegation target")
+	}
+
+	// Rule 2 must instruct the leader not to pass a per-call model parameter.
+	if !strings.Contains(content, "per-call model parameter") {
+		t.Error("CLAUDE.md delegation rule must instruct the leader not to pass a per-call model parameter")
+	}
+}
+
+// 5.8d: AGENTS.md routes delegation to the named subagent.
+func TestTemplates_AgentsDelegationRuleNamesSubagent(t *testing.T) {
+	data := TemplateData{
+		Agent:          "opencode",
+		HarnessVersion: "1.0.0",
+		SkillCount:     10,
+	}
+
+	content, err := RenderAgentsMD(data)
+	if err != nil {
+		t.Fatalf("RenderAgentsMD() error = %v", err)
+	}
+
+	// Rule 2 must name archon-<phase> as the delegation target.
+	if !strings.Contains(content, "archon-<phase>") {
+		t.Error("AGENTS.md delegation rule does not name archon-<phase> as the delegation target")
 	}
 }

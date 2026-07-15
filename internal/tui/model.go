@@ -8,7 +8,7 @@ import (
 
 	"github.com/archon-ai/archon/internal/config"
 	"github.com/archon-ai/archon/internal/initcmd"
-	"github.com/archon-ai/archon/internal/models"
+	"github.com/archon-ai/archon/internal/opencode"
 	"github.com/archon-ai/archon/skills"
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
@@ -24,6 +24,7 @@ const (
 	JudgeTab
 	MutationTab
 	PlaywrightTab
+	SecurityTab
 	tabCount
 )
 
@@ -36,11 +37,15 @@ type Model struct {
 	quitting   bool
 	statusMsg  string
 	statusErr  bool
+	// Provider catalog loaded once when the TUI opens; reused on agentInitDoneMsg rebuild.
+	providers map[string]opencode.Provider
+	cacheErr  error
 	// Tab states
 	modelsTab     modelsTabState
 	judgeTab      judgeTabState
 	mutationTab   mutationTabState
 	playwrightTab playwrightTabState
+	securityTab   securityTabState
 	agentTab      agentTabState
 }
 
@@ -82,18 +87,26 @@ var defaultKeys = keyMap{
 }
 
 func NewModel(cfg *config.Config, projectDir string) Model {
-	// Detect the offered model catalog once when the TUI opens. Detection must
-	// not run per keystroke nor during "archon init"; the cached slice is reused
-	// for the lifetime of the Models view.
-	catalog := models.Resolve()
+	// Load the opencode provider catalog once when the TUI opens. Absent cache =>
+	// empty map + nil err (silent); corrupt cache => err (drives an inline warning).
+	var providers map[string]opencode.Provider
+	var cacheErr error
+	if path, err := opencode.DefaultCachePath(); err == nil {
+		providers, cacheErr = opencode.LoadModelsOrEmpty(path)
+	} else {
+		cacheErr = err
+	}
 	return Model{
 		config:        cfg,
 		projectDir:    projectDir,
 		activeTab:     AgentTab,
-		modelsTab:     newModelsTabState(cfg, catalog),
+		providers:     providers,
+		cacheErr:      cacheErr,
+		modelsTab:     newModelsTabState(cfg, providers, cacheErr),
 		judgeTab:      newJudgeTabState(cfg.Judge),
 		mutationTab:   newMutationTabState(cfg.MutationTesting),
 		playwrightTab: newPlaywrightTabState(cfg.Playwright),
+		securityTab:   newSecurityTabState(cfg.Security),
 		agentTab:      newAgentTabState(cfg.Agent),
 	}
 }
@@ -113,6 +126,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.judgeTab.setWidth(m.width)
 		m.mutationTab.setWidth(m.width)
 		m.playwrightTab.setWidth(m.width)
+		m.securityTab.setWidth(m.width)
 		m.agentTab.setWidth(m.width)
 
 	case tea.KeyMsg:
@@ -157,6 +171,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if cmd != nil {
 				cmds = append(cmds, cmd)
 			}
+		case SecurityTab:
+			cmd, _ := m.securityTab.update(msg)
+			if cmd != nil {
+				cmds = append(cmds, cmd)
+			}
 		case AgentTab:
 			cmd, _ := m.agentTab.update(msg)
 			if cmd != nil {
@@ -177,18 +196,20 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Adopt the freshly written config and rebuild tab states from it.
 		msg.cfg.HomeDir = m.projectDir
 		m.config = msg.cfg
-		// Reuse the catalog detected when the view first opened; init does not
+		// Reuse the provider map loaded when the view first opened; init does not
 		// re-run detection.
-		m.modelsTab = newModelsTabState(msg.cfg, m.modelsTab.catalog)
+		m.modelsTab = newModelsTabState(msg.cfg, m.providers, m.cacheErr)
 		m.judgeTab = newJudgeTabState(msg.cfg.Judge)
 		m.mutationTab = newMutationTabState(msg.cfg.MutationTesting)
 		m.playwrightTab = newPlaywrightTabState(msg.cfg.Playwright)
+		m.securityTab = newSecurityTabState(msg.cfg.Security)
 		m.agentTab = newAgentTabState(msg.cfg.Agent)
 		if m.width > 0 {
 			m.modelsTab.setWidth(m.width)
 			m.judgeTab.setWidth(m.width)
 			m.mutationTab.setWidth(m.width)
 			m.playwrightTab.setWidth(m.width)
+			m.securityTab.setWidth(m.width)
 			m.agentTab.setWidth(m.width)
 		}
 		m.statusMsg = msg.summary
@@ -250,7 +271,7 @@ func (m Model) renderTabs() string {
 		BorderForeground(lipgloss.Color("63")).
 		Bold(true)
 
-	tabs := []string{"Agent", "Models", "Judge", "Mutation Testing", "Playwright"}
+	tabs := []string{"Agent", "Models", "Judge", "Mutation Testing", "Playwright", "Security"}
 	var rendered []string
 
 	for i, name := range tabs {
@@ -279,6 +300,8 @@ func (m Model) renderTabContent() string {
 		return style.Render(m.mutationTab.view(m.width, m.height))
 	case PlaywrightTab:
 		return style.Render(m.playwrightTab.view(m.width, m.height))
+	case SecurityTab:
+		return style.Render(m.securityTab.view(m.width, m.height))
 	case AgentTab:
 		return style.Render(m.agentTab.view(m.width, m.height))
 	default:
@@ -316,6 +339,7 @@ func (m Model) saveConfig() tea.Cmd {
 		m.judgeTab.applyToConfig(cfg)
 		m.mutationTab.applyToConfig(cfg)
 		m.playwrightTab.applyToConfig(cfg)
+		m.securityTab.applyToConfig(cfg)
 		m.agentTab.applyToConfig(cfg)
 
 		if err := cfg.Save(); err != nil {
@@ -331,8 +355,17 @@ func (m Model) saveConfig() tea.Cmd {
 		// opencode.json using the same writer as init so both paths produce
 		// byte-identical output. No-op when models.leader is empty.
 		if cfg.Agent == "opencode" {
-			if _, err := initcmd.MergeOpencodeAgent(m.projectDir, cfg.Models.Leader); err != nil {
+			if _, err := initcmd.MergeOpencodeAgent(m.projectDir, cfg.Models); err != nil {
 				return fmt.Errorf("saved config but failed to merge opencode agent: %w", err)
+			}
+		}
+
+		// For claude projects, write/update .claude/agents/archon-<phase>.md
+		// files using the same writer as init so both paths produce
+		// byte-identical output. No-op when no models are resolvable.
+		if cfg.Agent == "claude" {
+			if _, err := initcmd.WriteClaudeAgents(m.projectDir, cfg.Models); err != nil {
+				return fmt.Errorf("saved config but failed to write claude agents: %w", err)
 			}
 		}
 

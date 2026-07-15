@@ -1,0 +1,57 @@
+change: structured-model-resolution
+current_phase: tasks
+phases:
+  explore:
+    status: completed
+    completed_at: "2026-06-19"
+    artifact: openspec/changes/structured-model-resolution/exploration.md
+  propose:
+    status: completed
+    completed_at: "2026-06-19"
+    artifact: openspec/changes/structured-model-resolution/proposal.md
+    scope: foundation-pr-s0-s1-combined
+  spec:
+    status: completed
+    completed_at: "2026-06-19"
+    scope: foundation-pr-s0-s1-combined
+    artifacts:
+      - openspec/changes/structured-model-resolution/specs/model-ref/spec.md
+      - openspec/changes/structured-model-resolution/specs/model-ref/model-ref.feature
+      - openspec/changes/structured-model-resolution/specs/opencode-model-cache/spec.md
+      - openspec/changes/structured-model-resolution/specs/opencode-model-cache/opencode-model-cache.feature
+  design:
+    status: completed
+    completed_at: "2026-06-19"
+    scope: foundation-pr-s0-s1-combined
+    artifact: openspec/changes/structured-model-resolution/design.md
+  tasks:
+    status: in_progress
+    started_at: "2026-06-19"
+    artifact: openspec/changes/structured-model-resolution/tasks.md
+  apply:
+    status: pending
+  verify:
+    status: pending
+  judge:
+    status: pending
+  archive:
+    status: pending
+preflight:
+  execution_mode: interactive   # A1
+  artifact_store: openspec       # B1
+  chained_pr_strategy: ask-always # C1
+  review_budget_lines: 400        # D1
+  playwright_enabled: false       # E1
+chained_pr:
+  initiative: structured-model-resolution
+  this_pr: foundation (S0 + S1 combined)
+  loc_forecast: "~400-480 (exceeds D1; flagged per C1, user accepted)"
+  remaining_slices:
+    - s2-writers
+    - s3-tui-picker
+    - s4-effort-variants
+capabilities_to_spec:
+  - model-ref
+  - opencode-model-cache
+base: master@7360b4d
+branch: feat/opencode-phase-subagents

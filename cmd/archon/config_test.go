@@ -163,6 +163,133 @@ func TestConfigCmd_List(t *testing.T) {
 	}
 }
 
+// TestConfigCmd_SetProviderQualified confirms the ParseModelRef + FullID seam
+// end-to-end: setting a provider-qualified value and getting it back returns the
+// same string. (S1f-1, optional)
+func TestConfigCmd_SetProviderQualified(t *testing.T) {
+	tmpDir := setupProjectWithConfig(t)
+	origDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	var stdout1, stderr1 bytes.Buffer
+	root1 := newRootCmd(&stdout1, &stderr1)
+	root1.SetArgs([]string{"config", "set", "models.default", "opencode/deepseek-v4-pro"})
+
+	if err := root1.Execute(); err != nil {
+		t.Fatalf("set Execute() error = %v, stderr = %s", err, stderr1.String())
+	}
+
+	var stdout2, stderr2 bytes.Buffer
+	root2 := newRootCmd(&stdout2, &stderr2)
+	root2.SetArgs([]string{"config", "get", "models.default"})
+
+	if err := root2.Execute(); err != nil {
+		t.Fatalf("get Execute() error = %v, stderr = %s", err, stderr2.String())
+	}
+
+	got := strings.TrimSpace(stdout2.String())
+	if got != "opencode/deepseek-v4-pro" {
+		t.Errorf("config get models.default = %q, want %q", got, "opencode/deepseek-v4-pro")
+	}
+}
+
+// TestConfigCmd_SecuritySetGet asserts set then get roundtrip for security.enabled
+// and security.profile (S1-7).
+func TestConfigCmd_SecuritySetGet(t *testing.T) {
+	tmpDir := setupProjectWithConfig(t)
+	origDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	// Set security.enabled = true
+	var stdout1, stderr1 bytes.Buffer
+	root1 := newRootCmd(&stdout1, &stderr1)
+	root1.SetArgs([]string{"config", "set", "security.enabled", "true"})
+	if err := root1.Execute(); err != nil {
+		t.Fatalf("set security.enabled Execute() error = %v, stderr = %s", err, stderr1.String())
+	}
+
+	// Get security.enabled
+	var stdout2, stderr2 bytes.Buffer
+	root2 := newRootCmd(&stdout2, &stderr2)
+	root2.SetArgs([]string{"config", "get", "security.enabled"})
+	if err := root2.Execute(); err != nil {
+		t.Fatalf("get security.enabled Execute() error = %v, stderr = %s", err, stderr2.String())
+	}
+	if got := strings.TrimSpace(stdout2.String()); got != "true" {
+		t.Errorf("security.enabled = %q, want %q", got, "true")
+	}
+
+	// Set security.profile = cli
+	var stdout3, stderr3 bytes.Buffer
+	root3 := newRootCmd(&stdout3, &stderr3)
+	root3.SetArgs([]string{"config", "set", "security.profile", "cli"})
+	if err := root3.Execute(); err != nil {
+		t.Fatalf("set security.profile cli Execute() error = %v, stderr = %s", err, stderr3.String())
+	}
+
+	// Get security.profile
+	var stdout4, stderr4 bytes.Buffer
+	root4 := newRootCmd(&stdout4, &stderr4)
+	root4.SetArgs([]string{"config", "get", "security.profile"})
+	if err := root4.Execute(); err != nil {
+		t.Fatalf("get security.profile Execute() error = %v, stderr = %s", err, stderr4.String())
+	}
+	if got := strings.TrimSpace(stdout4.String()); got != "cli" {
+		t.Errorf("security.profile = %q, want %q", got, "cli")
+	}
+
+	// Set security.profile = web (valid)
+	var stdout5, stderr5 bytes.Buffer
+	root5 := newRootCmd(&stdout5, &stderr5)
+	root5.SetArgs([]string{"config", "set", "security.profile", "web"})
+	if err := root5.Execute(); err != nil {
+		t.Fatalf("set security.profile web Execute() error = %v, stderr = %s", err, stderr5.String())
+	}
+	var stdout6, stderr6 bytes.Buffer
+	root6 := newRootCmd(&stdout6, &stderr6)
+	root6.SetArgs([]string{"config", "get", "security.profile"})
+	if err := root6.Execute(); err != nil {
+		t.Fatalf("get security.profile Execute() error = %v, stderr = %s", err, stderr6.String())
+	}
+	if got := strings.TrimSpace(stdout6.String()); got != "web" {
+		t.Errorf("security.profile = %q, want %q", got, "web")
+	}
+}
+
+// TestConfigCmd_SecurityProfileInvalidValues asserts that llm, agentic, and a
+// garbage value are rejected with the exact profile error (S1-7).
+func TestConfigCmd_SecurityProfileInvalidValues(t *testing.T) {
+	invalid := []string{"llm", "agentic", "garbage"}
+
+	for _, val := range invalid {
+		t.Run(val, func(t *testing.T) {
+			tmpDir := setupProjectWithConfig(t)
+			origDir, _ := os.Getwd()
+			os.Chdir(tmpDir)
+			defer os.Chdir(origDir)
+
+			var stdout, stderr bytes.Buffer
+			root := newRootCmd(&stdout, &stderr)
+			root.SetArgs([]string{"config", "set", "security.profile", val})
+
+			err := root.Execute()
+			if err == nil {
+				t.Fatalf("expected error for security.profile = %q, got none", val)
+			}
+			wantSubstr := "invalid profile"
+			if !strings.Contains(err.Error(), wantSubstr) {
+				t.Errorf("error = %q, want contains %q", err.Error(), wantSubstr)
+			}
+			wantSupported := "(supported: cli, web)"
+			if !strings.Contains(err.Error(), wantSupported) {
+				t.Errorf("error = %q, want contains %q", err.Error(), wantSupported)
+			}
+		})
+	}
+}
+
 func TestConfigCmd_ListEmpty(t *testing.T) {
 	tmpDir := t.TempDir()
 	archonDir := filepath.Join(tmpDir, ".archon")

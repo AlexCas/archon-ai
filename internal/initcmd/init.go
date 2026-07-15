@@ -25,6 +25,8 @@ type Options struct {
 	ModelPhases  map[string]string
 	// Playwright enables generation and execution of Playwright E2E tests.
 	Playwright bool
+	// Security enables the security-baseline gate across the SDD phases.
+	Security bool
 	// OverwriteTemplate, when true, replaces an existing orchestrator file
 	// (CLAUDE.md / AGENTS.md) without prompting. When false and the file
 	// already exists, Run aborts with ErrTemplateExists so the caller can
@@ -82,7 +84,7 @@ func Run(opts Options) (*Result, error) {
 	projectSkillsDir := res.ProjectSkillsDir
 	extracted := res.Extracted
 
-	cfg := buildConfig(agentName, extracted, res.Inventory, opts.ModelDefault, opts.ModelLeader, opts.ModelPhases, opts.Playwright)
+	cfg := buildConfig(agentName, extracted, res.Inventory, opts.ModelDefault, opts.ModelLeader, opts.ModelPhases, opts.Playwright, opts.Security)
 	cfg.HomeDir = opts.ProjectDir
 	if err := cfg.Save(); err != nil {
 		return nil, fmt.Errorf("save config: %w", err)
@@ -99,13 +101,24 @@ func Run(opts Options) (*Result, error) {
 	// This must run before WriteManifest so the written path is registered for
 	// rollback alongside everything else init created.
 	if agentName == "opencode" {
-		mergedPath, err := mergeOpencodeAgent(opts.ProjectDir, cfg.Models.Leader)
+		mergedPath, err := mergeOpencodeAgent(opts.ProjectDir, cfg.Models)
 		if err != nil {
 			return nil, fmt.Errorf("merge opencode agent: %w", err)
 		}
 		if mergedPath != "" {
 			rollback.CreatedPaths = append(rollback.CreatedPaths, mergedPath)
 		}
+	}
+
+	// Write one .claude/agents/archon-<phase>.md per resolvable phase for
+	// claude projects. Must run before WriteManifest so all written paths are
+	// registered for rollback.
+	if agentName == "claude" {
+		paths, err := writeClaudeAgents(opts.ProjectDir, cfg.Models)
+		if err != nil {
+			return nil, fmt.Errorf("write claude agents: %w", err)
+		}
+		rollback.CreatedPaths = append(rollback.CreatedPaths, paths...)
 	}
 
 	if err := rollback.WriteManifest(); err != nil {
@@ -204,14 +217,14 @@ func createSymlinks(globalDir, projectDir string, skills []string) error {
 	return nil
 }
 
-func buildConfig(agentName string, extracted []string, inventory []config.SkillInventory, modelDefault string, modelLeader string, modelPhases map[string]string, playwright bool) *config.Config {
-	var phases map[string]string
+func buildConfig(agentName string, extracted []string, inventory []config.SkillInventory, modelDefault string, modelLeader string, modelPhases map[string]string, playwright bool, security bool) *config.Config {
+	var phases map[string]config.ModelRef
 	for k, v := range modelPhases {
 		if v != "" {
 			if phases == nil {
-				phases = make(map[string]string)
+				phases = make(map[string]config.ModelRef)
 			}
-			phases[k] = v
+			phases[k] = config.ParseModelRef(v)
 		}
 	}
 
@@ -229,9 +242,12 @@ func buildConfig(agentName string, extracted []string, inventory []config.SkillI
 		Playwright: config.Playwright{
 			Enabled: playwright,
 		},
+		Security: config.Security{
+			Enabled: security,
+		},
 		Models: config.ModelConfig{
-			Default: modelDefault,
-			Leader:  modelLeader,
+			Default: config.ParseModelRef(modelDefault),
+			Leader:  config.ParseModelRef(modelLeader),
 			Phases:  phases,
 		},
 		SkillInventory: inventory,
