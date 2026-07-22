@@ -8,6 +8,7 @@ this preamble is authored prose and is preserved across every regeneration. See
 
 <!-- MAP:START -->
 ## Capabilities
+- [[archon-map]] — The `archon-map` capability is a deterministic Go module (`internal/mapgen`) and `archon map` CLI subcommand that regenerates `openspec/map.md` (capabilities index + materialized backlink map), rewrites boundary-crossing relative links on archive, offers a `--check` guard, and supports a one-shot `--backfill` mode for existing archived changes.
 - [[claude-phase-subagents]]
 - [[cli-installer]] — The `archon` CLI bootstraps the SDD harness into any project by extracting 21 embedded gentle-ai skills and scaffolding per-project config, agent instructions, and rollback tracking.
 - [[harness-commits]] — Ensure commits created through the harness are attributed only to the user.
@@ -22,10 +23,15 @@ this preamble is authored prose and is preserved across every regeneration. See
 - [[opencode-model-cache]] — Define a structured reader for opencode's provider-keyed cache (`~/.cache/opencode/models.json`) that preserves the provider, degrades gracefully when the cache is absent, and serves as the primary catalog source in `ResolveModels` with the existing `opencode models` shell-out retained as a fallback (PR #45 preserved, not reverted).
 - [[opencode-phase-writers]] — For an opencode project, `archon init` and the TUI save path MUST write one `archon-<phase>` subagent into `opencode.json` per resolvable SDD phase, each carrying its resolved per-phase model as a `provider/model` FullID, alongside the existing `archon-leader`. Resolution reuses `config.ResolvePhaseModels`, so the opencode subagents agree with the AGENTS.md "Phase Models" advisory. The leader's shape and behavior are unchanged.
 - [[opencode-provider-catalog]] — Provide provider/model query helpers over the opencode cache (`internal/opencode`) so the TUI (Slice 3b) can build a provider→model picker: which providers are usable for SDD and which of their models support tool_call. Additive, pure, deterministic. No UI behavior change in this slice.
+- [[openspec-convention]]
 - [[propose-security-risk]] — When `security.enabled`, `sdd-propose` MUST add a mandatory security-risk row to the proposal's Risks table, derived from the baseline module's risk taxonomy. When disabled, proposal output is unchanged.
+- [[sdd-archive]]
+- [[sdd-init]]
+- [[sdd-phase-skills]]
 - [[security-baseline-module]] — Defines `skills/_shared/security-baseline.md`, a non-invocable shared reference module holding a profile-scaled, OWASP-derived secure-by-design checklist. Phase skills load it conditionally when `security.enabled`.
 - [[security-config]] — Defines the opt-in `security` configuration surface: a Go config block, CLI get/set, an `archon init --security` flag, and a TUI Security tab. Mirrors the existing `playwright` config. Default is OFF so existing projects see zero behavior change.
 - [[spec-security-scenarios]] — When `security.enabled`, `sdd-spec` MUST author `@security`-tagged abuse-case Gherkin scenarios alongside the normal scenarios for each MUST requirement. When disabled, no `@security` scenarios are emitted.
+- [[spec-vault]] — The `spec-vault` capability defines the Obsidian-style vault layout for `openspec/`, the hybrid link convention (wikilinks for capability identity, relative links for intra-change navigation), the managed-marker policy, and the rule that `.feature` files stay put and are only referenced. It is the single source of truth all phase skills inherit.
 - [[tasks-security-scanner]] — When `security.enabled`, `sdd-tasks` MUST emit a tool-agnostic CI scanning task covering SAST, secrets, and dependency vulnerabilities. When disabled, no scanning task is emitted.
 - [[tui-model-picker]] — Replace the free-form text rows in the TUI Models tab with an in-tab, per-row two-step provider→model picker driven by the opencode cache (via the 3a catalog helpers), populating `config.ModelRef{Provider, Model}` directly — while preserving untouched legacy values, keeping a free-form escape hatch always available, and warning in-UI (never stderr) when the cache is present but unreadable.
 - [[verify-security-gate]] — When `security.enabled`, `sdd-verify` MUST check that every `@security` scenario has covering verification, and `harness-judge` MUST gate on that coverage. When disabled, no such checks run.
@@ -35,10 +41,11 @@ this preamble is authored prose and is preserved across every regeneration. See
 |--------|-------|--------|
 | [ai-orchestration-harness](changes/ai-orchestration-harness/proposal.md) |  |  |
 | [issue-16-leader-personality](changes/issue-16-leader-personality/proposal.md) |  |  |
-| [obsidian-vault-specs](changes/obsidian-vault-specs/proposal.md) | judge | in_progress |
 | [opencode-phase-subagents](changes/opencode-phase-subagents/proposal.md) | design | in_progress |
 
 ## Archive
+### 2026-07-22
+- [obsidian-vault-specs](changes/archive/2026-07-22-obsidian-vault-specs/proposal.md)
 ### 2026-07-15
 - [concise-output-skill](changes/archive/2026-07-15-concise-output-skill/proposal.md)
 ### 2026-07-14
@@ -67,5 +74,11 @@ this preamble is authored prose and is preserved across every regeneration. See
 - [ai-orchestration-harness](changes/archive/2026-06-11-ai-orchestration-harness/proposal.md)
 
 ## Backlinks
+- [[archon-map]] ← obsidian-vault-specs
 - [[harness-workflow]] ← obsidian-vault-specs
+- [[openspec-convention]] ← obsidian-vault-specs
+- [[sdd-archive]] ← obsidian-vault-specs
+- [[sdd-init]] ← obsidian-vault-specs
+- [[sdd-phase-skills]] ← obsidian-vault-specs
+- [[spec-vault]] ← obsidian-vault-specs
 <!-- MAP:END -->
