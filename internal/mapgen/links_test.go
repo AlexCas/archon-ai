@@ -111,6 +111,26 @@ func TestRewrite_OneLevelDeeper(t *testing.T) {
 	}
 }
 
+func TestRewrite_PreservesLinksInCodeRegions(t *testing.T) {
+	md := "See [spec](../../specs/bar/spec.md) for details.\n\n" +
+		"```\n" +
+		"Example: [link](../../specs/foo/spec.md)\n" +
+		"```\n\n" +
+		"Inline: `[link](../../specs/baz/spec.md)`.\n"
+
+	got := Rewrite(md, "changes/foo", "changes/archive/2026-01-01-foo")
+
+	if !strings.Contains(got, "[spec](../../../specs/bar/spec.md)") {
+		t.Errorf("Rewrite() = %q, want prose link depth-shifted", got)
+	}
+	if !strings.Contains(got, "Example: [link](../../specs/foo/spec.md)") {
+		t.Errorf("Rewrite() = %q, want fenced-code link byte-identical", got)
+	}
+	if !strings.Contains(got, "Inline: `[link](../../specs/baz/spec.md)`.") {
+		t.Errorf("Rewrite() = %q, want inline-code link byte-identical", got)
+	}
+}
+
 func TestRewrite_LeavesWikilinksByteIdentical(t *testing.T) {
 	md := "Implements [[alpha]] and [[beta|Beta]]; see [proposal](../proposal.md).\n"
 

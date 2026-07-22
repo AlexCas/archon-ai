@@ -191,13 +191,34 @@ func Resolve(srcPath, link string) (target string, ok bool) {
 // Rewrite recomputes every relative link in md so it still resolves to the
 // same absolute target after the containing file moves from oldDir to
 // newDir (slash-separated paths relative to a common root). Only matched
-// link spans are edited; wikilinks and prose are left byte-identical.
+// link spans found OUTSIDE fenced code blocks / inline code spans are
+// edited; wikilinks, absolute URLs, and link-like syntax used as a
+// documentation example inside code regions are left byte-identical.
 func Rewrite(md, oldDir, newDir string) string {
-	return relLinkRe.ReplaceAllStringFunc(md, func(match string) string {
-		sub := relLinkRe.FindStringSubmatch(match)
-		text, target := sub[1], sub[2]
+	masked := maskCodeRegions(md)
+
+	var b strings.Builder
+	last := 0
+	for _, loc := range relLinkRe.FindAllStringSubmatchIndex(md, -1) {
+		start, end := loc[0], loc[1]
+		textStart, textEnd := loc[2], loc[3]
+		targetStart, targetEnd := loc[4], loc[5]
+
+		b.WriteString(md[last:start])
+		last = end
+
+		// Link syntax inside a fenced code block or inline code span reads
+		// as spaces in masked but the original bytes in md — it's a
+		// documentation example, not a real link. Leave it byte-identical.
+		if masked[start:end] != md[start:end] {
+			b.WriteString(md[start:end])
+			continue
+		}
+
+		text, target := md[textStart:textEnd], md[targetStart:targetEnd]
 		if isAbsoluteLink(target) {
-			return match
+			b.WriteString(md[start:end])
+			continue
 		}
 
 		frag := ""
@@ -207,13 +228,16 @@ func Rewrite(md, oldDir, newDir string) string {
 			clean = clean[:i]
 		}
 		if clean == "" {
-			return match
+			b.WriteString(md[start:end])
+			continue
 		}
 
 		abs := path.Clean(path.Join(oldDir, clean))
 		newTarget := relPath(newDir, abs) + frag
-		return "[" + text + "](" + newTarget + ")"
-	})
+		b.WriteString("[" + text + "](" + newTarget + ")")
+	}
+	b.WriteString(md[last:])
+	return b.String()
 }
 
 // relPath returns the slash-separated relative path from dir to target,
