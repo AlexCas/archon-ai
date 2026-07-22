@@ -128,9 +128,13 @@ golden file matches; `archon map` idempotency asserted (two runs yield zero diff
 
 > Split into Slice 2b sub-PR if total Slice 2 diff exceeds 400 lines.
 > **Triggered**: 2.1–2.9 + 2.14 + 2.15 already total 851 changed lines, so 2.10–2.13
-> below are deferred to Slice 2b in full (not started in this apply batch).
+> were deferred to Slice 2b, implemented in a separate apply batch on branch
+> `feat/obsidian-vault-specs-s2check` (stacked on the Slice 3 branch). That batch's
+> diff (`links.go`, `check.go`, their tests, and the real `--check` CLI wiring) is
+> ~500 changed lines on its own — over the 400-line budget by itself; see the apply
+> return summary for the overage detail.
 
-- [ ] **2.10** Create `internal/mapgen/links.go` — three functions:
+- [x] **2.10** Create `internal/mapgen/links.go` — three functions:
   `FindRelLinks(md string) []Link` (extracts `[text](rel)` link spans; ignores wikilinks
   and absolute URLs);
   `Resolve(srcPath, link string) (target string, ok bool)` (resolves a relative link
@@ -139,22 +143,27 @@ golden file matches; `archon map` idempotency asserted (two runs yield zero diff
   resolves to the same absolute file after a directory move; edits only matched spans,
   never prose).
 
-- [ ] **2.11** Create `internal/mapgen/check.go` — `Check(root string) ([]Issue, error)`:
+- [x] **2.11** Create `internal/mapgen/check.go` — `Check(root string) ([]Issue, error)`:
   walks every `.md` under `openspec/`; for each file, extracts relative links and
   `Resolve`s each — flag as dangling if target does not exist; also re-renders each
   managed region and diffs against on-disk content — flag as stale if they differ.
   Returns `[]Issue{File, Kind, Detail}`. Read-only; never writes.
 
-- [ ] **2.12** Tests for `links.go` — fixture markdown strings; assert FindRelLinks extracts
+- [x] **2.12** Tests for `links.go` — fixture markdown strings; assert FindRelLinks extracts
   only relative links (not wikilinks, not absolute URLs); Resolve returns ok for
   existing targets, false for missing; Rewrite recomputes depths correctly when moving
   one level deeper.
 
-- [ ] **2.13** Tests for `check.go` — fixture `fstest.MapFS` with:
+- [x] **2.13** Tests for `check.go` — fixtures (real `t.TempDir()` vaults, matching the
+  `Check(root string)`/`Generate(root string)` signature) with:
   (a) fresh generated map.md → exit 0, no issues;
   (b) stale managed region (hand-edited) → stale issue reported;
   (c) dangling relative link in a change artifact → dangling issue reported;
   assert read-only (no writes to fixture).
+  **Deviation**: uses real temp-dir fixtures instead of `fstest.MapFS` — `Check` takes a
+  `root string` (real filesystem, matching `Generate`), not an `fs.FS`, so the fixture
+  style follows `mapgen_test.go`'s existing `Generate` tests rather than `scan_test.go`'s
+  `fstest.MapFS` style.
 
 ### 2d — CLI wiring
 
@@ -164,21 +173,21 @@ golden file matches; `archon map` idempotency asserted (two runs yield zero diff
   per-issue report, exit non-zero on any issue; `--backfill` → `mapgen.Backfill(cwd)`
   (Slice 4 fully implements; Slice 2 wires the flag, returns stub error if called).
   Register in `newRootCmd`.
-  **Deviation**: `--check` is a compiling stub in this slice (returns a "not yet
-  implemented" error) rather than calling `mapgen.Check` — `Check` itself is deferred
-  to Slice 2b per the budget guard. `--backfill` behaves as designed (calls the
-  `mapgen.Backfill` stub from 2.6).
+  **Update (Slice 2b)**: `--check` now calls the real `mapgen.Check(cwd)` (implemented
+  in 2.11) instead of the Slice-2 stub — prints a per-issue report (File, Kind, Detail)
+  to stderr and exits non-zero on any issue, exit 0 on a clean vault. `--backfill`
+  remains a compiling stub (Slice 4 fully implements; calls the `mapgen.Backfill` stub
+  from 2.6).
 
 - [x] **2.15** Integration test for `archon map` in `cmd/archon/main_test.go` — seed a
   `t.TempDir()` with fixture `openspec/`; run `archon map`; assert `map.md` contains
   the expected managed region; run `archon map --check`; assert exit 0; mutate the
   managed region; assert `archon map --check` exits non-zero.
-  **Deviation (minimal, per budget guard)**: implemented `TestMapCommand_GeneratesManagedRegion`
-  (Generate path: managed region + capability entry present) and
-  `TestMapCommand_CheckIsStubbed` (asserts `--check` compiles and returns the stub
-  "not yet implemented" error) instead of the full stale/exit-0/exit-non-zero
-  `--check` assertions — those require the real `Check` implementation, deferred to
-  Slice 2b along with 2.10–2.13.
+  **Update (Slice 2b)**: `TestMapCommand_GeneratesManagedRegion` covers the Generate
+  path (unchanged from Slice 2); `TestMapCommand_Check` replaces the old
+  `TestMapCommand_CheckIsStubbed` stub test — asserts `--check` exits 0 on a freshly
+  generated vault and exits non-zero (with "stale" in stderr) after the managed region
+  is hand-mutated, now that `Check` is implemented.
 
 ---
 

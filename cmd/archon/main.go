@@ -420,9 +420,8 @@ func newStatusCmd(stdout, stderr io.Writer) *cobra.Command {
 
 // newMapCmd regenerates or checks the openspec vault map (openspec/map.md).
 //
-// --check and --backfill are wired as compiling stubs in this slice: their
-// real behavior (Slice 2b for --check, Slice 4 for --backfill) is not yet
-// implemented. See internal/mapgen.ErrNotImplemented.
+// --backfill remains a compiling stub in this slice: its real behavior
+// (Slice 4) is not yet implemented. See internal/mapgen.ErrNotImplemented.
 func newMapCmd(stdout, stderr io.Writer) *cobra.Command {
 	var (
 		checkFlag    bool
@@ -448,8 +447,19 @@ func newMapCmd(stdout, stderr io.Writer) *cobra.Command {
 				fmt.Fprintln(stdout, "Backfill complete.")
 				return nil
 			case checkFlag:
-				fmt.Fprintln(stderr, "Error: --check is not yet implemented (planned for a follow-up slice).")
-				return fmt.Errorf("map --check: not yet implemented")
+				issues, err := mapgen.Check(projectDir)
+				if err != nil {
+					fmt.Fprintf(stderr, "Error: %v\n", err)
+					return err
+				}
+				if len(issues) == 0 {
+					fmt.Fprintln(stdout, "openspec/map.md is up to date; no issues found.")
+					return nil
+				}
+				for _, issue := range issues {
+					fmt.Fprintf(stderr, "%s: %s: %s\n", issue.File, issue.Kind, issue.Detail)
+				}
+				return fmt.Errorf("map --check: %d issue(s) found", len(issues))
 			default:
 				if err := mapgen.Generate(projectDir); err != nil {
 					fmt.Fprintf(stderr, "Error: %v\n", err)
@@ -461,7 +471,7 @@ func newMapCmd(stdout, stderr io.Writer) *cobra.Command {
 		},
 	}
 
-	cmd.Flags().BoolVar(&checkFlag, "check", false, "Check map.md and links for staleness without writing (not yet implemented)")
+	cmd.Flags().BoolVar(&checkFlag, "check", false, "Check map.md and links for staleness without writing")
 	cmd.Flags().BoolVar(&backfillFlag, "backfill", false, "Rewrite links in archived changes and regenerate map.md (not yet implemented)")
 
 	return cmd
