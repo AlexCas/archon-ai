@@ -35,7 +35,7 @@ this preamble is authored prose and is preserved across every regeneration. See
 |--------|-------|--------|
 | [ai-orchestration-harness](changes/ai-orchestration-harness/proposal.md) |  |  |
 | [issue-16-leader-personality](changes/issue-16-leader-personality/proposal.md) |  |  |
-| [obsidian-vault-specs](changes/obsidian-vault-specs/proposal.md) | apply | in_progress |
+| [obsidian-vault-specs](changes/obsidian-vault-specs/proposal.md) | verify | in_progress |
 | [opencode-phase-subagents](changes/opencode-phase-subagents/proposal.md) | design | in_progress |
 
 ## Archive
@@ -67,22 +67,5 @@ this preamble is authored prose and is preserved across every regeneration. See
 - [ai-orchestration-harness](changes/archive/2026-06-11-ai-orchestration-harness/proposal.md)
 
 ## Backlinks
-- [[...]] ← obsidian-vault-specs
-- [[archon-map]] ← obsidian-vault-specs
-- [[cap]] ← obsidian-vault-specs
-- [[capability]] ← obsidian-vault-specs
 - [[harness-workflow]] ← obsidian-vault-specs
-- [[harness-workflow spec]] ← obsidian-vault-specs
-- [[openspec-convention]] ← obsidian-vault-specs
-- [[sdd-archive]] ← obsidian-vault-specs
-- [[sdd-design]] ← obsidian-vault-specs
-- [[sdd-init]] ← obsidian-vault-specs
-- [[sdd-propose]] ← obsidian-vault-specs
-- [[sdd-spec]] ← obsidian-vault-specs
-- [[sdd-tasks]] ← obsidian-vault-specs
-- [[sdd-verify]] ← obsidian-vault-specs
-- [[spec-vault]] ← obsidian-vault-specs
-- [[spec.md]] ← obsidian-vault-specs
-- [[specs/harness-workflow/spec]] ← obsidian-vault-specs
-- [[wikilinks]] ← obsidian-vault-specs
 <!-- MAP:END -->
