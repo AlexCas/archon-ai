@@ -95,6 +95,10 @@ openspec/changes/{change-name}/
 ```markdown
 # Proposal: {Change Title}
 
+<!-- Link convention: [[capability]] wikilinks for capability identity (e.g.
+     "Implements [[archon-map]]"), relative links for intra-change navigation
+     (e.g. "[design](design.md)"). Full rule: skills/_shared/spec-vault.md. -->
+
 ## Intent
 
 {What problem are we solving? Why does this change need to happen?
@@ -205,6 +209,7 @@ Ready for specs (sdd-spec) or design (sdd-design).
   categories). When `security.enabled` is false, skip this row entirely — no
   change to proposal behavior.
 - **ALWAYS fill in the Capabilities section** — this is the contract with sdd-spec. Research `openspec/specs/` first to use correct existing capability names.
+- **Link convention**: emit `[[capability]]` for capability references and relative links for intra-change navigation. See `skills/_shared/spec-vault.md` ([[spec-vault]]) for the full rule.
 - New Capabilities → each will become `openspec/specs/<name>/spec.md` (new full spec)
 - Modified Capabilities → each will become a delta spec in the change folder
 - If nothing changes at the spec level (pure refactor, config change), explicitly write "None" under both sub-sections — don't leave them as template placeholders

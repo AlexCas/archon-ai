@@ -156,6 +156,10 @@ Why copy-full-then-edit?
 ```markdown
 # Delta for {Domain}
 
+<!-- Link convention: [[capability]] wikilinks for capability identity, relative
+     links for intra-change navigation — e.g. [proposal](../../proposal.md)
+     from changes/{c}/specs/{cap}/spec.md. Full rule: skills/_shared/spec-vault.md. -->
+
 ## ADDED Requirements
 
 ### Requirement: {Requirement Name}
@@ -310,6 +314,7 @@ Ready for design (sdd-design). If design already exists, ready for tasks (sdd-ta
 - If adding new behavior without changing existing behavior → use ADDED, not MODIFIED
 - REMOVED requirements MUST include Reason and SHOULD include Migration when consumers, persisted behavior, docs, or tests are affected
 - RENAMED requirements MUST state both old and new names explicitly and SHOULD include Migration guidance for references/tests/docs
+- **Link convention**: emit `[[capability]]` for capability references and relative links for intra-change navigation (depth from `changes/{c}/specs/{cap}/spec.md` to `changes/{c}/proposal.md` is `../../proposal.md`). See `skills/_shared/spec-vault.md` ([[spec-vault]]) for the full rule.
 - Apply any `rules.specs` from `openspec/config.yaml`
 - **Size budget**: Spec artifact MUST be under 650 words. Prefer requirement tables over narrative descriptions. Each scenario: 3-5 lines max.
 - Return envelope per **Section D** from `skills/_shared/sdd-phase-common.md`.

@@ -88,10 +88,17 @@ Valid transitions:
 
 ### Step 3: Update State (on allowed transition)
 
-Write updated `state.yaml`:
+Write updated `state.yaml` using atomic write (temp file + rename):
 - Set `phase` to the requested phase
 - Set `status` to `in_progress` (unless resuming, keep `in_progress`)
 - Append history entry: `{phase: requested, status: in_progress, ts: <now>}`
+
+Execution order is fixed: `state.yaml` MUST be written (temp+rename complete)
+BEFORE the next sub-step runs. Immediately after, shell out to `archon map` to
+regenerate `openspec/map.md` so it reflects the new phase/status. A regen
+failure (non-zero exit) MUST be surfaced to the orchestrator as a WARNING —
+it MUST NOT roll back the `state.yaml` write or block the recorded transition;
+state is LLM-owned, the map regen is best-effort.
 
 ### Step 3b: Update SESSION_STATUS.md (MANDATORY on every transition)
 

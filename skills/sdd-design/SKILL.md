@@ -79,6 +79,11 @@ openspec/changes/{change-name}/
 ```markdown
 # Design: {Change Title}
 
+<!-- Link convention: [[capability]] wikilinks for capability identity (e.g.
+     "Implements [[archon-map]]"), relative links for intra-change navigation
+     (e.g. "[proposal](proposal.md)" — design.md lives beside proposal.md).
+     Full rule: skills/_shared/spec-vault.md. -->
+
 ## Technical Approach
 
 {Concise description of the overall technical strategy.
@@ -179,6 +184,7 @@ Ready for tasks (sdd-tasks).
 - Use the project's ACTUAL patterns and conventions, not generic best practices
 - If you find the codebase uses a pattern different from what you'd recommend, note it but FOLLOW the existing pattern unless the change specifically addresses it
 - Keep ASCII diagrams simple — clarity over beauty
+- **Link convention**: emit `[[capability]]` for capability references and relative links for intra-change navigation (`design.md` is at `changes/{c}/design.md`, same depth as `proposal.md`). See `skills/_shared/spec-vault.md` ([[spec-vault]]) for the full rule.
 - Apply any `rules.design` from `openspec/config.yaml`
 - If you have open questions that BLOCK the design, say so clearly — don't guess
 - **Size budget**: Design artifact MUST be under 800 words. Architecture decisions as tables (option | tradeoff | decision). Code snippets only for non-obvious patterns.

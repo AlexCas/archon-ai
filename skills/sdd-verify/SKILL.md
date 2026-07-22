@@ -49,6 +49,7 @@ The orchestrator should provide structured status from `skills/_shared/sdd-statu
 - Compare specs first, design second, task completion third.
 - Do not fix issues; report them for the orchestrator/user.
 - Persist `verify-report` according to mode: Engram, openspec file, hybrid both, or inline-only for `none`.
+- **Link convention**: emit `[[capability]]` for capability references and relative links for intra-change navigation (e.g. `[tasks](tasks.md)` — `verify-report.md` is at `changes/{c}/verify-report.md`). See `skills/_shared/spec-vault.md` ([[spec-vault]]) for the full rule.
 - If Strict TDD is active, load `strict-tdd-verify.md` from this skill directory; if inactive, never load it.
 - Return the Section D envelope from `../_shared/sdd-phase-common.md`.
 

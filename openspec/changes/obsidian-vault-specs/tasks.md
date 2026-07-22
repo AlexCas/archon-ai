@@ -190,42 +190,42 @@ Est: <200 lines. Risk: low.
 Verification: manual `archon init` in a tmpdir creates `openspec/map.md` with markers;
 peer review of skill SKILL.md diffs confirms the convention pointer is minimal and correct.
 
-- [ ] **3.1** Update `skills/harness-workflow/SKILL.md` — add one instruction block in Step 3
+- [x] **3.1** Update `skills/harness-workflow/SKILL.md` — add one instruction block in Step 3
   (after the `state.yaml` temp+rename write): shell out to `archon map`; surface failure
   as a warning to the orchestrator; MUST NOT roll back or block the recorded transition.
   Instruction MUST specify execution order: state.yaml written first, then `archon map`.
 
-- [ ] **3.2** Update `skills/sdd-init/SKILL.md` — add one instruction: when scaffolding
+- [x] **3.2** Update `skills/sdd-init/SKILL.md` — add one instruction: when scaffolding
   `openspec/`, call `archon init` (which seeds `map.md`) or note that `createOpenSpecDir`
   is responsible; clarify the skill does not need to create `map.md` directly — the Go
   init step does it.
 
-- [ ] **3.3** Update `internal/initcmd/init.go` `createOpenSpecDir` — after creating
+- [x] **3.3** Update `internal/initcmd/init.go` `createOpenSpecDir` — after creating
   `openspec/changes/`, also write `openspec/map.md` with a minimal preamble +
   `<!-- MAP:START -->\n<!-- MAP:END -->` if the file does not already exist. Use
   temp+rename write. MUST NOT overwrite if file already exists.
 
-- [ ] **3.4** Test `createOpenSpecDir` — extend `internal/initcmd/init_test.go`: assert
+- [x] **3.4** Test `createOpenSpecDir` — extend `internal/initcmd/init_test.go`: assert
   that after `archon init` in a clean `t.TempDir()`, `openspec/map.md` exists and
   contains both marker strings; assert re-running `archon init` leaves existing
   `map.md` unchanged (idempotent).
 
-- [ ] **3.5** Update `skills/sdd-propose/SKILL.md` — add one-line convention pointer:
+- [x] **3.5** Update `skills/sdd-propose/SKILL.md` — add one-line convention pointer:
   emit `[[capability]]` for any capability referenced by name; emit relative links for
   intra-change artifact navigation. Reference `[[spec-vault]]` for the full rule. Include
   a one-line example in the artifact template showing both forms.
 
-- [ ] **3.6** Update `skills/sdd-spec/SKILL.md` — same one-line convention pointer +
+- [x] **3.6** Update `skills/sdd-spec/SKILL.md` — same one-line convention pointer +
   example as 3.5; relative link depth from `changes/{c}/specs/{cap}/spec.md` to
   `changes/{c}/proposal.md` is `../../proposal.md`.
 
-- [ ] **3.7** Update `skills/sdd-design/SKILL.md` — same convention pointer + example;
+- [x] **3.7** Update `skills/sdd-design/SKILL.md` — same convention pointer + example;
   artifact lives at `changes/{c}/design.md` (depth = same dir as proposal).
 
-- [ ] **3.8** Update `skills/sdd-tasks/SKILL.md` — same convention pointer + example;
+- [x] **3.8** Update `skills/sdd-tasks/SKILL.md` — same convention pointer + example;
   artifact lives at `changes/{c}/tasks.md`.
 
-- [ ] **3.9** Update `skills/sdd-verify/SKILL.md` — same convention pointer + example;
+- [x] **3.9** Update `skills/sdd-verify/SKILL.md` — same convention pointer + example;
   artifact lives at `changes/{c}/verify-report.md`.
 
 ---
