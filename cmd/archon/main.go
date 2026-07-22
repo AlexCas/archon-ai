@@ -419,9 +419,6 @@ func newStatusCmd(stdout, stderr io.Writer) *cobra.Command {
 }
 
 // newMapCmd regenerates or checks the openspec vault map (openspec/map.md).
-//
-// --backfill remains a compiling stub in this slice: its real behavior
-// (Slice 4) is not yet implemented. See internal/mapgen.ErrNotImplemented.
 func newMapCmd(stdout, stderr io.Writer) *cobra.Command {
 	var (
 		checkFlag    bool
@@ -440,6 +437,10 @@ func newMapCmd(stdout, stderr io.Writer) *cobra.Command {
 
 			switch {
 			case backfillFlag:
+				changes, _ := mapgen.ArchivedChangeNames(projectDir)
+				for _, c := range changes {
+					fmt.Fprintf(stdout, "Backfilling %s...\n", c.Name)
+				}
 				if err := mapgen.Backfill(projectDir); err != nil {
 					fmt.Fprintf(stderr, "Error: %v\n", err)
 					return err
@@ -472,7 +473,7 @@ func newMapCmd(stdout, stderr io.Writer) *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&checkFlag, "check", false, "Check map.md and links for staleness without writing")
-	cmd.Flags().BoolVar(&backfillFlag, "backfill", false, "Rewrite links in archived changes and regenerate map.md (not yet implemented)")
+	cmd.Flags().BoolVar(&backfillFlag, "backfill", false, "Rewrite boundary-crossing links in archived changes and regenerate map.md")
 
 	return cmd
 }
