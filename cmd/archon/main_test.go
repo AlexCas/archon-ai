@@ -411,3 +411,58 @@ func TestInitCommand_JudgeDefaultsToVerifyModel(t *testing.T) {
 			frontmatterModel, verifyModel)
 	}
 }
+
+// TestMapCommand_GeneratesManagedRegion covers the Slice-2 Generate path only.
+// --check's real behavior is deferred to Slice 2b (see internal/mapgen and
+// newMapCmd); this test only asserts it still compiles and reports "not yet
+// implemented" rather than crashing or silently succeeding.
+func TestMapCommand_GeneratesManagedRegion(t *testing.T) {
+	origDir, _ := os.Getwd()
+	tmpDir := t.TempDir()
+	openspecDir := filepath.Join(tmpDir, "openspec")
+	if err := os.MkdirAll(filepath.Join(openspecDir, "specs", "alpha"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(openspecDir, "specs", "alpha", "spec.md"),
+		[]byte("## Purpose\n\nAlpha capability.\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	var stdout, stderr bytes.Buffer
+	root := newRootCmd(&stdout, &stderr)
+	root.SetArgs([]string{"map"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v, stderr = %s", err, stderr.String())
+	}
+
+	mapContent, err := os.ReadFile(filepath.Join(openspecDir, "map.md"))
+	if err != nil {
+		t.Fatalf("read map.md: %v", err)
+	}
+	if !strings.Contains(string(mapContent), "<!-- MAP:START -->") ||
+		!strings.Contains(string(mapContent), "[[alpha]]") {
+		t.Errorf("map.md missing managed region or capability entry; got:\n%s", mapContent)
+	}
+}
+
+func TestMapCommand_CheckIsStubbed(t *testing.T) {
+	origDir, _ := os.Getwd()
+	tmpDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(tmpDir, "openspec"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	var stdout, stderr bytes.Buffer
+	root := newRootCmd(&stdout, &stderr)
+	root.SetArgs([]string{"map", "--check"})
+	if err := root.Execute(); err == nil {
+		t.Error("Execute() with --check should return an error in this slice (stub)")
+	}
+	if !strings.Contains(stderr.String(), "not yet implemented") {
+		t.Errorf("stderr = %q, want contains 'not yet implemented'", stderr.String())
+	}
+}

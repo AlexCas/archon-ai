@@ -12,6 +12,7 @@ import (
 
 	"github.com/archon-ai/archon/internal/config"
 	"github.com/archon-ai/archon/internal/initcmd"
+	"github.com/archon-ai/archon/internal/mapgen"
 	"github.com/archon-ai/archon/internal/scaffold"
 	"github.com/archon-ai/archon/internal/status"
 	"github.com/archon-ai/archon/internal/tui"
@@ -47,6 +48,7 @@ func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 		newStatusCmd(stdout, stderr),
 		newConfigCmd(stdout, stderr),
 		newTuiCmd(stdout, stderr),
+		newMapCmd(stdout, stderr),
 	)
 
 	return root
@@ -414,6 +416,55 @@ func newStatusCmd(stdout, stderr io.Writer) *cobra.Command {
 			return nil
 		},
 	}
+}
+
+// newMapCmd regenerates or checks the openspec vault map (openspec/map.md).
+//
+// --check and --backfill are wired as compiling stubs in this slice: their
+// real behavior (Slice 2b for --check, Slice 4 for --backfill) is not yet
+// implemented. See internal/mapgen.ErrNotImplemented.
+func newMapCmd(stdout, stderr io.Writer) *cobra.Command {
+	var (
+		checkFlag    bool
+		backfillFlag bool
+	)
+
+	cmd := &cobra.Command{
+		Use:   "map",
+		Short: "Regenerate the openspec vault map (openspec/map.md)",
+		Long:  "Walk openspec/specs and openspec/changes, then regenerate the managed region of openspec/map.md.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			projectDir, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("get working directory: %w", err)
+			}
+
+			switch {
+			case backfillFlag:
+				if err := mapgen.Backfill(projectDir); err != nil {
+					fmt.Fprintf(stderr, "Error: %v\n", err)
+					return err
+				}
+				fmt.Fprintln(stdout, "Backfill complete.")
+				return nil
+			case checkFlag:
+				fmt.Fprintln(stderr, "Error: --check is not yet implemented (planned for a follow-up slice).")
+				return fmt.Errorf("map --check: not yet implemented")
+			default:
+				if err := mapgen.Generate(projectDir); err != nil {
+					fmt.Fprintf(stderr, "Error: %v\n", err)
+					return err
+				}
+				fmt.Fprintln(stdout, "openspec/map.md regenerated.")
+				return nil
+			}
+		},
+	}
+
+	cmd.Flags().BoolVar(&checkFlag, "check", false, "Check map.md and links for staleness without writing (not yet implemented)")
+	cmd.Flags().BoolVar(&backfillFlag, "backfill", false, "Rewrite links in archived changes and regenerate map.md (not yet implemented)")
+
+	return cmd
 }
 
 func newTuiCmd(stdout, stderr io.Writer) *cobra.Command {

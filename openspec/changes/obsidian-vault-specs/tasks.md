@@ -57,20 +57,28 @@ Est: ~350 lines. Risk: **watch budget**. If scan + render + check + tests togeth
 exceed 400 lines of diff, split `--check` and its tests into Slice 2b (separate PR,
 base on Slice 2).
 
+> **Budget outcome**: 2.1–2.9 + 2.14 (Generate path) + 2.15 (minimal) already total
+> **851 changed lines** — well past the 400-line budget on their own, before any
+> `links.go`/`check.go` work. Per the budget guard, tasks 2.10–2.13 and the real
+> `--check` implementation are deferred to **Slice 2b**; `--check`/`--backfill` are
+> wired in `newMapCmd` as compiling stubs that return a "not yet implemented" error.
+> This PR (Slice 2) already exceeds the per-slice budget by itself — see the apply
+> return summary for the split recommendation.
+
 Verification: `go test ./internal/mapgen/...` green; `go test ./cmd/archon/...` green;
 golden file matches; `archon map` idempotency asserted (two runs yield zero diff);
 `archon map --check` exits non-zero on stale/dangling fixture.
 
 ### 2a — Core types and scan
 
-- [ ] **2.1** Create `internal/mapgen/graph.go` — types:
+- [x] **2.1** Create `internal/mapgen/graph.go` — types:
   `Capability{Name, Purpose string}`;
   `Change{Name, Phase, Status string; Archived bool; Date string}`;
   `Edge{FromChange, ToCapability string}`;
   `Graph{Capabilities []Capability; Changes []Change; Edges []Edge}` with method
   `Backlinks() map[string][]string` (cap → sorted change names).
 
-- [ ] **2.2** Create `internal/mapgen/scan.go` — `Scan(fsys fs.FS) (*Graph, error)`:
+- [x] **2.2** Create `internal/mapgen/scan.go` — `Scan(fsys fs.FS) (*Graph, error)`:
   walks `specs/` (each subdir = one `Capability`, identity = `path.Base(dir)`, purpose
   read from first non-heading paragraph or `## Purpose` of `spec.md`);
   walks `changes/` (non-archive dirs = active; `changes/archive/YYYY-MM-DD-{name}` =
@@ -78,14 +86,14 @@ golden file matches; `archon map` idempotency asserted (two runs yield zero diff
   scans each change's `.md` artifacts for `[[capability]]` tokens to build `Edge` list.
   Uses `fs.FS` for testability; matched by `fstest.MapFS` in tests.
 
-- [ ] **2.3** Tests for `scan.go` — fixture `fstest.MapFS` with 2 capabilities, 1 active
+- [x] **2.3** Tests for `scan.go` — fixture `fstest.MapFS` with 2 capabilities, 1 active
   change (state.yaml present), 1 archived change (date prefix). Assert: capability
   names, purpose strings, phase/status from state.yaml, edge extraction from wikilinks,
   archived flag and date.
 
 ### 2b — Render and region splice
 
-- [ ] **2.4** Create `internal/mapgen/render.go` — `Render(g *Graph) string`: deterministic
+- [x] **2.4** Create `internal/mapgen/render.go` — `Render(g *Graph) string`: deterministic
   managed-region body. Sections in order:
   `## Capabilities` (alpha-sorted bullet list `[[cap]] — purpose`);
   `## Active Changes` (markdown table, sorted by name, cols: Change, Phase, Status, with
@@ -94,31 +102,33 @@ golden file matches; `archon map` idempotency asserted (two runs yield zero diff
   `## Backlinks` (per capability, sorted, `[[cap]] ← change1, change2`).
   Pure function of the graph — same graph = same bytes.
 
-- [ ] **2.5** Create `internal/mapgen/region.go` — `Splice(existing, body string) (string, error)`:
+- [x] **2.5** Create `internal/mapgen/region.go` — `Splice(existing, body string) (string, error)`:
   replaces content between `<!-- MAP:START -->` and `<!-- MAP:END -->` with `body`;
   if markers are absent, appends them with body;
   returns `ErrNestedRegion` if more than one pair is found;
   preserves all bytes outside the markers exactly.
 
-- [ ] **2.6** Create `internal/mapgen/mapgen.go` — orchestration entry points:
+- [x] **2.6** Create `internal/mapgen/mapgen.go` — orchestration entry points:
   `Generate(root string) error` (open `openspec/map.md` or create with preamble if
   absent; scan fs; render; splice; temp+rename write);
   `Backfill(root string) error` (stub — wired in Slice 4; panics with "not yet wired"
   or returns `ErrNotImplemented` to allow compile-time linkage in Slice 2).
 
-- [ ] **2.7** Golden test for `render.go` — use `gotest.tools/golden`; fixture graph with
+- [x] **2.7** Golden test for `render.go` — use `gotest.tools/golden`; fixture graph with
   known caps, changes, edges; assert rendered body matches golden file
   `internal/mapgen/testdata/map_body.golden`.
 
-- [ ] **2.8** Idempotency test — call `Generate` twice on a temp dir with the fixture vault;
+- [x] **2.8** Idempotency test — call `Generate` twice on a temp dir with the fixture vault;
   assert the resulting `map.md` bytes are identical after both runs (zero diff).
 
-- [ ] **2.9** Splice edge cases — unit tests: absent markers (appends), existing markers
+- [x] **2.9** Splice edge cases — unit tests: absent markers (appends), existing markers
   (replaces), nested markers (ErrNestedRegion), prose outside markers preserved.
 
 ### 2c — Link resolve and --check
 
 > Split into Slice 2b sub-PR if total Slice 2 diff exceeds 400 lines.
+> **Triggered**: 2.1–2.9 + 2.14 + 2.15 already total 851 changed lines, so 2.10–2.13
+> below are deferred to Slice 2b in full (not started in this apply batch).
 
 - [ ] **2.10** Create `internal/mapgen/links.go` — three functions:
   `FindRelLinks(md string) []Link` (extracts `[text](rel)` link spans; ignores wikilinks
@@ -148,17 +158,27 @@ golden file matches; `archon map` idempotency asserted (two runs yield zero diff
 
 ### 2d — CLI wiring
 
-- [ ] **2.14** Add `newMapCmd` in `cmd/archon/main.go` — mirrors the existing subcommand
+- [x] **2.14** Add `newMapCmd` in `cmd/archon/main.go` — mirrors the existing subcommand
   pattern (`newInitCmd`, `newStatusCmd`). Flags: `--check` (bool), `--backfill` (bool).
   Behavior: no flags → `mapgen.Generate(cwd)`; `--check` → `mapgen.Check(cwd)`, emit
   per-issue report, exit non-zero on any issue; `--backfill` → `mapgen.Backfill(cwd)`
   (Slice 4 fully implements; Slice 2 wires the flag, returns stub error if called).
   Register in `newRootCmd`.
+  **Deviation**: `--check` is a compiling stub in this slice (returns a "not yet
+  implemented" error) rather than calling `mapgen.Check` — `Check` itself is deferred
+  to Slice 2b per the budget guard. `--backfill` behaves as designed (calls the
+  `mapgen.Backfill` stub from 2.6).
 
-- [ ] **2.15** Integration test for `archon map` in `cmd/archon/main_test.go` — seed a
+- [x] **2.15** Integration test for `archon map` in `cmd/archon/main_test.go` — seed a
   `t.TempDir()` with fixture `openspec/`; run `archon map`; assert `map.md` contains
   the expected managed region; run `archon map --check`; assert exit 0; mutate the
   managed region; assert `archon map --check` exits non-zero.
+  **Deviation (minimal, per budget guard)**: implemented `TestMapCommand_GeneratesManagedRegion`
+  (Generate path: managed region + capability entry present) and
+  `TestMapCommand_CheckIsStubbed` (asserts `--check` compiles and returns the stub
+  "not yet implemented" error) instead of the full stale/exit-0/exit-non-zero
+  `--check` assertions — those require the real `Check` implementation, deferred to
+  Slice 2b along with 2.10–2.13.
 
 ---
 
