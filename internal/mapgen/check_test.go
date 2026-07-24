@@ -106,6 +106,57 @@ func TestCheck_DanglingLink_ReadOnly(t *testing.T) {
 	}
 }
 
+func TestCheck_MapMissingRegion(t *testing.T) {
+	root := seedFixtureVault(t)
+	if err := Generate(root); err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+
+	mapPath := filepath.Join(root, "openspec", "map.md")
+	writeFile(t, mapPath, "# Vault Map\n\nHand written, no managed region.\n")
+
+	issues, err := Check(root)
+	if err != nil {
+		t.Fatalf("Check() error = %v", err)
+	}
+	if !hasIssue(issues, "openspec/map.md", IssueMissingRegion) {
+		t.Errorf("Check() = %+v, want IssueMissingRegion for openspec/map.md", issues)
+	}
+}
+
+func TestCheck_MapPartialMarker_ReportedNotCrashed(t *testing.T) {
+	root := seedFixtureVault(t)
+	if err := Generate(root); err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+
+	mapPath := filepath.Join(root, "openspec", "map.md")
+	writeFile(t, mapPath, "# Vault Map\n\n"+mapStart+"\norphaned body\n")
+
+	issues, err := Check(root)
+	if err != nil {
+		t.Fatalf("Check() error = %v, want a reported issue instead of a hard error", err)
+	}
+	if !hasIssue(issues, "openspec/map.md", IssueMissingRegion) {
+		t.Errorf("Check() = %+v, want IssueMissingRegion for partial-marker map.md", issues)
+	}
+}
+
+func TestCheck_OrdinaryFileWithoutRegion_NotFlagged(t *testing.T) {
+	root := seedFixtureVault(t)
+	if err := Generate(root); err != nil {
+		t.Fatalf("Generate() error = %v", err)
+	}
+
+	issues, err := Check(root)
+	if err != nil {
+		t.Fatalf("Check() error = %v", err)
+	}
+	if hasIssue(issues, "openspec/changes/my-feature/design.md", IssueMissingRegion) {
+		t.Errorf("Check() = %+v, want design.md (no managed region, not map.md) not flagged", issues)
+	}
+}
+
 func hasIssue(issues []Issue, file string, kind IssueKind) bool {
 	for _, i := range issues {
 		if filepath.ToSlash(i.File) == file && i.Kind == kind {
