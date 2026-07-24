@@ -1,0 +1,16 @@
+## Capabilities
+- [[alpha]] — Handles the alpha capability.
+- [[beta]] — Handles the beta capability.
+
+## Active Changes
+| Change | Phase | Status |
+|--------|-------|--------|
+| [my-feature](changes/my-feature/proposal.md) | design | in_progress |
+
+## Archive
+### 2026-01-05
+- [old-feature](changes/archive/2026-01-05-old-feature/proposal.md)
+
+## Backlinks
+- [[alpha]] ← my-feature, old-feature
+- [[beta]] ← my-feature

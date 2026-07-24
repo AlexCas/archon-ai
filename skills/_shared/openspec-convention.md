@@ -4,6 +4,7 @@
 
 ```
 openspec/
+├── map.md                   <- Vault entry node: generated overview + backlinks
 ├── config.yaml              <- Project-specific SDD config
 ├── specs/                   <- Source of truth (main specs)
 │   └── {domain}/
@@ -26,12 +27,26 @@ openspec/
 # archived change folder by sdd-archive (see session-status-contract).
 ```
 
+`openspec/map.md` is the vault's entry node — a generated overview of every
+capability and change, with backlinks between them. See `[[spec-vault]]` for the
+full vault root shape, link conventions, and managed-marker policy; this module
+only summarizes the parts skill authors need day to day.
+
+## Link Convention (summary)
+
+One unambiguous rule: use `[[capability]]` wikilinks for capability-identity
+references, and relative markdown links (`[text](path.md)`) for intra-change
+artifact navigation (proposal ↔ spec ↔ design ↔ tasks within the same change
+folder). See `[[spec-vault]]` for the full convention, the managed-marker policy,
+and the `.feature`-stays-put rule.
+
 ## Artifact File Paths
 
 | Skill | Creates / Reads | Path |
 |-------|----------------|------|
 | orchestrator | Creates/Updates | `openspec/changes/{change-name}/state.yaml` |
-| sdd-init | Creates | `openspec/config.yaml`, `openspec/specs/`, `openspec/changes/`, `openspec/changes/archive/` |
+| sdd-init | Creates | `openspec/config.yaml`, `openspec/specs/`, `openspec/changes/`, `openspec/changes/archive/`, `openspec/map.md` |
+| archon map | Regenerates | `openspec/map.md` (managed region) after every phase transition and archive |
 | sdd-explore | Creates (optional) | `openspec/changes/{change-name}/exploration.md` |
 | sdd-propose | Creates | `openspec/changes/{change-name}/proposal.md` |
 | sdd-spec | Creates | `openspec/changes/{change-name}/specs/{domain}/spec.md` + `{domain}.feature` (Gherkin) |

@@ -140,6 +140,23 @@ openspec/changes/{change-name}/
 
 Use today's date in ISO format (e.g., `2026-02-16`).
 
+### Step 3b: Rewrite Vault Links
+
+**IF mode is `openspec` or `hybrid`:** After the folder move, run:
+
+1. `archon map --backfill` — rewrites boundary-crossing relative links inside
+   the moved files (e.g. `../../specs/...` gains a `../` level; plain
+   `archon map` regenerates `map.md` but does not touch archived-file links,
+   so `--backfill` is required here) and regenerates `openspec/map.md`.
+   Wikilinks (`[[capability]]`) need no rewrite — they resolve by name, not
+   by path.
+2. `archon map --check` — verifies no dangling relative links remain.
+3. If `--check` exits non-zero, **STOP**: surface the failure to the
+   orchestrator and do NOT mark the archive complete. Do not proceed to
+   Step 3c or Step 4 until `--check` passes.
+
+**IF mode is `engram` or `none`:** Skip — no `openspec/` filesystem tree exists.
+
 ### Step 3c: Archive SESSION_STATUS.md
 
 The session-level resume file lives at the repository ROOT during work. Finalize it
@@ -164,6 +181,7 @@ If `SESSION_STATUS.md` is absent at the root (e.g., already archived), note it a
 **IF mode is `openspec` or `hybrid`:** Confirm:
 - [ ] Main specs updated correctly
 - [ ] Change folder moved to archive
+- [ ] `archon map --check` passed after the move (Step 3b)
 - [ ] Archive contains all artifacts (proposal, specs, design, tasks, SESSION_STATUS.md)
 - [ ] `SESSION_STATUS.md` no longer exists at the repo root
 - [ ] Archived `tasks.md` has no unchecked implementation tasks, unless the orchestrator explicitly approved archive-time stale-checkbox reconciliation backed by apply-progress/verify-report proof

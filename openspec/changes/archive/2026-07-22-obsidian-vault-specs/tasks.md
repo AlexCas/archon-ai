@@ -1,0 +1,332 @@
+# Tasks: Obsidian-Style Vault for SDD Specs
+
+See [proposal](proposal.md) and [design](design.md).
+Implements [[spec-vault]] and [[archon-map]]; touches [[openspec-convention]],
+[[sdd-init]], [[sdd-archive]], [[harness-workflow]], and the phase skills.
+
+## Review Workload Forecast
+
+| Field | Value |
+|-------|-------|
+| Estimated total changed lines | ~850–950 (across 4 slices) |
+| Per-slice budget | 400 lines |
+| Slice 1 | <150 lines — low risk |
+| Slice 2 | ~350 lines — **watch; split into 2b if exceeded** |
+| Slice 3 | <200 lines — low risk |
+| Slice 4 | ~350 lines (code) + separate data commit — high risk; lands last |
+| Chained PRs strategy | ask-always (confirm before opening each PR) |
+| Playwright | disabled |
+
+---
+
+## Slice 1 — Vault Convention + Docs + Seed Skeleton
+
+**No Go. Skills and markdown only. Unblocks all downstream slices.**
+Est: <150 lines changed. Risk: low.
+
+Verification: `grep -r 'MAP:START' openspec/map.md` passes; peer review of convention prose.
+
+- [x] **1.1** Create `skills/_shared/spec-vault.md` — the single source-of-truth convention doc.
+  Sections: vault root shape (`openspec/map.md` entry node, `specs/`, `changes/archive/`),
+  hybrid link convention (wikilinks for capability identity, relative links for
+  intra-change navigation), managed-marker policy (`<!-- MAP:START/END -->`; at most one
+  pair per file; no nested regions; tooling writes only inside markers), and the
+  `.feature`-stays-put rule (location and content are SDD-spec-phase-only; vault ops
+  must not modify them).
+
+- [x] **1.2** Update `skills/_shared/openspec-convention.md` — three targeted additions:
+  (a) vault root shape paragraph listing `map.md` as entry node with pointer to
+  `[[spec-vault]]` for full link rules; (b) hybrid link convention summary (one
+  unambiguous rule: `[[cap]]` for capability-identity references, relative link for
+  intra-change navigation); (c) extend the artifact file-paths table to include
+  `sdd-init` → creates `openspec/map.md` and `archon map` → regenerates it after
+  every phase transition and archive.
+
+- [x] **1.3** Seed `openspec/map.md` in this repo — create the file with a one-paragraph
+  authored preamble outside the markers and empty managed region:
+  `<!-- MAP:START -->\n<!-- MAP:END -->`. No generated content yet (Go is not wired);
+  markers establish the structure for Slice 2. File MUST NOT be created by Go in this
+  slice — this is a hand-authored seed.
+
+---
+
+## Slice 2 — `internal/mapgen` + `archon map` CLI
+
+**New Go module + subcommand. No skill wiring yet.**
+Est: ~350 lines. Risk: **watch budget**. If scan + render + check + tests together
+exceed 400 lines of diff, split `--check` and its tests into Slice 2b (separate PR,
+base on Slice 2).
+
+> **Budget outcome**: 2.1–2.9 + 2.14 (Generate path) + 2.15 (minimal) already total
+> **851 changed lines** — well past the 400-line budget on their own, before any
+> `links.go`/`check.go` work. Per the budget guard, tasks 2.10–2.13 and the real
+> `--check` implementation are deferred to **Slice 2b**; `--check`/`--backfill` are
+> wired in `newMapCmd` as compiling stubs that return a "not yet implemented" error.
+> This PR (Slice 2) already exceeds the per-slice budget by itself — see the apply
+> return summary for the split recommendation.
+
+Verification: `go test ./internal/mapgen/...` green; `go test ./cmd/archon/...` green;
+golden file matches; `archon map` idempotency asserted (two runs yield zero diff);
+`archon map --check` exits non-zero on stale/dangling fixture.
+
+### 2a — Core types and scan
+
+- [x] **2.1** Create `internal/mapgen/graph.go` — types:
+  `Capability{Name, Purpose string}`;
+  `Change{Name, Phase, Status string; Archived bool; Date string}`;
+  `Edge{FromChange, ToCapability string}`;
+  `Graph{Capabilities []Capability; Changes []Change; Edges []Edge}` with method
+  `Backlinks() map[string][]string` (cap → sorted change names).
+
+- [x] **2.2** Create `internal/mapgen/scan.go` — `Scan(fsys fs.FS) (*Graph, error)`:
+  walks `specs/` (each subdir = one `Capability`, identity = `path.Base(dir)`, purpose
+  read from first non-heading paragraph or `## Purpose` of `spec.md`);
+  walks `changes/` (non-archive dirs = active; `changes/archive/YYYY-MM-DD-{name}` =
+  archived, date parsed from prefix; reads `state.yaml` for `phase`/`status`);
+  scans each change's `.md` artifacts for `[[capability]]` tokens to build `Edge` list.
+  Uses `fs.FS` for testability; matched by `fstest.MapFS` in tests.
+
+- [x] **2.3** Tests for `scan.go` — fixture `fstest.MapFS` with 2 capabilities, 1 active
+  change (state.yaml present), 1 archived change (date prefix). Assert: capability
+  names, purpose strings, phase/status from state.yaml, edge extraction from wikilinks,
+  archived flag and date.
+
+### 2b — Render and region splice
+
+- [x] **2.4** Create `internal/mapgen/render.go` — `Render(g *Graph) string`: deterministic
+  managed-region body. Sections in order:
+  `## Capabilities` (alpha-sorted bullet list `[[cap]] — purpose`);
+  `## Active Changes` (markdown table, sorted by name, cols: Change, Phase, Status, with
+  relative link to `changes/{name}/proposal.md`);
+  `## Archive` (grouped by date desc then name; each entry relative link to archive path);
+  `## Backlinks` (per capability, sorted, `[[cap]] ← change1, change2`).
+  Pure function of the graph — same graph = same bytes.
+
+- [x] **2.5** Create `internal/mapgen/region.go` — `Splice(existing, body string) (string, error)`:
+  replaces content between `<!-- MAP:START -->` and `<!-- MAP:END -->` with `body`;
+  if markers are absent, appends them with body;
+  returns `ErrNestedRegion` if more than one pair is found;
+  preserves all bytes outside the markers exactly.
+
+- [x] **2.6** Create `internal/mapgen/mapgen.go` — orchestration entry points:
+  `Generate(root string) error` (open `openspec/map.md` or create with preamble if
+  absent; scan fs; render; splice; temp+rename write);
+  `Backfill(root string) error` (stub — wired in Slice 4; panics with "not yet wired"
+  or returns `ErrNotImplemented` to allow compile-time linkage in Slice 2).
+
+- [x] **2.7** Golden test for `render.go` — use `gotest.tools/golden`; fixture graph with
+  known caps, changes, edges; assert rendered body matches golden file
+  `internal/mapgen/testdata/map_body.golden`.
+
+- [x] **2.8** Idempotency test — call `Generate` twice on a temp dir with the fixture vault;
+  assert the resulting `map.md` bytes are identical after both runs (zero diff).
+
+- [x] **2.9** Splice edge cases — unit tests: absent markers (appends), existing markers
+  (replaces), nested markers (ErrNestedRegion), prose outside markers preserved.
+
+### 2c — Link resolve and --check
+
+> Split into Slice 2b sub-PR if total Slice 2 diff exceeds 400 lines.
+> **Triggered**: 2.1–2.9 + 2.14 + 2.15 already total 851 changed lines, so 2.10–2.13
+> were deferred to Slice 2b, implemented in a separate apply batch on branch
+> `feat/obsidian-vault-specs-s2check` (stacked on the Slice 3 branch). That batch's
+> diff (`links.go`, `check.go`, their tests, and the real `--check` CLI wiring) is
+> ~500 changed lines on its own — over the 400-line budget by itself; see the apply
+> return summary for the overage detail.
+
+- [x] **2.10** Create `internal/mapgen/links.go` — three functions:
+  `FindRelLinks(md string) []Link` (extracts `[text](rel)` link spans; ignores wikilinks
+  and absolute URLs);
+  `Resolve(srcPath, link string) (target string, ok bool)` (resolves a relative link
+  from srcPath's directory; ok=false if target path does not exist under fsys);
+  `Rewrite(md, oldDir, newDir string) string` (recomputes each relative link so it still
+  resolves to the same absolute file after a directory move; edits only matched spans,
+  never prose).
+
+- [x] **2.11** Create `internal/mapgen/check.go` — `Check(root string) ([]Issue, error)`:
+  walks every `.md` under `openspec/`; for each file, extracts relative links and
+  `Resolve`s each — flag as dangling if target does not exist; also re-renders each
+  managed region and diffs against on-disk content — flag as stale if they differ.
+  Returns `[]Issue{File, Kind, Detail}`. Read-only; never writes.
+
+- [x] **2.12** Tests for `links.go` — fixture markdown strings; assert FindRelLinks extracts
+  only relative links (not wikilinks, not absolute URLs); Resolve returns ok for
+  existing targets, false for missing; Rewrite recomputes depths correctly when moving
+  one level deeper.
+
+- [x] **2.13** Tests for `check.go` — fixtures (real `t.TempDir()` vaults, matching the
+  `Check(root string)`/`Generate(root string)` signature) with:
+  (a) fresh generated map.md → exit 0, no issues;
+  (b) stale managed region (hand-edited) → stale issue reported;
+  (c) dangling relative link in a change artifact → dangling issue reported;
+  assert read-only (no writes to fixture).
+  **Deviation**: uses real temp-dir fixtures instead of `fstest.MapFS` — `Check` takes a
+  `root string` (real filesystem, matching `Generate`), not an `fs.FS`, so the fixture
+  style follows `mapgen_test.go`'s existing `Generate` tests rather than `scan_test.go`'s
+  `fstest.MapFS` style.
+
+### 2d — CLI wiring
+
+- [x] **2.14** Add `newMapCmd` in `cmd/archon/main.go` — mirrors the existing subcommand
+  pattern (`newInitCmd`, `newStatusCmd`). Flags: `--check` (bool), `--backfill` (bool).
+  Behavior: no flags → `mapgen.Generate(cwd)`; `--check` → `mapgen.Check(cwd)`, emit
+  per-issue report, exit non-zero on any issue; `--backfill` → `mapgen.Backfill(cwd)`
+  (Slice 4 fully implements; Slice 2 wires the flag, returns stub error if called).
+  Register in `newRootCmd`.
+  **Update (Slice 2b)**: `--check` now calls the real `mapgen.Check(cwd)` (implemented
+  in 2.11) instead of the Slice-2 stub — prints a per-issue report (File, Kind, Detail)
+  to stderr and exits non-zero on any issue, exit 0 on a clean vault. `--backfill`
+  remains a compiling stub (Slice 4 fully implements; calls the `mapgen.Backfill` stub
+  from 2.6).
+
+- [x] **2.15** Integration test for `archon map` in `cmd/archon/main_test.go` — seed a
+  `t.TempDir()` with fixture `openspec/`; run `archon map`; assert `map.md` contains
+  the expected managed region; run `archon map --check`; assert exit 0; mutate the
+  managed region; assert `archon map --check` exits non-zero.
+  **Update (Slice 2b)**: `TestMapCommand_GeneratesManagedRegion` covers the Generate
+  path (unchanged from Slice 2); `TestMapCommand_Check` replaces the old
+  `TestMapCommand_CheckIsStubbed` stub test — asserts `--check` exits 0 on a freshly
+  generated vault and exits non-zero (with "stale" in stderr) after the managed region
+  is hand-mutated, now that `Check` is implemented.
+
+---
+
+## Slice 3 — Auto-Regen Hook + Link Emission
+
+**Skill/doc edits only. No new Go files; one small addition to `internal/initcmd/init.go`.**
+Est: <200 lines. Risk: low.
+
+Verification: manual `archon init` in a tmpdir creates `openspec/map.md` with markers;
+peer review of skill SKILL.md diffs confirms the convention pointer is minimal and correct.
+
+- [x] **3.1** Update `skills/harness-workflow/SKILL.md` — add one instruction block in Step 3
+  (after the `state.yaml` temp+rename write): shell out to `archon map`; surface failure
+  as a warning to the orchestrator; MUST NOT roll back or block the recorded transition.
+  Instruction MUST specify execution order: state.yaml written first, then `archon map`.
+
+- [x] **3.2** Update `skills/sdd-init/SKILL.md` — add one instruction: when scaffolding
+  `openspec/`, call `archon init` (which seeds `map.md`) or note that `createOpenSpecDir`
+  is responsible; clarify the skill does not need to create `map.md` directly — the Go
+  init step does it.
+
+- [x] **3.3** Update `internal/initcmd/init.go` `createOpenSpecDir` — after creating
+  `openspec/changes/`, also write `openspec/map.md` with a minimal preamble +
+  `<!-- MAP:START -->\n<!-- MAP:END -->` if the file does not already exist. Use
+  temp+rename write. MUST NOT overwrite if file already exists.
+
+- [x] **3.4** Test `createOpenSpecDir` — extend `internal/initcmd/init_test.go`: assert
+  that after `archon init` in a clean `t.TempDir()`, `openspec/map.md` exists and
+  contains both marker strings; assert re-running `archon init` leaves existing
+  `map.md` unchanged (idempotent).
+
+- [x] **3.5** Update `skills/sdd-propose/SKILL.md` — add one-line convention pointer:
+  emit `[[capability]]` for any capability referenced by name; emit relative links for
+  intra-change artifact navigation. Reference `[[spec-vault]]` for the full rule. Include
+  a one-line example in the artifact template showing both forms.
+
+- [x] **3.6** Update `skills/sdd-spec/SKILL.md` — same one-line convention pointer +
+  example as 3.5; relative link depth from `changes/{c}/specs/{cap}/spec.md` to
+  `changes/{c}/proposal.md` is `../../proposal.md`.
+
+- [x] **3.7** Update `skills/sdd-design/SKILL.md` — same convention pointer + example;
+  artifact lives at `changes/{c}/design.md` (depth = same dir as proposal).
+
+- [x] **3.8** Update `skills/sdd-tasks/SKILL.md` — same convention pointer + example;
+  artifact lives at `changes/{c}/tasks.md`.
+
+- [x] **3.9** Update `skills/sdd-verify/SKILL.md` — same convention pointer + example;
+  artifact lives at `changes/{c}/verify-report.md`.
+
+---
+
+## Slice 4 — Archive Link Rewrite + Backfill
+
+**Riskiest slice. Lands last. Ships with fixture-move tests. The 20-change backfill
+is a separate data-only commit reviewable apart from the code changes.**
+Est: ~350 lines (code PR) + backfill diff (data commit). Risk: high.
+
+Verification: `go test ./internal/mapgen/...` green including archive + backfill tests;
+`archon map --check` exits 0 after a fixture archive move; `archon map --backfill` in a
+tmpdir with the 20 archived changes exits 0 and `--check` passes; second `--backfill`
+run produces zero diff.
+
+### 4a — RewriteMove (boundary-edge rewrite)
+
+- [x] **4.1** Implement `internal/mapgen/archive.go` — `RewriteMove(root, oldRel, newRel string) error`:
+  for every `.md` file under the moved folder's new location, call `links.Rewrite` to
+  recompute each relative link so it still resolves to the same absolute target after the
+  directory shift (one level deeper). Wikilinks are never touched. Writes via temp+rename.
+  **Deviation**: also skips any file whose links already resolve from their current
+  location (`hasDanglingRelLink`) — needed so `Backfill` (4.3/4.4) is idempotent; otherwise
+  a second run would double-shift already-correct links.
+
+- [x] **4.2** Fixture-move tests for `archive.go` — a change containing relative
+  `../../specs/foo/spec.md` links; simulate move one level deeper; assert:
+  (a) rewritten link resolves to the same absolute file; (b) wikilinks in the same file
+  are byte-identical after rewrite; (c) `.feature` file content is untouched.
+  **Deviation**: real `t.TempDir()` fixtures instead of `fstest.MapFS` (temp+rename needs a
+  real filesystem) — same deviation as `check_test.go` in 2.13.
+
+### 4b — Implement Backfill
+
+- [x] **4.3** Implement `mapgen.Backfill(root string) error` in `internal/mapgen/mapgen.go` —
+  walks all `openspec/changes/archive/YYYY-MM-DD-{name}/` dirs; for each, calls
+  `RewriteMove` treating the archive path as the current location and the expected
+  pre-archive path as `oldRel`; then calls `Generate` once after the loop. Idempotent: a
+  second run on already-correct files produces no diff (relies on 4.1's dangling-link guard).
+
+- [x] **4.4** Backfill idempotency test — run `Backfill` twice on a fixture with 2 archived
+  changes; capture all file bytes after each run; assert zero diff between run 1 and
+  run 2 outputs.
+
+- [x] **4.5** Wire `archon map --backfill` fully in `cmd/archon/main.go` `newMapCmd` —
+  remove the Slice-2 stub; call `mapgen.Backfill(cwd)`; emit per-change progress lines
+  to stdout; exit non-zero on any error.
+
+### 4c — sdd-archive skill wiring
+
+- [x] **4.6** Update `skills/sdd-archive/SKILL.md` — add a Step 3b after the folder-move
+  instruction (Step 3): (1) invoke `archon map --backfill`; (2) run `archon map --check`;
+  (3) if `--check` exits non-zero, surface failure to orchestrator and abort — do NOT mark
+  archive complete. Wikilinks require no rewrite (documented explicitly to avoid confusion).
+  **Deviation**: `--backfill`, not plain `archon map` — design.md's CLI table says plain
+  `archon map` "ignores archive rewrite"; `--backfill` is idempotent over the whole
+  `changes/archive/` tree, so it is safe to call after every single move.
+
+### 4d — One-shot backfill of this repo's 20 archived changes (data-only commit)
+
+- [x] **4.7** Run `archon map --backfill` against this repo's `openspec/changes/archive/`
+  (the 18 existing archived changes — tasks.md's "~20" estimate was approximate) —
+  executed via `go build -o /tmp/archon ./cmd/archon && /tmp/archon map --backfill` from
+  the repo root. Result: none of the 18 archived changes' `.md` files needed a rewrite
+  (this repo has zero pre-existing boundary-crossing relative links in archived changes —
+  confirmed by grep before running); the only diff is `openspec/map.md`, regenerated by
+  the trailing `Generate` call (its managed region was still the empty seed from Slice 1).
+  **The apply executor does NOT commit** (per apply-phase hard constraint) — the
+  orchestrator must commit this diff as the standalone data-only commit
+  `chore(openspec): backfill vault links in 18 archived changes`, separate from and after
+  the code commit.
+
+- [x] **4.8** Verify backfill result — ran `archon map --check` after the backfill.
+  **Deviation**: exits 1, but the 9 reported issues are all pre-existing dangling-link
+  false positives inside `openspec/changes/obsidian-vault-specs/{design,proposal,
+  exploration,tasks}.md` and two of its `specs/*/spec.md` files — illustrative example
+  link syntax (e.g. `` `[text](../specs/x/spec.md)` ``, a fenced-code rendered `map.md`
+  sample) that `FindRelLinks` can't distinguish from real links. These files are
+  untouched by this slice (verified via `git diff --stat`, empty) and predate it (authored
+  in the design/spec phases). Zero issues touch `openspec/changes/archive/**` or
+  `openspec/map.md` — the actual scope of the backfill. Filed as a known `--check`
+  limitation (code fences aren't excluded), out of scope for Slice 4 to fix.
+
+---
+
+## Cross-Slice Constraints
+
+- `.feature` files are never modified by any task in any slice. Go writes only inside
+  `<!-- MAP:START/END -->` markers and known relative link patterns.
+- All Go writes use temp+rename (atomic, matching existing `internal/` conventions).
+- All Go packages use `fs.FS` injection for scan paths to support `fstest.MapFS` in tests.
+- Tests are co-located with the code they cover (work-unit-commits discipline).
+- Slice 4 code PR and the backfill data commit are separate reviewable units.
+- Slices 2b (`--check` split) and 4 (code vs. data) each have a defined split boundary
+  to stay under the 400-line per-PR budget.

@@ -12,6 +12,7 @@ import (
 
 	"github.com/archon-ai/archon/internal/config"
 	"github.com/archon-ai/archon/internal/initcmd"
+	"github.com/archon-ai/archon/internal/mapgen"
 	"github.com/archon-ai/archon/internal/scaffold"
 	"github.com/archon-ai/archon/internal/status"
 	"github.com/archon-ai/archon/internal/tui"
@@ -47,6 +48,7 @@ func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 		newStatusCmd(stdout, stderr),
 		newConfigCmd(stdout, stderr),
 		newTuiCmd(stdout, stderr),
+		newMapCmd(stdout, stderr),
 	)
 
 	return root
@@ -414,6 +416,66 @@ func newStatusCmd(stdout, stderr io.Writer) *cobra.Command {
 			return nil
 		},
 	}
+}
+
+// newMapCmd regenerates or checks the openspec vault map (openspec/map.md).
+func newMapCmd(stdout, stderr io.Writer) *cobra.Command {
+	var (
+		checkFlag    bool
+		backfillFlag bool
+	)
+
+	cmd := &cobra.Command{
+		Use:   "map",
+		Short: "Regenerate the openspec vault map (openspec/map.md)",
+		Long:  "Walk openspec/specs and openspec/changes, then regenerate the managed region of openspec/map.md.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			projectDir, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("get working directory: %w", err)
+			}
+
+			switch {
+			case backfillFlag:
+				changes, _ := mapgen.ArchivedChangeNames(projectDir)
+				for _, c := range changes {
+					fmt.Fprintf(stdout, "Backfilling %s...\n", c.Name)
+				}
+				if err := mapgen.Backfill(projectDir); err != nil {
+					fmt.Fprintf(stderr, "Error: %v\n", err)
+					return err
+				}
+				fmt.Fprintln(stdout, "Backfill complete.")
+				return nil
+			case checkFlag:
+				issues, err := mapgen.Check(projectDir)
+				if err != nil {
+					fmt.Fprintf(stderr, "Error: %v\n", err)
+					return err
+				}
+				if len(issues) == 0 {
+					fmt.Fprintln(stdout, "openspec/map.md is up to date; no issues found.")
+					return nil
+				}
+				for _, issue := range issues {
+					fmt.Fprintf(stderr, "%s: %s: %s\n", issue.File, issue.Kind, issue.Detail)
+				}
+				return fmt.Errorf("map --check: %d issue(s) found", len(issues))
+			default:
+				if err := mapgen.Generate(projectDir); err != nil {
+					fmt.Fprintf(stderr, "Error: %v\n", err)
+					return err
+				}
+				fmt.Fprintln(stdout, "openspec/map.md regenerated.")
+				return nil
+			}
+		},
+	}
+
+	cmd.Flags().BoolVar(&checkFlag, "check", false, "Check map.md and links for staleness without writing")
+	cmd.Flags().BoolVar(&backfillFlag, "backfill", false, "Rewrite boundary-crossing links in archived changes and regenerate map.md")
+
+	return cmd
 }
 
 func newTuiCmd(stdout, stderr io.Writer) *cobra.Command {
