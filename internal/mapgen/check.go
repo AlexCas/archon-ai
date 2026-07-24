@@ -18,7 +18,20 @@ const (
 	// IssueStale flags a managed region whose on-disk content no longer
 	// matches a fresh regeneration.
 	IssueStale IssueKind = "stale"
+	// IssueMissingRegion flags openspec/map.md (the vault's entry node) when
+	// it has no managed MAP:START/END region at all, or only one of the two
+	// markers (a partial region) — both states mean the vault's map can no
+	// longer be regenerated safely.
+	IssueMissingRegion IssueKind = "missing_region"
 )
+
+// errNoManagedRegion signals that content has neither MAP:START nor
+// MAP:END. Unlike ErrPartialMarker/ErrNestedRegion, this is not a mapgen
+// package-level error: for most .md files it is the normal, expected state
+// (they simply have no managed region), and Check must not flag any file
+// for it — except map.md itself, the vault's entry node, which is required
+// to carry a managed region.
+var errNoManagedRegion = errors.New("mapgen: no MAP:START/MAP:END markers found")
 
 // Issue is a single problem found by Check.
 type Issue struct {
@@ -72,7 +85,9 @@ func Check(root string) ([]Issue, error) {
 		}
 
 		if p == mapPath {
-			if body, ok := extractManagedBody(content); ok {
+			body, extractErr := extractManagedBody(content)
+			switch {
+			case extractErr == nil:
 				g, scanErr := Scan(os.DirFS(openspecDir))
 				if scanErr != nil {
 					return fmt.Errorf("scan openspec: %w", scanErr)
@@ -84,6 +99,22 @@ func Check(root string) ([]Issue, error) {
 						Detail: "managed region does not match a fresh regeneration",
 					})
 				}
+			case errors.Is(extractErr, errNoManagedRegion):
+				issues = append(issues, Issue{
+					File:   rel,
+					Kind:   IssueMissingRegion,
+					Detail: "map.md has no MAP:START/MAP:END managed region",
+				})
+			case errors.Is(extractErr, ErrPartialMarker):
+				issues = append(issues, Issue{
+					File:   rel,
+					Kind:   IssueMissingRegion,
+					Detail: "map.md has only one of the MAP:START/MAP:END markers (partial region)",
+				})
+			// ErrNestedRegion (and any other unexpected error) on map.md is
+			// left unreported here, matching prior behavior — Generate/Check
+			// callers that need the managed body already surface
+			// ErrNestedRegion directly when they call Splice.
 			}
 		}
 
@@ -97,20 +128,19 @@ func Check(root string) ([]Issue, error) {
 }
 
 // extractManagedBody returns the content between the MAP:START/END markers
-// (mirroring Splice's insertion format) and whether exactly one marker pair
-// was found. Nested or absent markers return ok=false.
-func extractManagedBody(content string) (string, bool) {
-	if strings.Count(content, mapStart) != 1 || strings.Count(content, mapEnd) != 1 {
-		return "", false
+// (mirroring Splice's insertion format). It returns errNoManagedRegion if
+// neither marker is present, ErrPartialMarker if exactly one is present, and
+// ErrNestedRegion if either marker repeats or the pair is out of order.
+func extractManagedBody(content string) (string, error) {
+	start, end, err := markerSpan(content)
+	if err != nil {
+		return "", err
 	}
-
-	start := strings.Index(content, mapStart)
-	end := strings.Index(content, mapEnd)
-	if start == -1 || end == -1 || end < start {
-		return "", false
+	if start == -1 {
+		return "", errNoManagedRegion
 	}
 
 	body := content[start+len(mapStart) : end]
 	body = strings.TrimPrefix(body, "\n")
-	return body, true
+	return body, nil
 }

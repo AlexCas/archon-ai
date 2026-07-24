@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
+	"regexp"
 )
 
-// ErrNotImplemented is returned by Backfill in this slice. Backfill is fully
-// wired in Slice 4 of the obsidian-vault-specs change.
-var ErrNotImplemented = errors.New("mapgen: Backfill is not yet implemented")
+// archiveDirRe matches an archived change directory name: a YYYY-MM-DD date
+// prefix followed by the change name, e.g. "2026-01-01-my-feature".
+var archiveDirRe = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}-(.+)$`)
 
 // defaultMap is the seed content used when openspec/map.md does not exist.
 const defaultMap = `# openspec Map
@@ -58,9 +60,56 @@ func Generate(root string) error {
 	return nil
 }
 
-// Backfill will rewrite boundary-crossing relative links in every archived
-// change and regenerate map.md. Not implemented in this slice — see
-// ErrNotImplemented.
+// Backfill rewrites boundary-crossing relative links in every archived
+// change (treating its archive path as current and changes/{name}/ as the
+// pre-archive path), then regenerates map.md. Idempotent: a second run over
+// already-correct files produces zero diff (RewriteMove no-ops once every
+// link already resolves).
 func Backfill(root string) error {
-	return ErrNotImplemented
+	names, err := ArchivedChangeNames(root)
+	if err != nil {
+		return fmt.Errorf("list archived changes: %w", err)
+	}
+
+	for _, name := range names {
+		oldRel := path.Join("changes", name.Name)
+		newRel := path.Join("changes", "archive", name.Dir)
+		if err := RewriteMove(root, oldRel, newRel); err != nil {
+			return fmt.Errorf("rewrite links for %s: %w", name.Dir, err)
+		}
+	}
+
+	return Generate(root)
+}
+
+// ArchivedChange pairs an archive directory entry with the change name
+// parsed out of its YYYY-MM-DD-{name} prefix.
+type ArchivedChange struct {
+	Dir  string // e.g. "2026-01-01-my-feature"
+	Name string // e.g. "my-feature"
+}
+
+// ArchivedChangeNames lists every entry under
+// {root}/openspec/changes/archive/ matching the date-prefixed convention.
+// Returns nil (no error) if the archive directory does not exist. Shared by
+// Backfill and by `archon map --backfill`'s per-change progress reporting.
+func ArchivedChangeNames(root string) ([]ArchivedChange, error) {
+	entries, err := os.ReadDir(filepath.Join(root, "openspec", "changes", "archive"))
+	if err != nil {
+		if errors.Is(err, fs.ErrNotExist) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var changes []ArchivedChange
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		if m := archiveDirRe.FindStringSubmatch(entry.Name()); m != nil {
+			changes = append(changes, ArchivedChange{Dir: entry.Name(), Name: m[1]})
+		}
+	}
+	return changes, nil
 }

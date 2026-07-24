@@ -496,3 +496,53 @@ func TestMapCommand_Check(t *testing.T) {
 		t.Errorf("stderr = %q, want contains %q", stderr2.String(), "stale")
 	}
 }
+
+// TestMapCommand_Backfill covers the real --backfill path: it rewrites a
+// stale boundary-crossing link, reports progress, and leaves --check green.
+func TestMapCommand_Backfill(t *testing.T) {
+	origDir, _ := os.Getwd()
+	tmpDir := t.TempDir()
+	openspecDir := filepath.Join(tmpDir, "openspec")
+	if err := os.MkdirAll(filepath.Join(openspecDir, "specs", "alpha"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(openspecDir, "specs", "alpha", "spec.md"),
+		[]byte("## Purpose\n\nAlpha capability.\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	archiveDir := filepath.Join(openspecDir, "changes", "archive", "2026-01-01-my-feature")
+	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(archiveDir, "proposal.md"),
+		[]byte("Implements [[alpha]]. See [spec](../../specs/alpha/spec.md).\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	var stdout, stderr bytes.Buffer
+	root := newRootCmd(&stdout, &stderr)
+	root.SetArgs([]string{"map", "--backfill"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute() map --backfill error = %v, stderr = %s", err, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "my-feature") {
+		t.Errorf("stdout = %q, want per-change progress mentioning %q", stdout.String(), "my-feature")
+	}
+
+	proposal, err := os.ReadFile(filepath.Join(archiveDir, "proposal.md"))
+	if err != nil {
+		t.Fatalf("read proposal.md: %v", err)
+	}
+	if !strings.Contains(string(proposal), "../../../specs/alpha/spec.md") {
+		t.Errorf("proposal.md = %q, want rewritten link with an extra ../ level", proposal)
+	}
+
+	var checkOut, checkErr bytes.Buffer
+	checkRoot := newRootCmd(&checkOut, &checkErr)
+	checkRoot.SetArgs([]string{"map", "--check"})
+	if err := checkRoot.Execute(); err != nil {
+		t.Fatalf("Execute() map --check after backfill error = %v, stderr = %s", err, checkErr.String())
+	}
+}
