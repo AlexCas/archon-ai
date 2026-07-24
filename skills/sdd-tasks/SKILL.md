@@ -80,6 +80,10 @@ openspec/changes/{change-name}/
 ```markdown
 # Tasks: {Change Title}
 
+<!-- Link convention: [[capability]] wikilinks for capability identity, relative
+     links for intra-change navigation (e.g. "[design](design.md)" — tasks.md
+     lives at changes/{c}/tasks.md). Full rule: skills/_shared/spec-vault.md. -->
+
 ## Review Workload Forecast
 
 | Field | Value |
@@ -260,6 +264,7 @@ Return to the orchestrator:
 - Each task should be completable in ONE session (if a task feels too big, split it)
 - Use hierarchical numbering: 1.1, 1.2, 2.1, 2.2, etc.
 - NEVER include vague tasks like "implement feature" or "add tests"
+- **Link convention**: emit `[[capability]]` for capability references and relative links for intra-change navigation (`tasks.md` is at `changes/{c}/tasks.md`). See `skills/_shared/spec-vault.md` ([[spec-vault]]) for the full rule.
 - Apply any `rules.tasks` from `openspec/config.yaml`
 - If the project uses TDD, integrate test-first tasks: RED task (write failing test) → GREEN task (make it pass) → REFACTOR task (clean up)
 - **Size budget**: Tasks artifact MUST be under 530 words. Each task: 1-2 lines max. Use checklist format, not paragraphs.

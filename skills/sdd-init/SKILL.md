@@ -42,6 +42,7 @@ Run this phase when the orchestrator/user asks to initialize SDD in a project. Y
 - Always build `.atl/skill-registry.md`; also save `skill-registry` to Engram when available.
 - Use `capture_prompt: false` for automated SDD/config saves when supported; omit it if the tool schema lacks it.
 - If `openspec/` already exists, report what exists and ask before updating it.
+- `openspec/map.md` is seeded by the Go init step (`createOpenSpecDir` in `internal/initcmd/init.go`), not hand-created by this skill — rely on it existing after `archon init` runs.
 
 ## Decision Gates
 
