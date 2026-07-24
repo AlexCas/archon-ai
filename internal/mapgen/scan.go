@@ -26,7 +26,12 @@ func Scan(fsys fs.FS) (*Graph, error) {
 		return nil, err
 	}
 
-	changes, edges, err := scanChanges(fsys)
+	capNames := make(map[string]bool, len(caps))
+	for _, c := range caps {
+		capNames[c.Name] = true
+	}
+
+	changes, edges, err := scanChanges(fsys, capNames)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +90,7 @@ func readPurpose(fsys fs.FS, p string) string {
 	return strings.Join(para, " ")
 }
 
-func scanChanges(fsys fs.FS) ([]Change, []Edge, error) {
+func scanChanges(fsys fs.FS, capNames map[string]bool) ([]Change, []Edge, error) {
 	entries, err := fs.ReadDir(fsys, "changes")
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
@@ -101,7 +106,7 @@ func scanChanges(fsys fs.FS) ([]Change, []Edge, error) {
 			continue
 		}
 		if e.Name() == "archive" {
-			archived, archEdges, err := scanArchive(fsys)
+			archived, archEdges, err := scanArchive(fsys, capNames)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -110,7 +115,7 @@ func scanChanges(fsys fs.FS) ([]Change, []Edge, error) {
 			continue
 		}
 
-		c, ce, err := scanChangeDir(fsys, path.Join("changes", e.Name()), e.Name())
+		c, ce, err := scanChangeDir(fsys, path.Join("changes", e.Name()), e.Name(), capNames)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -121,7 +126,7 @@ func scanChanges(fsys fs.FS) ([]Change, []Edge, error) {
 	return changes, edges, nil
 }
 
-func scanArchive(fsys fs.FS) ([]Change, []Edge, error) {
+func scanArchive(fsys fs.FS, capNames map[string]bool) ([]Change, []Edge, error) {
 	entries, err := fs.ReadDir(fsys, "changes/archive")
 	if err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
@@ -141,7 +146,7 @@ func scanArchive(fsys fs.FS) ([]Change, []Edge, error) {
 			continue
 		}
 		date, name := m[1], m[2]
-		c, ce, err := scanChangeDir(fsys, path.Join("changes", "archive", e.Name()), name)
+		c, ce, err := scanChangeDir(fsys, path.Join("changes", "archive", e.Name()), name, capNames)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -155,11 +160,11 @@ func scanArchive(fsys fs.FS) ([]Change, []Edge, error) {
 
 // scanChangeDir reads state.yaml for phase/status and extracts distinct
 // [[capability]] edges from every markdown artifact under dir.
-func scanChangeDir(fsys fs.FS, dir, name string) (Change, []Edge, error) {
+func scanChangeDir(fsys fs.FS, dir, name string, capNames map[string]bool) (Change, []Edge, error) {
 	phase, status := readState(fsys, path.Join(dir, "state.yaml"))
 	c := Change{Name: name, Phase: phase, Status: status}
 
-	edges, err := scanEdges(fsys, dir, name)
+	edges, err := scanEdges(fsys, dir, name, capNames)
 	if err != nil {
 		return Change{}, nil, err
 	}
@@ -183,7 +188,14 @@ func readState(fsys fs.FS, p string) (phase, status string) {
 	return s.Phase, s.Status
 }
 
-func scanEdges(fsys fs.FS, dir, changeName string) ([]Edge, error) {
+// scanEdges extracts distinct [[capability]] wikilink edges from every
+// markdown artifact under dir. Wikilink syntax inside fenced code blocks or
+// inline code spans (illustrative examples in prose) is masked out first, so
+// it is never mistaken for a real capability reference. A token only becomes
+// an Edge when it names a capability that actually exists in capNames —
+// unknown tokens (typos, examples of the wikilink syntax itself, etc.) are
+// dropped.
+func scanEdges(fsys fs.FS, dir, changeName string, capNames map[string]bool) ([]Edge, error) {
 	var edges []Edge
 	seen := make(map[string]bool)
 
@@ -198,8 +210,12 @@ func scanEdges(fsys fs.FS, dir, changeName string) ([]Edge, error) {
 		if err != nil {
 			return err
 		}
-		for _, m := range wikilinkRe.FindAllStringSubmatch(string(data), -1) {
+		masked := maskCodeRegions(string(data))
+		for _, m := range wikilinkRe.FindAllStringSubmatch(masked, -1) {
 			cap := strings.TrimSpace(m[1])
+			if !capNames[cap] {
+				continue
+			}
 			if seen[cap] {
 				continue
 			}

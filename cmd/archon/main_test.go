@@ -412,10 +412,9 @@ func TestInitCommand_JudgeDefaultsToVerifyModel(t *testing.T) {
 	}
 }
 
-// TestMapCommand_GeneratesManagedRegion covers the Slice-2 Generate path only.
-// --check's real behavior is deferred to Slice 2b (see internal/mapgen and
-// newMapCmd); this test only asserts it still compiles and reports "not yet
-// implemented" rather than crashing or silently succeeding.
+// TestMapCommand_GeneratesManagedRegion covers the Generate path: running
+// `archon map` seeds map.md with a managed region containing the scanned
+// capability.
 func TestMapCommand_GeneratesManagedRegion(t *testing.T) {
 	origDir, _ := os.Getwd()
 	tmpDir := t.TempDir()
@@ -447,22 +446,103 @@ func TestMapCommand_GeneratesManagedRegion(t *testing.T) {
 	}
 }
 
-func TestMapCommand_CheckIsStubbed(t *testing.T) {
+// TestMapCommand_Check covers the real --check path: it exits 0 on a freshly
+// generated vault and non-zero after the managed region is hand-mutated.
+func TestMapCommand_Check(t *testing.T) {
 	origDir, _ := os.Getwd()
 	tmpDir := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(tmpDir, "openspec"), 0o755); err != nil {
+	openspecDir := filepath.Join(tmpDir, "openspec")
+	if err := os.MkdirAll(filepath.Join(openspecDir, "specs", "alpha"), 0o755); err != nil {
 		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(openspecDir, "specs", "alpha", "spec.md"),
+		[]byte("## Purpose\n\nAlpha capability.\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	var genOut, genErr bytes.Buffer
+	genRoot := newRootCmd(&genOut, &genErr)
+	genRoot.SetArgs([]string{"map"})
+	if err := genRoot.Execute(); err != nil {
+		t.Fatalf("Execute() map error = %v, stderr = %s", err, genErr.String())
+	}
+
+	var stdout, stderr bytes.Buffer
+	root := newRootCmd(&stdout, &stderr)
+	root.SetArgs([]string{"map", "--check"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute() map --check on fresh vault error = %v, stderr = %s", err, stderr.String())
+	}
+
+	mapPath := filepath.Join(openspecDir, "map.md")
+	data, err := os.ReadFile(mapPath)
+	if err != nil {
+		t.Fatalf("read map.md: %v", err)
+	}
+	mutated := strings.Replace(string(data), "<!-- MAP:END -->", "hand-edited\n<!-- MAP:END -->", 1)
+	if err := os.WriteFile(mapPath, []byte(mutated), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	var stdout2, stderr2 bytes.Buffer
+	root2 := newRootCmd(&stdout2, &stderr2)
+	root2.SetArgs([]string{"map", "--check"})
+	if err := root2.Execute(); err == nil {
+		t.Error("Execute() map --check after mutating managed region should return an error")
+	}
+	if !strings.Contains(stderr2.String(), "stale") {
+		t.Errorf("stderr = %q, want contains %q", stderr2.String(), "stale")
+	}
+}
+
+// TestMapCommand_Backfill covers the real --backfill path: it rewrites a
+// stale boundary-crossing link, reports progress, and leaves --check green.
+func TestMapCommand_Backfill(t *testing.T) {
+	origDir, _ := os.Getwd()
+	tmpDir := t.TempDir()
+	openspecDir := filepath.Join(tmpDir, "openspec")
+	if err := os.MkdirAll(filepath.Join(openspecDir, "specs", "alpha"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(openspecDir, "specs", "alpha", "spec.md"),
+		[]byte("## Purpose\n\nAlpha capability.\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	archiveDir := filepath.Join(openspecDir, "changes", "archive", "2026-01-01-my-feature")
+	if err := os.MkdirAll(archiveDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(archiveDir, "proposal.md"),
+		[]byte("Implements [[alpha]]. See [spec](../../specs/alpha/spec.md).\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
 	}
 	os.Chdir(tmpDir)
 	defer os.Chdir(origDir)
 
 	var stdout, stderr bytes.Buffer
 	root := newRootCmd(&stdout, &stderr)
-	root.SetArgs([]string{"map", "--check"})
-	if err := root.Execute(); err == nil {
-		t.Error("Execute() with --check should return an error in this slice (stub)")
+	root.SetArgs([]string{"map", "--backfill"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute() map --backfill error = %v, stderr = %s", err, stderr.String())
 	}
-	if !strings.Contains(stderr.String(), "not yet implemented") {
-		t.Errorf("stderr = %q, want contains 'not yet implemented'", stderr.String())
+	if !strings.Contains(stdout.String(), "my-feature") {
+		t.Errorf("stdout = %q, want per-change progress mentioning %q", stdout.String(), "my-feature")
+	}
+
+	proposal, err := os.ReadFile(filepath.Join(archiveDir, "proposal.md"))
+	if err != nil {
+		t.Fatalf("read proposal.md: %v", err)
+	}
+	if !strings.Contains(string(proposal), "../../../specs/alpha/spec.md") {
+		t.Errorf("proposal.md = %q, want rewritten link with an extra ../ level", proposal)
+	}
+
+	var checkOut, checkErr bytes.Buffer
+	checkRoot := newRootCmd(&checkOut, &checkErr)
+	checkRoot.SetArgs([]string{"map", "--check"})
+	if err := checkRoot.Execute(); err != nil {
+		t.Fatalf("Execute() map --check after backfill error = %v, stderr = %s", err, checkErr.String())
 	}
 }

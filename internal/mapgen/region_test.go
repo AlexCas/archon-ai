@@ -48,3 +48,23 @@ func TestSplice_NestedRegion(t *testing.T) {
 		t.Errorf("Splice() error = %v, want ErrNestedRegion", err)
 	}
 }
+
+func TestSplice_PartialMarker_StartOnly(t *testing.T) {
+	// A user hand-editing the authored preamble accidentally deleted the
+	// MAP:END marker. Appending a fresh pair here would leave two
+	// MAP:START markers behind — a corruption that then permanently trips
+	// ErrNestedRegion on every later call. Must fail loudly instead.
+	existing := "# Preamble\n\n" + mapStart + "\norphaned body\n"
+	_, err := Splice(existing, "body\n")
+	if !errors.Is(err, ErrPartialMarker) {
+		t.Errorf("Splice() error = %v, want ErrPartialMarker", err)
+	}
+}
+
+func TestSplice_PartialMarker_EndOnly(t *testing.T) {
+	existing := "# Preamble\n\norphaned body\n" + mapEnd + "\n"
+	_, err := Splice(existing, "body\n")
+	if !errors.Is(err, ErrPartialMarker) {
+		t.Errorf("Splice() error = %v, want ErrPartialMarker", err)
+	}
+}
