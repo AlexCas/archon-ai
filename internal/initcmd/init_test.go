@@ -525,6 +525,73 @@ func TestRun_StillWritesTemplateConfigRollback(t *testing.T) {
 	}
 }
 
+// TestRun_SeedsMapMD covers the sdd-init spec scenarios "Init creates map.md
+// with managed markers" and "Init does not overwrite an existing map.md":
+// createOpenSpecDir must seed openspec/map.md with both MAP markers, and a
+// second init run must leave existing map.md content (even hand-edited)
+// byte-identical.
+func TestRun_SeedsMapMD(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	homeDir := filepath.Join(tmpDir, "home")
+	projectDir := filepath.Join(tmpDir, "project")
+
+	if err := os.MkdirAll(homeDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+
+	embeddedFS := fstest.MapFS{
+		"sdd-init/SKILL.md": &fstest.MapFile{
+			Data: []byte("---\nname: sdd-init\n---\n# Init"),
+		},
+	}
+
+	opts := Options{
+		HomeDir:    homeDir,
+		ProjectDir: projectDir,
+		Agent:      "claude",
+		EmbeddedFS: embeddedFS,
+	}
+
+	if _, err := Run(opts); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	mapPath := filepath.Join(projectDir, "openspec", "map.md")
+	data, err := os.ReadFile(mapPath)
+	if err != nil {
+		t.Fatalf("map.md not created: %v", err)
+	}
+
+	content := string(data)
+	if !strings.Contains(content, "<!-- MAP:START -->") || !strings.Contains(content, "<!-- MAP:END -->") {
+		t.Errorf("map.md missing MAP markers, got:\n%s", content)
+	}
+
+	// Simulate hand-edited/regenerated content, then re-run init: the
+	// existing file must be left byte-identical (init never overwrites it).
+	custom := content + "\n<!-- hand-edited addition -->\n"
+	if err := os.WriteFile(mapPath, []byte(custom), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	opts.OverwriteTemplate = true
+	if _, err := Run(opts); err != nil {
+		t.Fatalf("second Run() error = %v", err)
+	}
+
+	after, err := os.ReadFile(mapPath)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if string(after) != custom {
+		t.Errorf("map.md was overwritten on re-init:\ngot:\n%s\nwant:\n%s", after, custom)
+	}
+}
+
 // TestBuildConfig_SecurityFlag covers spec scenario "Init flag enables the gate"
 // and "Init without flag leaves security off". Same for the pre-existing
 // Playwright gap: both flags must be faithfully forwarded to the config.

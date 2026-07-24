@@ -73,6 +73,59 @@ func TestScan(t *testing.T) {
 	}
 }
 
+func TestScan_WikilinkMaskingAndCapabilityFilter(t *testing.T) {
+	fsys := fstest.MapFS{
+		"specs/realcap/spec.md": &fstest.MapFile{Data: []byte(
+			"# realcap Specification\n\n## Purpose\n\nHandles the real capability.\n",
+		)},
+		"changes/my-feature/state.yaml": &fstest.MapFile{Data: []byte(
+			"phase: design\nstatus: in_progress\n",
+		)},
+		"changes/my-feature/proposal.md": &fstest.MapFile{Data: []byte(
+			"Implements [[realcap]] end to end.\n\n" +
+				"Use inline code like `[[not-a-cap]]` for illustration.\n\n" +
+				"```\n[[not-a-cap]]\n```\n",
+		)},
+	}
+
+	g, err := Scan(fsys)
+	if err != nil {
+		t.Fatalf("Scan() error = %v", err)
+	}
+
+	if len(g.Edges) != 1 || g.Edges[0].ToCapability != "realcap" || g.Edges[0].FromChange != "my-feature" {
+		t.Fatalf("Edges = %+v, want exactly one edge my-feature -> realcap", g.Edges)
+	}
+}
+
+func TestScan_UnknownCapabilityInProse_NoEdge(t *testing.T) {
+	// Unlike TestScan_WikilinkMaskingAndCapabilityFilter (which only places
+	// the unknown token inside masked code regions, so removing the
+	// `!capNames[cap]` filter wouldn't be caught), this places the unknown
+	// token in plain prose: only the capability-existence filter — not code
+	// masking — keeps it from becoming an edge.
+	fsys := fstest.MapFS{
+		"specs/realcap/spec.md": &fstest.MapFile{Data: []byte(
+			"# realcap Specification\n\n## Purpose\n\nHandles the real capability.\n",
+		)},
+		"changes/my-feature/state.yaml": &fstest.MapFile{Data: []byte(
+			"phase: design\nstatus: in_progress\n",
+		)},
+		"changes/my-feature/proposal.md": &fstest.MapFile{Data: []byte(
+			"Implements [[realcap]] and also references [[not-a-real-capability]] in prose.\n",
+		)},
+	}
+
+	g, err := Scan(fsys)
+	if err != nil {
+		t.Fatalf("Scan() error = %v", err)
+	}
+
+	if len(g.Edges) != 1 || g.Edges[0].ToCapability != "realcap" || g.Edges[0].FromChange != "my-feature" {
+		t.Fatalf("Edges = %+v, want exactly one edge my-feature -> realcap (unknown-capability prose token dropped)", g.Edges)
+	}
+}
+
 func TestScan_EmptyVault(t *testing.T) {
 	g, err := Scan(fstest.MapFS{})
 	if err != nil {
