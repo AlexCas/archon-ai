@@ -178,6 +178,23 @@ produced by `sdd-spec`:
 Treat the generated specs as part of this work unit's diff (commit them with the
 behavior they cover). If `playwright.enabled: false`, skip this step entirely.
 
+### Step 4c: Run Impeccable Design Verbs (conditional, frontend changes only)
+
+**Only if `.archon/config.yaml` → `impeccable.enabled: true`** AND this batch's
+tasks touch frontend-affecting files (UI components, styles, templates,
+client-side routes). Load `skills/impeccable/SKILL.md` for the full contract.
+
+- Run the relevant `/impeccable <verb>` (e.g. `craft`, `polish`, `harden`,
+  `animate`) as **agent slash commands inside this session** — this is
+  AGENT-BEHAVIORAL, NOT an `npx` shell-out. Do not attempt to shell out to
+  `/impeccable`; only `install`/`update`/`detect` are real `npx` commands.
+- Apply the verbs to the frontend files you just changed or created in this
+  batch.
+- Note which verbs were run (or that none applied) in the return summary.
+
+If `impeccable.enabled: false`, or the batch has no frontend-affecting files,
+skip this step entirely.
+
 ### Step 5: Mark Tasks Complete
 
 Update `tasks.md` — change `- [ ]` to `- [x]` for completed tasks:
@@ -269,6 +286,7 @@ If none, say "None."}
 - When applying `size:exception`, state it explicitly in apply-progress and the return summary
 - NEVER implement tasks that weren't assigned to you
 - When `playwright.enabled` and the project is web, GENERATE Playwright specs from the Gherkin `.feature` files (Step 4b); never execute them here
+- When `impeccable.enabled`, run Impeccable design verbs on frontend-affecting changes during apply (Step 4c)
 - **Commit attribution**: if you create commits, they are authored SOLELY by the user's git account. NEVER add `Co-Authored-By` trailers, "Generated with" lines, or any agent/tool attribution to commit messages or PR bodies.
 - Skill loading is handled in Step 1 — follow any loaded skills strictly when writing code
 - Apply any `rules.apply` from `openspec/config.yaml`

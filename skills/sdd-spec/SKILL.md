@@ -109,6 +109,13 @@ Rules for `.feature` files:
 - Tag scenarios for traceability and selective execution, e.g. `@happy`, `@edge`,
   `@error`, `@web` for browser-facing flows that Playwright will exercise, and
   `@security` for abuse-case scenarios when `security.enabled` is true.
+- **Impeccable annotation (conditional, prose not tag)**: when `impeccable.enabled`
+  is true and a requirement concerns frontend design-language quality (visual
+  consistency, brand voice, component polish), add a short `@design` prose note
+  in the scenario or requirement text (e.g. "@design: covered by the Impeccable
+  gate") instead of a new Gherkin tag — this keeps the annotation lightweight and
+  avoids coupling a new hard tag to the `@web` selector Playwright already owns.
+  When `impeccable.enabled` is false, omit this note entirely.
 - Every requirement in `spec.md` MUST map to at least one scenario in the
   `.feature` file. Keep the scenario names identical in both files.
 
@@ -301,6 +308,11 @@ Ready for design (sdd-design). If design already exists, ready for tasks (sdd-ta
   case MUST describe the malicious or prohibited action and use RFC 2119 `MUST NOT`
   for the prohibition. Example: `Then the system MUST NOT process the command`.
   When `security.enabled` is false, do not emit `@security` tags — no change to
+  spec behavior.
+- **Impeccable design note (conditional)**: If `impeccable.enabled` is true, flag
+  frontend design-language requirements with a lightweight `@design` prose note
+  (not a new hard Gherkin tag) so they can be selected by the Impeccable gate. See
+  `skills/impeccable/SKILL.md`. When `impeccable.enabled` is false, no change to
   spec behavior.
 - ALWAYS use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY) for requirement strength
 - Read the proposal's **Capabilities section** first — it tells you exactly which spec files to create

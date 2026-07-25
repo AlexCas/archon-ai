@@ -10,7 +10,7 @@ metadata:
 
 ## Purpose
 
-Orchestrate the judge phase: invoke `judgment-day` for dual adversarial review, optionally run mutation testing and Playwright E2E tests as quality gates, and automatically re-run `sdd-apply` with structured feedback on failure (up to 3 retries).
+Orchestrate the judge phase: invoke `judgment-day` for dual adversarial review, optionally run mutation testing, Playwright E2E tests, and the Impeccable design-language detection gate as quality gates, and automatically re-run `sdd-apply` with structured feedback on failure (up to 3 retries).
 
 ## Activation Contract
 
@@ -20,12 +20,13 @@ The FIRST action on activation is to read the judge flag (Step 0). If the judge 
 
 ## Hard Rules
 
-- The judge phase is configurable. ALWAYS read `.archon/config.yaml` → `judge.enabled` BEFORE doing anything else. Default: `true` (run when the section is absent). When `judge.enabled: false`, SKIP the entire judge phase — do NOT invoke `judgment-day`, mutation testing, or Playwright — and return `skipped` so the orchestrator advances from verify straight to archive.
+- The judge phase is configurable. ALWAYS read `.archon/config.yaml` → `judge.enabled` BEFORE doing anything else. Default: `true` (run when the section is absent). When `judge.enabled: false`, SKIP the entire judge phase — do NOT invoke `judgment-day`, mutation testing, Playwright, or the Impeccable gate — and return `skipped` so the orchestrator advances from verify straight to archive.
 - ALWAYS delegate the dual review to the archon-judge subagent. Do NOT invoke judgment-day inline on the orchestrator's model.
 - ALWAYS invoke `sdd-apply` for re-fixes. Do NOT apply fixes inline.
 - ALWAYS invoke `sdd-verify` after each re-apply before re-judging.
 - Mutation testing is OPT-IN. Read `.archon/config.yaml` → `mutation_testing.enabled`. Default: `false`. Skip entirely when disabled.
 - Playwright E2E is OPT-IN and runs only for web projects. ALWAYS read `.archon/config.yaml` → `playwright.enabled` to decide whether to run it. Default: `false`. Skip entirely when disabled. These tests run AFTER verify and after `judgment-day` passes.
+- The Impeccable detection gate is OPT-IN. ALWAYS read `.archon/config.yaml` → `impeccable.enabled` to decide whether to run it. Default: `false`. Skip entirely when disabled — no invocation, no "### Impeccable Gate" section, no result-table column. When enabled, it runs `npx impeccable detect --json .` AFTER `judgment-day` passes, parses the JSON payload for pass/fail (never relying on exit code alone), and applies `impeccable.severity` to decide whether deterministic violations or LLM-critique findings block the gate.
 - Security gate is OPT-IN. Read `.archon/config.yaml` → `security.enabled`. Default: `false`. When `security.enabled` is true, treat any unresolved `@security` CRITICAL coverage gap (reported by `sdd-verify`) as a failing gate — do NOT advance to archive. When `security.enabled` is false, skip this check entirely and count it as `pass`.
 - Maximum 3 retry cycles. The 4th failure returns `blocked` with `max_retries_exceeded: true`.
 - NEVER skip the re-verify step between re-apply and re-judge.
@@ -68,10 +69,17 @@ playwright:
   enabled: false
   test_dir: e2e
   base_url: http://localhost:3000
+impeccable:
+  enabled: false
+  auto_install: false
+  severity: block-deterministic
+  product_path: ""
+  design_path: ""
 ```
 
 - `judge.enabled` controls whether the whole phase runs (see Step 0). Default: `true`.
 - If the file or either gate section is missing, default that gate to `enabled: false`.
+- `impeccable.enabled` gates Step 3c. Default: `false`. If the section is missing, treat it as disabled.
 
 ### Step 2: Delegate Dual Review to archon-judge
 
@@ -114,17 +122,60 @@ the harness flow.
 
 **If `playwright.enabled: false`:** Skip this step entirely.
 
+### Step 3c: Impeccable Detection Gate (conditional)
+
+**Only if `impeccable.enabled: true` AND `judgment-day` passed:**
+
+This is the design-language quality gate backed by the external `npx impeccable`
+tool (see the `impeccable` skill). It runs AFTER verify and AFTER judgment-day,
+mirroring the Playwright gate's placement in the flow.
+
+1. Read `.archon/config.yaml` → `impeccable.enabled`. If not `true` → skip entirely
+   (no invocation, no "### Impeccable Gate" section, no result-table column).
+2. Check that `node` and `npx` are on PATH in the target project. Missing → return
+   `blocked` with the actionable message (see below). Never silent-pass.
+3. If `auto_install: true` AND Impeccable is not yet installed → run
+   `npx impeccable install` once, then continue. If `auto_install: false` and the
+   package is missing (npx reports not-found) → return `blocked` with the install
+   instruction (package-missing variant, below). No silent install.
+4. Run `npx impeccable detect --json .` from the target-project root.
+5. Interpret results — do NOT rely on exit code for pass/fail:
+   - Parse the `--json` payload into deterministic-detector violations vs
+     LLM-critique findings.
+   - Exit code is used ONLY to detect tool crash / not-found → `blocked`.
+   - Unrecognized/unparseable JSON → treat findings as advisory, note the parse
+     failure, do NOT hard-fail.
+6. Apply `impeccable.severity`:
+   - `block-deterministic` (default): deterministic violations > 0 → gate `fail`;
+     LLM-critique findings are reported as advisory (non-blocking).
+   - `block-all`: any finding from either category (deterministic or LLM-critique)
+     → gate `fail`.
+   - `advisory`: all findings are advisory only; gate always returns `pass`.
+7. Emit the "### Impeccable Gate" section (see Output Contract).
+8. Fold the gate status into the overall judge result table as a new column;
+   `fail`/`blocked` degrade the overall verdict exactly like the Playwright column.
+
+**Blocked messages (verbatim):**
+
+- Node/npx missing:
+  `Impeccable requires Node.js and npx. Install Node.js or set impeccable.enabled: false to skip this gate.`
+- Package missing, `auto_install: false`:
+  `Impeccable is not installed. Run 'npx impeccable install' (or set impeccable.auto_install: true), or set impeccable.enabled: false to skip this gate.`
+
+**If `impeccable.enabled: false`:** Skip this step entirely.
+
 ### Step 4: Evaluate Result
 
 A gate that is disabled or skipped counts as `pass` for that column. Overall `pass`
 requires judgment-day to pass AND every enabled gate to pass.
 
-| judgment-day | mutation gate | playwright gate | result |
-|---|---|---|---|
-| pass | pass (or skipped) | pass (or skipped) | `pass` → advance to archive |
-| pass | fail | any | `fail` → enter re-apply loop |
-| pass | pass (or skipped) | fail | `fail` → enter re-apply loop |
-| fail | any | any | `fail` → enter re-apply loop |
+| judgment-day | mutation gate | playwright gate | impeccable gate | result |
+|---|---|---|---|---|
+| pass | pass (or skipped) | pass (or skipped) | pass (or skipped) | `pass` → advance to archive |
+| pass | fail | any | any | `fail` → enter re-apply loop |
+| pass | pass (or skipped) | fail | any | `fail` → enter re-apply loop |
+| pass | pass (or skipped) | pass (or skipped) | fail or blocked | `fail` → enter re-apply loop |
+| fail | any | any | any | `fail` → enter re-apply loop |
 
 ### Step 5: On Pass
 
@@ -216,6 +267,15 @@ Return `## Judge Phase Report`:
 - Status: {passed | failed | skipped}
 - Scenarios: {passed}/{total} (if run)
 
+### Impeccable Gate
+- Status: {pass | fail | blocked | skipped}
+- Severity mode: {block-deterministic | block-all | advisory} (if run)
+- Deterministic violations: {n} (if run)
+- Advisory findings (LLM critique): {n} (if run)
+- Details:
+  - {rule id / description per violation, when n > 0}
+- (blocked only) Reason: {node/npx missing | package not installed | detect crashed}
+
 ### Accumulated Issues
 {running total across all retry cycles}
 
@@ -240,10 +300,13 @@ If blocked:
 | `judgment-day` skill unavailable | `blocked` — report: `judgment-day skill not found` |
 | `sdd-apply` fails during re-apply | Count as retry attempt; include failure in next feedback |
 | `sdd-verify` fails after re-apply | Include verify failures in feedback; count as retry attempt |
-| `.archon/config.yaml` missing | Default to `judge.enabled: true`, `mutation_testing.enabled: false`, `playwright.enabled: false`; warn in report |
+| `.archon/config.yaml` missing | Default to `judge.enabled: true`, `mutation_testing.enabled: false`, `playwright.enabled: false`, `impeccable.enabled: false`; warn in report |
 | Mutation tool not installed | `blocked` — report: `{tool} not found in PATH — install or disable mutation_testing` |
 | Playwright not installed | `blocked` — report: `playwright not found — install (npx playwright install) or disable playwright` |
 | App/dev server unreachable at base_url | `blocked` — report: `cannot reach {base_url} — start the app or set playwright.base_url` |
+| Impeccable: node/npx missing | `blocked` — report: `Impeccable requires Node.js and npx. Install Node.js or set impeccable.enabled: false to skip this gate.` |
+| Impeccable: package not installed + `auto_install: false` | `blocked` — report: `Impeccable is not installed. Run 'npx impeccable install' (or set impeccable.auto_install: true), or set impeccable.enabled: false to skip this gate.` |
+| Impeccable: config absent | Default to `impeccable.enabled: false` (gate skipped) |
 | `state.yaml` missing or corrupt | `blocked` — report: `state.yaml not found — run harness-workflow first` |
 
 ## Rules
@@ -254,6 +317,7 @@ If blocked:
 - This skill does NOT implement verification logic — delegate to `sdd-verify`.
 - The orchestrator does NOT pause between retries — the loop is fully automatic.
 - After max retries, the orchestrator MUST surface accumulated issues to the user.
-- Mutation testing and the Playwright E2E gate run ONLY after `judgment-day` passes. Overall `pass` requires judgment-day AND every enabled gate to pass.
+- Mutation testing, the Playwright E2E gate, and the Impeccable detection gate run ONLY after `judgment-day` passes. Overall `pass` requires judgment-day AND every enabled gate to pass.
 - The Playwright gate executes the specs generated from Gherkin `.feature` files; it never authors product code.
+- The Impeccable gate ALWAYS parses the `npx impeccable detect --json .` payload for pass/fail — it NEVER relies on exit code alone (exit code is only used to detect tool crash / not-found). Deterministic-detector violations and LLM-critique findings are mapped to the verdict according to `impeccable.severity` (`block-deterministic` default, `block-all`, or `advisory`).
 - Each retry cycle counts as ONE attempt regardless of how many sub-steps (apply → verify → judge) it contains.
