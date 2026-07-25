@@ -105,7 +105,7 @@ func TestModel_Update_TabNavigation(t *testing.T) {
 
 // TestModel_Update_ShiftTabWrapsFromAgent verifies that a single Shift+Tab
 // from a freshly-constructed model (default AgentTab) wraps around to the
-// last tab, SecurityTab.
+// last tab, ImpeccableTab.
 func TestModel_Update_ShiftTabWrapsFromAgent(t *testing.T) {
 	m := NewModel(&config.Config{}, "")
 
@@ -117,8 +117,8 @@ func TestModel_Update_ShiftTabWrapsFromAgent(t *testing.T) {
 	newModel, _ := m.Update(msg)
 	model := newModel.(Model)
 
-	if model.activeTab != SecurityTab {
-		t.Errorf("activeTab after Shift+Tab from AgentTab = %d, want %d", model.activeTab, SecurityTab)
+	if model.activeTab != ImpeccableTab {
+		t.Errorf("activeTab after Shift+Tab from AgentTab = %d, want %d", model.activeTab, ImpeccableTab)
 	}
 }
 
@@ -218,7 +218,7 @@ func TestModel_renderTabs_Order(t *testing.T) {
 	m.width = 80
 	rendered := m.renderTabs()
 
-	labels := []string{"Agent", "Models", "Judge", "Mutation Testing", "Playwright"}
+	labels := []string{"Agent", "Models", "Judge", "Mutation Testing", "Playwright", "Security", "Impeccable"}
 	lastIndex := -1
 	for _, label := range labels {
 		idx := strings.Index(rendered, label)
@@ -374,6 +374,61 @@ func TestMutationTabState_ApplyToConfig(t *testing.T) {
 	}
 	if cfg.MutationTesting.Threshold != 0.25 {
 		t.Errorf("threshold = %f, want 0.25", cfg.MutationTesting.Threshold)
+	}
+}
+
+func TestImpeccableTabState_ApplyToConfig(t *testing.T) {
+	cfg := &config.Config{}
+	state := newImpeccableTabState(config.Impeccable{})
+
+	// Drive toggles.
+	state.focused = 0
+	state.update(tea.KeyMsg{Type: tea.KeyEnter})
+	if !state.enabled {
+		t.Error("enabled should be true after toggle")
+	}
+	state.focused = 1
+	state.update(tea.KeyMsg{Type: tea.KeyEnter})
+	if !state.autoInstall {
+		t.Error("autoInstall should be true after toggle")
+	}
+
+	// Drive text inputs.
+	state.severity.SetValue("block-all")
+	state.productPath.SetValue("PRODUCT.md")
+	state.designPath.SetValue("DESIGN.md")
+
+	state.applyToConfig(cfg)
+
+	if !cfg.Impeccable.Enabled {
+		t.Error("cfg.Impeccable.Enabled should be true")
+	}
+	if !cfg.Impeccable.AutoInstall {
+		t.Error("cfg.Impeccable.AutoInstall should be true")
+	}
+	if cfg.Impeccable.Severity != "block-all" {
+		t.Errorf("cfg.Impeccable.Severity = %q, want %q", cfg.Impeccable.Severity, "block-all")
+	}
+	if cfg.Impeccable.ProductPath != "PRODUCT.md" {
+		t.Errorf("cfg.Impeccable.ProductPath = %q, want %q", cfg.Impeccable.ProductPath, "PRODUCT.md")
+	}
+	if cfg.Impeccable.DesignPath != "DESIGN.md" {
+		t.Errorf("cfg.Impeccable.DesignPath = %q, want %q", cfg.Impeccable.DesignPath, "DESIGN.md")
+	}
+}
+
+// TestImpeccableTabState_ApplyToConfig_BlankSeverityFallback asserts a blank
+// severity input falls back to the safe default on save (design residual OQ
+// #4: explicit fallback rather than relying solely on Load() normalization).
+func TestImpeccableTabState_ApplyToConfig_BlankSeverityFallback(t *testing.T) {
+	cfg := &config.Config{}
+	state := newImpeccableTabState(config.Impeccable{Severity: ""})
+	state.severity.SetValue("")
+
+	state.applyToConfig(cfg)
+
+	if cfg.Impeccable.Severity != "block-deterministic" {
+		t.Errorf("cfg.Impeccable.Severity = %q, want %q", cfg.Impeccable.Severity, "block-deterministic")
 	}
 }
 
