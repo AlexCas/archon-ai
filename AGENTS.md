@@ -27,7 +27,7 @@ Required choices:
 
 ```text
 Antes de continuar con SDD, elija una opción por grupo.
-Responda con "usar recomendado" o con códigos como: A1, B1, C1, D1.
+Responda con "usar recomendado" o con códigos como: A1, B1, C1, D1, E1, F1.
 
 A. Ritmo
    A1 Interactivo (recomendado): mostrar cada fase y esperar confirmación antes de continuar.
@@ -52,6 +52,10 @@ D. Revisión
 E. Pruebas web (Playwright)
    E1 No (recomendado para proyectos no web): no generar ni ejecutar pruebas Playwright.
    E2 Sí: generar pruebas Playwright desde los escenarios Gherkin y ejecutarlas tras verify y jueces.
+
+F. Impeccable (Diseño de interfaz)
+   F1 No (recomendado): no correr verificaciones de diseño.
+   F2 Sí: activar el gate de Impeccable tras verify/judge cuando esté habilitado.
 ```
 
 **Project type & web testing (group E):**
@@ -59,11 +63,17 @@ E. Pruebas web (Playwright)
 - For a NEW or blank project where explore cannot determine the type, ASK group E together with the rhythm (group A) during preflight.
 - Group E maps to `playwright.enabled` in `.archon/config.yaml`. The `--playwright` flag at init time or the Playwright tab in `archon tui` set the same value. When enabled, the harness generates Playwright specs from Gherkin scenarios and runs them after the verify and judge phases.
 
+**Project type & design-language gate (group F):**
+- Group F maps to `impeccable.enabled` in `.archon/config.yaml`. The `--impeccable`
+  flag at init time or the Impeccable tab in `archon tui` set the same value. When
+  enabled, the harness invokes Impeccable subcommands during apply and runs the
+  detection gate after the judge phase.
+
 **Hard gate rules:**
 - `openspec/config.yaml`, existing SDD artifacts, or previous `sdd-init` results do NOT satisfy this preflight.
 - If the session has no preflight block, ask the prompt above and **STOP**. Do not run init, delegate phases, or apply tasks in the same turn.
 - Cache the choices for this session and include them in later phase prompts.
-- If the user explicitly provided all four choices in the current conversation, summarize them as the session preflight block and continue.
+- If the user explicitly provided all six choices in the current conversation, summarize them as the session preflight block and continue.
 
 ## Vague Request Guard (MANDATORY)
 
@@ -133,11 +143,12 @@ When committing on the user's behalf through the harness or any sub-agent:
 4. After every phase that produces an editable artifact, run the Human Review Gate
 5. After verify, invoke harness-judge
 6. When playwright.enabled, run the generated Playwright tests after verify and judge pass
-7. On judge fail: re-apply with feedback (max 3 retries)
-8. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution
+7. When impeccable.enabled, run Impeccable subcommands during apply and the detection gate after judge passes
+8. On judge fail: re-apply with feedback (max 3 retries)
+9. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution
 
 ## Configuration
-- Skills: 24 (embedded via archon init)
+- Skills: 25 (embedded via archon init)
 - Config: .archon/config.yaml
 - Agent: opencode
 - Harness Version: 0.6.0

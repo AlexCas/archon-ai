@@ -484,3 +484,230 @@ flag-gated, correctly typed (design read-only, apply agent-behavioral, verify ad
 and inert when disabled. Scope is clean — no PR3 or PR1 Go files touched. The only warning
 is the unrelated `idea-player.md` deletion, which must be kept out of the PR2 commit. Ready
 for the judge phase once the stray deletion is addressed.
+
+---
+
+# Verification Report — PR3 slice (Judge gate + preflight group F + docs sync)
+
+Change: [[impeccable-gate]] — Impeccable Frontend-Integration, **PR3 slice (FINAL: judge
+detection gate, preflight group F, templates/CLAUDE.md/AGENTS.md sync)**
+Branch: `feat/impeccable-pr3-judge-gate-templates` (applied, NOT committed)
+Mode: interactive · Artifact store: OpenSpec · Verified: 2026-07-24
+
+Scope note: PR3 is the terminal slice. It wires the Impeccable detection gate into
+`harness-judge` Step 3c, adds preflight group F to the generated templates and the repo
+`CLAUDE.md`/`AGENTS.md`, and applies the follow-up count-wording consistency fix (five→six,
+A–E→A–F). It also carries the one-sentence rescope of `skills/impeccable/SKILL.md`. Design
+authority: design §6 (judge gate), §9 (templates/docs). All PR1 (§1–§6) and PR2 (§7–§12)
+tasks were verified in the sections above.
+
+## Completeness — PR3 tasks (T13.1–T14.4)
+
+All PR3 implementation tasks are `[x]` in [tasks.md](tasks.md) and independently confirmed:
+
+| Task | Description | Status |
+|---|---|---|
+| T13.1 | harness-judge Step 3c 8-step gate flow | done — SKILL.md:125–165 |
+| T13.2 | "### Impeccable Gate" output section | done — SKILL.md:270–277 |
+| T13.3 | verbatim blocked messages | done — SKILL.md:158–163, 307–308 |
+| T13.4 | 5 touchpoints (intro/config/result-table/edge/output) | done — SKILL.md:13,29,71–82,172–178,303–309 |
+| T14.1 | templates.go group F + mapping paragraph | done — templates.go:83–92 |
+| T14.2 | Impeccable rule in both rule consts | done — templates.go:185,199 |
+| T14.3 | templates_test.go assertions | done — templates_test.go:149–150,196–198,242–244 |
+| T14.4 | repo CLAUDE.md manual mirror | done — CLAUDE.md:73–78,84,156 |
+
+T15.2 ("Run `go test ./internal/initcmd/...` after PR3 lands") remains `[ ]` — it is the
+post-land verification step itself, executed by this report (PASS below). It is a
+verification/cleanup task, not a core implementation task, so it is not a blocker.
+
+## Build / Vet / Tests (independently executed, this session)
+
+Full tree, `-count=1`, from the applied-but-uncommitted working tree:
+
+```
+$ go build ./...   → exit 0 (no output)
+$ go vet ./...     → exit 0 (no output)
+$ go test ./... -count=1
+ok  cmd/archon 0.038s · internal/agent · internal/config · internal/initcmd 0.031s
+ok  internal/mapgen · internal/models · internal/opencode · internal/scaffold
+ok  internal/status · internal/tui 1.607s · internal/version · skills
+→ all 12 packages PASS, exit 0
+```
+
+Targeted (`internal/initcmd`, verbose):
+
+```
+--- PASS: TestTemplates_ContainSDDSessionPreflight (AGENTS.md, CLAUDE.md)
+--- PASS: TestTemplates_FiveRules            (AGENTS.md, CLAUDE.md)
+```
+
+## Per-criterion results
+
+| # | Criterion | Verdict |
+|---|---|---|
+| 1 | Build / vet / tests green (initcmd especially) | PASS |
+| 2 | Judge gate (harness-judge Step 3c) | PASS |
+| 3 | templates.go group F (both rule consts, renumbered) | PASS |
+| 4 | templates_test.go assertions | PASS |
+| 5 | CLAUDE.md + AGENTS.md mirror + count wording consistent | PASS |
+| 6 | Scope hygiene (no PR1/PR2 files beyond the one rescope) | PASS |
+| 7 | No stray preflight-count inconsistency | PASS |
+
+### Criterion 1 — Build / vet / tests — PASS
+
+All three commands exit 0; all 12 packages pass. `internal/initcmd` (templates_test.go)
+passes including the two group-F/rule tests shown above.
+
+### Criterion 2 — Judge gate (harness-judge Step 3c) — PASS
+
+`skills/harness-judge/SKILL.md` implements the gate exactly per design §6:
+- Flag-gated on `impeccable.enabled` (Step 3c header line 127 "Only if
+  `impeccable.enabled: true` AND judgment-day passed"; hard rule line 29; Step 1 line 82
+  "gates Step 3c. Default: `false`").
+- Runs `npx impeccable detect --json .` from target-project root (line 141).
+- Parses JSON for pass/fail; exit code used ONLY for ran-vs-crash/not-found (line 142–147,
+  and Rule line 322: "NEVER relies on exit code alone (exit code is only used to detect
+  tool crash / not-found)").
+- node/npx missing → `blocked` with verbatim message (line 160–161, 307), never silent
+  pass ("Never silent-pass" line 136).
+- Deterministic violations → `fail` under default severity (line 149–150).
+- LLM critique → advisory unless `block-all` (line 150–153).
+- `### Impeccable Gate` output section present (line 270–277) with Status/Severity mode/
+  Deterministic count/Advisory count/Details/blocked Reason.
+- Result-table row added mirroring Playwright (line 172–178: 4th "impeccable gate" column,
+  `fail or blocked` degrades overall exactly like Playwright).
+- Error-handling rows mirror Playwright (line 307–309: node/npx-missing, package-missing,
+  config-absent).
+- All three severity values handled — `block-deterministic` (default), `block-all`,
+  `advisory` — enumerated at line 148–153 and Rule 322. (grep count: block-deterministic ×4,
+  block-all ×3, advisory ×6.)
+
+### Criterion 3 — templates.go group F — PASS
+
+`internal/initcmd/templates.go`:
+- Group F preflight bullet added after group E (line 83–85): "F. Impeccable (Diseño de
+  interfaz)" with recommended No / opt-in Sí.
+- Group F mapping paragraph added after the group E mapping (line 90–94): "Group F maps to
+  `impeccable.enabled` … The `--impeccable` flag … or the Impeccable tab in `archon tui`".
+- New rule added in BOTH consts, byte-identical: `orchestratorRulesClaude` line 185 and
+  `orchestratorRulesOpencode` line 199 — "7. When impeccable.enabled, run Impeccable
+  subcommands during apply and the detection gate after judge passes".
+- Downstream rules renumbered consistently in both: 7→8 (judge fail re-apply), 8→9 (commit
+  authorship). No duplicate or missing numbers; the `--impeccable` flag / config struct /
+  TUI tab the paragraph references all exist (config.go:52,90; internal/tui/impeccable_tab.go).
+
+### Criterion 4 — templates_test.go — PASS
+
+- `TestTemplates_ContainSDDSessionPreflight` now asserts `"F. Impeccable (Diseño de
+  interfaz)"` and `"Group F maps to \`impeccable.enabled\`"` (lines 149–150), run against
+  both AGENTS.md and CLAUDE.md renderings.
+- `TestTemplates_FiveRules` shared-rules slice includes the new rule 7 and the renumbered
+  8/9 (lines 191–198), and the negative guard was updated from "no rule 9" to "no rule 10 /
+  exactly 9 rules" (lines 242–244).
+- Both tests PASS (verbose output above).
+
+### Criterion 5 — Repo CLAUDE.md + AGENTS.md mirror — PASS
+
+- Group F question bullet in repo `CLAUDE.md` is byte-identical to the rendered templates.go
+  string after the `§`→backtick substitution (automated `diff` returned IDENTICAL).
+- Group F mapping paragraph byte-identical across templates.go (rendered) and CLAUDE.md.
+- The new rule line collapses to a single unique string across templates.go (both consts),
+  CLAUDE.md, and AGENTS.md (`grep -h … | sort -u` → one line).
+- `AGENTS.md` correctly keeps its pre-existing legacy `F1/F2` answer-code question format
+  (by design) while mirroring the mapping paragraph (AGENTS.md:66–71) and the rule
+  (AGENTS.md:146–148). Verified only the paragraph + rule are mirrored there, not the
+  arrow-key question shape.
+- Count-wording consistency confirmed: `grep -E "all five|five per-group|group A–E|A–E|
+  five choices|five questions"` across `CLAUDE.md`, `AGENTS.md`, `templates.go` → **none
+  found**. The "A–F", "six per-group", "all six" wording is present in both templates.go
+  (lines 58,98,100) and CLAUDE.md (lines 42,82,84).
+
+### Criterion 6 — Scope hygiene — PASS
+
+`git diff --name-only` against the PR2 tip (HEAD = ab2daac) shows exactly the intended set:
+AGENTS.md, CLAUDE.md, internal/initcmd/templates.go, internal/initcmd/templates_test.go,
+skills/harness-judge/SKILL.md, skills/impeccable/SKILL.md, plus tasks.md (progress
+tracking) and the pre-existing idea-player.md deletion.
+- No PR1 Go files touched: `grep -E "internal/(config|tui|status)/|cmd/archon/"` on the
+  changed set → NONE.
+- The only PR2 phase-hook skill touched is `skills/impeccable/SKILL.md`, and its diff is
+  the single intended sentence: `"The judge gate is the ONLY place that executes
+  Impeccable:"` → `"The judge gate (\`harness-judge\` Step 3c) is the place that executes
+  Impeccable's detection:"`. No other phase-hook skill (sdd-design/apply/verify/tasks/
+  explore/spec) was modified in PR3.
+
+### Criterion 7 — No stray count inconsistency — PASS
+
+Adding group F introduced no internal contradiction: all "five→six" and "A–E→A–F" call
+sites were updated together (question intro, "ask the six per-group questions", "all six
+choices"). No remaining "five"/"A–E" reference exists in any of the three synced docs
+(grep evidence in Criterion 5). templates_test.go's rule-count guard is also consistent
+(exactly 9 rules).
+
+## Gherkin scenario mapping (PR3-scoped)
+
+Source: `specs/impeccable-gate/impeccable-gate.feature`.
+
+| Scenario | Covering evidence | Status |
+|---|---|---|
+| Judge gate passes when no violations (:129) | harness-judge Step 3c line 149–150 (`block-deterministic`, 0 violations → pass) + output section :270 | COVERED (prose) |
+| Judge gate blocks on deterministic violations (:136) | Step 3c line 149; result table :174 fail column | COVERED (prose) |
+| Judge gate skipped when disabled (:144) | flag gate line 127,134 "no invocation, no section, no column" | COVERED (prose) |
+| Judge gate blocked when Node/npx absent (:151) | Step 3c line 136,160; error row :307; "Never silent-pass" :136 | COVERED (prose) |
+| npx not found + auto_install false (:187) | Step 3c line 138–140; error row :308 verbatim message | COVERED (prose) |
+| auto_install true triggers install (:195) | Step 3c line 138 "run `npx impeccable install` once, then continue" | COVERED (prose) |
+| Generated CLAUDE.md includes group F (:205) | TestTemplates_ContainSDDSessionPreflight (F. Impeccable + mapping) — PASS at runtime | COVERED (test) |
+| Generated CLAUDE.md includes Impeccable rule (:211) | TestTemplates_FiveRules asserts rule 7 in both variants — PASS | COVERED (test) |
+| Template tests assert group F + rule (:217) | `go test ./internal/initcmd/...` — PASS | COVERED (test) |
+| Skill delegates detection to npx (:231) | impeccable/SKILL.md Rules :122–127 (never reimplement; npx only) | COVERED (prose) |
+
+The judge-gate/design/apply/auto_install scenarios are prose-behavioral (they describe
+runtime harness behavior that executes only when `impeccable.enabled: true` with the
+external `npx impeccable` tool present); their contract is verified by source inspection of
+the skill instructions, consistent with the design's decision to keep Impeccable a thin
+orchestration layer with no Go-side detector. The three template scenarios have real
+passing Go tests.
+
+## Design coherence — PR3
+
+Matches design §6 (judge gate: 8-step flow, severity mapping, verbatim blocked messages,
+result-table + output-contract mirroring Playwright) and §9 (group F question, mapping
+paragraph, rule in both consts, test assertions, repo doc mirror). The impeccable/SKILL.md
+rescope aligns the skill's earlier "ONLY place" claim with the now-authoritative
+harness-judge Step 3c, removing a cross-file contradiction. No design deviations found.
+
+## Issues — PR3
+
+**CRITICAL:** none.
+
+**WARNING:**
+1. `idea-player.md` remains deleted in the working tree (carried from PR1/PR2). Unrelated to
+   Impeccable (predates the branch; original deletion in commit 784e771). It must NOT be
+   included in the PR3 commit — recommend `git restore idea-player.md` before committing.
+
+**SUGGESTION:**
+1. Repo `CLAUDE.md:158` still reads `- Skills: 24 (embedded via archon init)`, but the
+   `impeccable` skill (added in PR2) makes the true embedded count 25 — the PR2 report
+   confirmed the generated `{{.SkillCount}}` renders 25. This static line is OUT OF PR3
+   SCOPE (PR3 T14.4 only mirrors the group F + rule additions, not the skill count), and it
+   is templated dynamically at `archon init` time, so generated projects are correct. Still,
+   consider bumping the repo CLAUDE.md line to 25 in a follow-up for repo self-consistency.
+2. `SESSION_STATUS.md` is untracked at the repo root (expected during an active session); it
+   will be archived with the change per the session-status contract at archive time.
+
+---
+
+## Final verdict — PR3
+
+**PASS WITH WARNINGS.** PR3 (the final slice) satisfies all seven verification criteria:
+build/vet/tests are green across all 12 packages with the templates tests passing; the
+harness-judge Step 3c gate is fully specified (flag-gated, JSON-parsed, exit-code-only-for-
+crash, verbatim blocked messages, all three severities, output section and result/error
+rows mirroring Playwright); templates.go adds group F plus the new rule in both consts with
+consistent renumbering; templates_test.go asserts all of it and passes; the repo CLAUDE.md
+and AGENTS.md mirror the rendered strings byte-for-byte (with AGENTS.md keeping its legacy
+question format by design); the five→six / A–E→A–F count wording is now consistent with no
+stray "five"/"A–E" references anywhere; and scope is clean — no PR1 Go files and only the
+single intended one-sentence rescope in the one PR2 skill. The sole warning is the unrelated
+`idea-player.md` deletion, which must be kept out of the PR3 commit. Ready for the judge
+phase once the stray deletion is addressed.

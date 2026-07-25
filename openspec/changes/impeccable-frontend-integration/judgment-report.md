@@ -257,3 +257,162 @@ test suite remain green after fix. Scope hygiene is clean — no PR3/PR1 Go file
 `scope: reference` frontmatter is ruled harmless-additive (WONTFIX). Advisory items are tracked above
 and do not block merge. `idea-player.md` must NOT be staged for the PR2 commit (stray unrelated
 working-tree deletion — restore with `git restore idea-player.md` before staging).
+
+---
+---
+
+# Judgment Report — PR3 slice (Judge gate + preflight group F + docs sync)
+
+Change: [[impeccable-gate]] — Impeccable Frontend-Integration, **PR3 slice (FINAL: judge
+detection gate, preflight group F, templates/CLAUDE.md/AGENTS.md sync)**
+Branch: `feat/impeccable-pr3-judge-gate-templates` (applied, NOT committed)
+Scope: `skills/harness-judge/SKILL.md` Step 3c gate, `internal/initcmd/templates.go` group F +
+rule in both consts, `internal/initcmd/templates_test.go`, repo `CLAUDE.md` + `AGENTS.md` mirror,
+count-wording consistency fix (five→six, A–E→A–F, Skills:24→25), and one-sentence rescope in
+`skills/impeccable/SKILL.md`.
+Artifact store: OpenSpec. Execution mode: interactive.
+Skill resolution: `paths-injected` — `go-testing/SKILL.md`, `harness-judge/SKILL.md`,
+`judgment-day/SKILL.md`.
+
+---
+
+## JUDGMENT: APPROVED
+
+Two rounds of dual adversarial review completed. Two confirmed issues found in Round 1 — both in
+`AGENTS.md` (stale count-wording divergence from the canonical template). Both fixed and verified
+clean in Round 2. No CRITICALs in either round. Build and full test suite green before and after
+fixes.
+
+---
+
+## Round 1 — Findings
+
+Two blind judges ran independently against the full PR3 diff (seven files).
+
+| ID | Severity | File:Location | Finding | Agreement |
+|----|----------|---------------|---------|-----------|
+| C1 | WARNING (real) | `AGENTS.md:76` | Hard gate rules wording reads "all four choices" — a stale pre-PR3 string. The canonical template (`templates.go:100`) and `CLAUDE.md:84` both read "all six choices". An opencode-harness session would incorrectly conclude preflight is satisfied after providing only 4 choices, silently skipping groups E and F. | Both judges |
+| C2 | WARNING (real) | `AGENTS.md:30` | Legacy fenced prompt instruction reads "A1, B1, C1, D1" — missing E1, F1. Group F (`F1`/`F2`) was added to the fenced block body (lines 56–58) but the example code list still shows only through D1, creating an internal contradiction within the AGENTS.md fenced prompt. | Both judges |
+| S1 | INFO | `AGENTS.md` fenced prompt | "ask the prompt above" (line 74) vs. "ask the six per-group questions" (templates.go/CLAUDE.md) — phrasing divergence consistent with the intentional legacy format. Not an issue. | Both judges (agree: not an issue) |
+| S2 | INFO | `skills/harness-judge/SKILL.md` Step 3c sub-step 1 | Step 3c sub-step 1 re-reads `impeccable.enabled` after the outer condition already gates on it — a minor redundancy, not a defect. Consistent with how Playwright gate (Step 3b) is structured. | Judge B only — agree: not a defect |
+
+**Confirmed (both judges):** C1, C2.
+**Suspect / INFO (single judge or ruled non-issue by both):** S1, S2.
+
+---
+
+## Judge-Gate Logic Verification (both judges, independently)
+
+Both judges confirmed the following gate properties are correctly implemented in
+`skills/harness-judge/SKILL.md` Step 3c:
+
+| Property | Evidence | Verdict |
+|----------|----------|---------|
+| JSON-parsed, not exit-code-based | Step 3c sub-step 5 + Hard Rule :322 | Correct |
+| Exit code ONLY for crash/not-found → `blocked` | Sub-step 5 bullet 2 + :145 | Correct |
+| node/npx missing → `blocked` (never silent pass) | Sub-step 2 + "Never silent-pass" :136 + error table :307 | Correct |
+| Unparseable JSON → advisory, not hard-fail | Sub-step 5 bullet 3 + :147 | Correct |
+| block-deterministic (default): deterministic→fail, LLM→advisory | Sub-step 6 :149–150 | Correct |
+| block-all: any finding → fail | Sub-step 6 :151–152 | Correct |
+| advisory: always pass | Sub-step 6 :153 | Correct |
+| auto_install flow: install once then continue; false + missing → blocked | Sub-steps 3–4 :138–141 | Correct |
+| "### Impeccable Gate" output section present | Output Contract :270–277 | Correct |
+| Result table row mirrors Playwright (fail/blocked degrade overall) | :172–178 + Sub-step 8 :156 | Correct |
+| Error-handling rows: node/npx, package-missing, config-absent | Error table :307–309 | Correct |
+| Gate skipped when disabled: no invocation, no section, no column | Sub-step 1 :134 + Hard Rule :29 | Correct |
+
+---
+
+## Fixes Applied (Round 1 → Round 2)
+
+### Fix 1 — `AGENTS.md:76` (C1)
+
+Changed "all four choices" to "all six choices" in the hard gate rules bullet:
+
+```
+Before: - If the user explicitly provided all four choices in the current conversation, summarize them as the session preflight block and continue.
+After:  - If the user explicitly provided all six choices in the current conversation, summarize them as the session preflight block and continue.
+```
+
+### Fix 2 — `AGENTS.md:30` (C2)
+
+Updated the example answer-code list in the legacy fenced prompt to include E1 and F1:
+
+```
+Before: Responda con "usar recomendado" o con códigos como: A1, B1, C1, D1.
+After:  Responda con "usar recomendado" o con códigos como: A1, B1, C1, D1, E1, F1.
+```
+
+Both fixes are confined to `AGENTS.md`. No Go source files or `templates.go` were modified.
+
+---
+
+## Round 2 — Re-judgment
+
+Both judges ran independently against the fixed code.
+
+| ID | Round 1 | Round 2 |
+|----|---------|---------|
+| C1 — "all four choices" stale wording | CONFIRMED | RESOLVED — "all six choices" now consistent with templates.go and CLAUDE.md |
+| C2 — "A1, B1, C1, D1" missing E1/F1 | CONFIRMED | RESOLVED — example codes now include E1, F1; consistent with fenced block content |
+| S1 — phrasing divergence (legacy format) | INFO | CLOSED — intentional legacy format; no contradiction after C2 fix |
+| S2 — Step 3c sub-step 1 re-read | INFO | CLOSED — structural mirror of Playwright gate; not a defect |
+
+**No new CRITICALs or confirmed WARNINGs in Round 2.**
+
+---
+
+## Final Build / Test State
+
+| Command | Result |
+|---------|--------|
+| `go build ./...` | PASS (exit 0) |
+| `go vet ./...` | PASS (exit 0) |
+| `go test ./... -count=1` | PASS — 12/12 packages ok, 0 failures |
+
+All packages confirmed clean, including `internal/initcmd` (templates_test.go all assertions pass:
+`TestTemplates_ContainSDDSessionPreflight`, `TestTemplates_FiveRules`, `TestTemplates_BacktickRendering`,
+`TestTemplates_AgentsAndClaudeSharedSections`). `AGENTS.md` is not exercised by templates_test.go
+(by design — the test covers the rendered output from templates.go, not the static repo file), which
+is why C1/C2 were not caught by the test suite.
+
+---
+
+## Spec / Design Compliance (PR3 scope)
+
+All PR3-scoped Gherkin scenarios verified (see verify-report.md §PR3 Gherkin mapping). Judge gate
+faithfully implements design §6 (8-step flow, verbatim blocked messages, severity mapping, result
+table + output contract mirroring Playwright). Templates implement design §9 (group F, mapping
+paragraph, rule in both consts, test assertions). Docs sync matches design §9.4. Impeccable/SKILL.md
+rescope aligns with the now-authoritative harness-judge Step 3c. No design deviations found.
+
+---
+
+## Advisory Items (not blocking)
+
+1. `AGENTS.md` fenced prompt is the legacy opencode format (intentionally kept as-is per the verified
+   design decision — the arrow-key `AskUserQuestion` prose format applies to claude/CLAUDE.md only).
+   The prompt's instruction "ask the prompt above" diverges stylistically from CLAUDE.md's "ask the
+   six per-group questions" — acceptable by design, no action needed.
+2. `AGENTS.md` fenced block description for group D still says "D3 Otro: preguntar el número después"
+   rather than the CLAUDE.md version ("hacer UNA pregunta de texto libre pidiendo el número de líneas
+   y usar ese valor como presupuesto"). These are equivalent in intent; the AGENTS.md wording predates
+   the more explicit CLAUDE.md phrasing. Not a defect; editorial improvement optional.
+3. `idea-player.md` remains deleted in the working tree (pre-existing stray deletion, unrelated to the
+   impeccable change). Must NOT be staged for the PR3 commit — restore with `git restore idea-player.md`
+   before staging.
+
+---
+
+## Go/No-Go for PR3 Commit and Full Chained PR Set
+
+**GO.** Both confirmed issues are fixed and independently verified by both judges in Round 2. Build
+and full test suite are green. The judge-gate logic is fully correct: JSON-parsed, exit-code only for
+crash/not-found, node/npx-missing→blocked (never silent-pass), all three severities correctly mapped,
+output contract and result table mirror Playwright, verbatim blocked messages present. Templates group
+F + rule renumbering are consistent across both consts and both rendered docs. The five→six / A–E→A–F
+count wording is now consistent across templates.go, CLAUDE.md, and AGENTS.md with no stale references.
+Scope is clean — no PR1 Go files, only the intended one-sentence rescope in impeccable/SKILL.md.
+
+The full chained PR set (PR1 + PR2 + PR3) is cleared for commit and PR creation. `idea-player.md`
+must be excluded from all commits.
