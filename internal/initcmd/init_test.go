@@ -607,12 +607,35 @@ func TestBuildConfig_SecurityFlag(t *testing.T) {
 		{"security off, playwright on", false, true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := buildConfig("opencode", nil, nil, "", "", nil, tt.playwright, tt.security)
+			cfg := buildConfig("opencode", nil, nil, "", "", nil, tt.playwright, tt.security, false)
 			if cfg.Security.Enabled != tt.security {
 				t.Errorf("Security.Enabled = %v, want %v", cfg.Security.Enabled, tt.security)
 			}
 			if cfg.Playwright.Enabled != tt.playwright {
 				t.Errorf("Playwright.Enabled = %v, want %v", cfg.Playwright.Enabled, tt.playwright)
+			}
+		})
+	}
+}
+
+// TestBuildConfig_ImpeccableFlag covers spec scenarios "Init with --impeccable
+// flag enables the gate", "Init without --impeccable leaves gate disabled",
+// and "buildConfig receives the flag value".
+func TestBuildConfig_ImpeccableFlag(t *testing.T) {
+	for _, tt := range []struct {
+		name       string
+		impeccable bool
+	}{
+		{"impeccable on", true},
+		{"impeccable off", false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := buildConfig("opencode", nil, nil, "", "", nil, false, false, tt.impeccable)
+			if cfg.Impeccable.Enabled != tt.impeccable {
+				t.Errorf("Impeccable.Enabled = %v, want %v", cfg.Impeccable.Enabled, tt.impeccable)
+			}
+			if cfg.Impeccable.Severity != "" {
+				t.Errorf("Impeccable.Severity = %q, want empty (buildConfig must not set it; Load() normalizes)", cfg.Impeccable.Severity)
 			}
 		})
 	}

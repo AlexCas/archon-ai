@@ -290,6 +290,104 @@ func TestConfigCmd_SecurityProfileInvalidValues(t *testing.T) {
 	}
 }
 
+// TestConfigCmd_UnknownKeyListsImpeccableKeys asserts the unknown-key error
+// contains all five impeccable.* keys (design §3.3).
+func TestConfigCmd_UnknownKeyListsImpeccableKeys(t *testing.T) {
+	tmpDir := setupProjectWithConfig(t)
+	origDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	var stdout, stderr bytes.Buffer
+	root := newRootCmd(&stdout, &stderr)
+	root.SetArgs([]string{"config", "get", "bogus.key"})
+
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected error for unknown key, got none")
+	}
+
+	wantKeys := []string{
+		"impeccable.enabled",
+		"impeccable.auto_install",
+		"impeccable.severity",
+		"impeccable.product_path",
+		"impeccable.design_path",
+	}
+	for _, k := range wantKeys {
+		if !strings.Contains(err.Error(), k) {
+			t.Errorf("error = %q, want contains %q", err.Error(), k)
+		}
+	}
+}
+
+// TestConfigCmd_ImpeccableSetGet asserts set/get roundtrip for all five
+// impeccable.* keys, and that an invalid severity is rejected.
+func TestConfigCmd_ImpeccableSetGet(t *testing.T) {
+	tmpDir := setupProjectWithConfig(t)
+	origDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	cases := []struct {
+		key   string
+		value string
+	}{
+		{"impeccable.enabled", "true"},
+		{"impeccable.auto_install", "true"},
+		{"impeccable.severity", "block-all"},
+		{"impeccable.product_path", "docs/PRODUCT.md"},
+		{"impeccable.design_path", "docs/DESIGN.md"},
+	}
+
+	for _, c := range cases {
+		var setOut, setErr bytes.Buffer
+		setCmd := newRootCmd(&setOut, &setErr)
+		setCmd.SetArgs([]string{"config", "set", c.key, c.value})
+		if err := setCmd.Execute(); err != nil {
+			t.Fatalf("set %s Execute() error = %v, stderr = %s", c.key, err, setErr.String())
+		}
+
+		var getOut, getErr bytes.Buffer
+		getCmd := newRootCmd(&getOut, &getErr)
+		getCmd.SetArgs([]string{"config", "get", c.key})
+		if err := getCmd.Execute(); err != nil {
+			t.Fatalf("get %s Execute() error = %v, stderr = %s", c.key, err, getErr.String())
+		}
+
+		if got := strings.TrimSpace(getOut.String()); got != c.value {
+			t.Errorf("%s = %q, want %q", c.key, got, c.value)
+		}
+	}
+}
+
+// TestConfigCmd_ImpeccableSeverityInvalid asserts `config set
+// impeccable.severity invalid` exits non-zero and names the value plus the
+// three valid options.
+func TestConfigCmd_ImpeccableSeverityInvalid(t *testing.T) {
+	tmpDir := setupProjectWithConfig(t)
+	origDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	var stdout, stderr bytes.Buffer
+	root := newRootCmd(&stdout, &stderr)
+	root.SetArgs([]string{"config", "set", "impeccable.severity", "invalid"})
+
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected error for invalid impeccable.severity, got none")
+	}
+	if !strings.Contains(err.Error(), "invalid") {
+		t.Errorf("error = %q, want contains %q", err.Error(), "invalid")
+	}
+	for _, v := range []string{"block-deterministic", "block-all", "advisory"} {
+		if !strings.Contains(err.Error(), v) {
+			t.Errorf("error = %q, want contains valid option %q", err.Error(), v)
+		}
+	}
+}
+
 func TestConfigCmd_ListEmpty(t *testing.T) {
 	tmpDir := t.TempDir()
 	archonDir := filepath.Join(tmpDir, ".archon")
