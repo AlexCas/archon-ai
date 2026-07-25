@@ -146,6 +146,8 @@ func TestTemplates_ContainSDDSessionPreflight(t *testing.T) {
 				"C. PRs",
 				"D. Revisión",
 				"E. Pruebas web (Playwright)",
+				"F. Impeccable (Diseño de interfaz)",
+				"Group F maps to `impeccable.enabled`",
 				"Interactivo (recomendado)",
 				"OpenSpec (recomendado)",
 				"Preguntarme (recomendado)",
@@ -184,15 +186,16 @@ func TestTemplates_ContainSDDSessionPreflight(t *testing.T) {
 }
 
 func TestTemplates_FiveRules(t *testing.T) {
-	// Rules shared across both harnesses (rules 1, 3-8).
+	// Rules shared across both harnesses (rules 1, 3-9).
 	sharedRules := []string{
 		"1. Check harness-workflow before any phase transition",
 		"3. Write/update SESSION_STATUS.md at the root on every phase transition",
 		"4. After every phase that produces an editable artifact, run the Human Review Gate",
 		"5. After verify, invoke harness-judge",
 		"6. When playwright.enabled, run the generated Playwright tests after verify and judge pass",
-		"7. On judge fail: re-apply with feedback (max 3 retries)",
-		"8. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution",
+		"7. When impeccable.enabled, run Impeccable subcommands during apply and the detection gate after judge passes",
+		"8. On judge fail: re-apply with feedback (max 3 retries)",
+		"9. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution",
 	}
 
 	tests := []struct {
@@ -236,9 +239,9 @@ func TestTemplates_FiveRules(t *testing.T) {
 				t.Errorf("%s missing rule 2 %q", tt.name, tt.rule2Want)
 			}
 
-			// Ensure there is no rule 9 (exactly 8 rules).
-			if strings.Contains(content, "9. ") {
-				t.Errorf("%s should have exactly 8 rules, found rule 9", tt.name)
+			// Ensure there is no rule 10 (exactly 9 rules).
+			if strings.Contains(content, "10. ") {
+				t.Errorf("%s should have exactly 9 rules, found rule 10", tt.name)
 			}
 		})
 	}

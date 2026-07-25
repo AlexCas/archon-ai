@@ -47,7 +47,7 @@ own — only `install`, `update`, and `detect` are real shell commands.
 
 ## Detect Invocation (Judge Gate)
 
-The judge gate is the ONLY place that executes Impeccable:
+The judge gate (`harness-judge` Step 3c) is the place that executes Impeccable's detection:
 
 ```
 npx impeccable detect --json .
