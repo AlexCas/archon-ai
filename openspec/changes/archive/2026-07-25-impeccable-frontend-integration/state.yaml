@@ -1,5 +1,7 @@
-phase: tasks
+phase: archive
 status: completed
+archived: true
+archived_ts: "2026-07-25T09:15:00Z"
 history:
   - {phase: explore, status: completed, ts: "2026-07-24T00:00:00Z"}
   - {phase: propose, status: completed, ts: "2026-07-24T00:00:00Z"}
@@ -7,3 +9,4 @@ history:
   - {phase: spec, status: completed, ts: "2026-07-24T00:00:00Z"}
   - {phase: tasks, status: in_progress, ts: "2026-07-24T00:00:00Z"}
   - {phase: tasks, status: completed, ts: "2026-07-24T00:00:00Z"}
+  - {phase: archive, status: completed, ts: "2026-07-25T09:15:00Z"}
