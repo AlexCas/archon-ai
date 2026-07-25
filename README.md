@@ -100,6 +100,7 @@ If a `CLAUDE.md`/`AGENTS.md` already exists, init **asks before replacing it** a
 ```bash
 archon init --agent claude          # Override auto-detection (creates the folder if missing)
 archon init --playwright            # Enable Playwright web E2E generation + execution
+archon init --impeccable            # Enable the Impeccable design-language gate
 archon init --force                 # Replace an existing orchestrator file without prompting
 archon init --dry-run               # Show what would happen without doing it
 archon init --model claude-sonnet-4-6  # Default AI model for all SDD phases
@@ -158,7 +159,7 @@ in sync with your config.
 #### Sections
 
 The TUI opens on the **Agent** tab. Tabs, in order: **Agent · Models · Judge ·
-Mutation Testing · Playwright · Security**.
+Mutation Testing · Playwright · Security · Impeccable**.
 
 **🤖 Agent** — Choose the AI agent (`opencode`, `claude`, `codex`, `agents`) and
 run/re-run initialization. Selecting an agent creates its folder if missing; if an
@@ -185,6 +186,11 @@ your Gherkin scenarios and runs them after the **verify** and **judge** phases.
 
 **🛡️ Security** — Toggle the opt-in security baseline and pick a profile (`cli` or
 `web`). When enabled, the security baseline is woven into the SDD phases.
+
+**🎨 Impeccable** — Toggle the opt-in Impeccable design-language gate, auto-install,
+severity, and the product/design doc paths. When enabled, the harness runs
+Impeccable design verbs during apply and the `npx impeccable detect` gate after
+the judge phase.
 
 #### Key bindings
 
@@ -251,6 +257,10 @@ playwright:
 security:
   enabled: false         # weave the opt-in security baseline into the SDD phases
   profile: cli           # "cli" | "web"
+impeccable:
+  enabled: false         # run the Impeccable design-language gate after judge
+  auto_install: false    # run `npx impeccable install` once before the first gate run
+  severity: block-deterministic  # "block-deterministic" | "block-all" | "advisory"
 models:
   default:               # structured provider/model with optional reasoning effort
     provider: anthropic
