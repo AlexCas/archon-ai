@@ -106,6 +106,16 @@ Report one of: `web`, `not-web`, or `unknown`.
 This determination informs `playwright.enabled` in `.archon/config.yaml`. Never
 enable Playwright for a `not-web` project.
 
+### Step 3c: Impeccable Recommendation (web/frontend detection)
+
+When Step 3b's project-type determination is `web`, note in your output
+that the orchestrator SHOULD recommend enabling Impeccable (preflight group F)
+to the user — the opt-in design-language quality gate documented in
+`skills/impeccable/SKILL.md`. This is a **recommendation only**, never an
+automatic activation: state it explicitly so the orchestrator can surface it
+at the preflight gate, but do NOT set `impeccable.enabled` yourself and do NOT
+treat `not-web`/`unknown` projects as needing this recommendation.
+
 ### Step 4: Analyze Options
 
 If there are multiple approaches, compare them:
@@ -134,6 +144,7 @@ Return EXACTLY this format to the orchestrator (and write the same content to `e
 ### Project Type
 **Web testing**: {web | not-web | unknown}
 {If `unknown`: "NEW/blank project — orchestrator must ask preflight group E (Playwright) before proceeding."}
+{If `web`: "Recommend preflight group F (Impeccable design-language gate) to the user."}
 
 ### Current State
 {How the system works today relevant to this topic}

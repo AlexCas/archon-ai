@@ -82,28 +82,28 @@ Chain strategy: stacked-to-main
 
 ### Phase 7: Thin Impeccable Skill (NEW)
 
-- [ ] 7.1 `skills/impeccable/SKILL.md` (NEW): Create the thin orchestration skill. Document: per-phase invocation map (design = read PRODUCT.md/DESIGN.md; apply = `/impeccable <verb>` slash commands; verify = advisory note; judge = `npx impeccable detect --json .`). Document detect invocation signature, exit-code/JSON interpretation, severity mapping, Node/npx-missing → blocked messages (verbatim from design §6.3), auto_install semantics, PRODUCT.md/DESIGN.md ownership, and two-surface warning (npx CLI vs `/impeccable` slash commands). Mirrors design §8. Covers spec scenarios: "Impeccable skill is auto-embedded and skill_count becomes 25", "Skill delegates detection to npx, not Go code". Note: file is auto-embedded by glob; skill_count bumps 24→25 automatically.
+- [x] 7.1 `skills/impeccable/SKILL.md` (NEW): Create the thin orchestration skill. Document: per-phase invocation map (design = read PRODUCT.md/DESIGN.md; apply = `/impeccable <verb>` slash commands; verify = advisory note; judge = `npx impeccable detect --json .`). Document detect invocation signature, exit-code/JSON interpretation, severity mapping, Node/npx-missing → blocked messages (verbatim from design §6.3), auto_install semantics, PRODUCT.md/DESIGN.md ownership, and two-surface warning (npx CLI vs `/impeccable` slash commands). Mirrors design §8. Covers spec scenarios: "Impeccable skill is auto-embedded and skill_count becomes 25", "Skill delegates detection to npx, not Go code". Note: file is auto-embedded by glob; skill_count bumps 24→25 automatically.
 
 ### Phase 8: Design-Phase Hook
 
-- [ ] 8.1 `skills/sdd-design/SKILL.md`: Add a flag-gated read-only hook. When `impeccable.enabled: true` and `PRODUCT.md`/`DESIGN.md` exist at target root (or `product_path`/`design_path`), read them as input context before drafting design.md. When docs absent, proceed normally and add a note recommending `/impeccable init` (slash command, not npx). When disabled, no change. Explicitly: MUST NOT run `npx impeccable detect`, MUST NOT run any slash command, MUST NOT overwrite SDD design.md. Mirrors design §7. Covers spec scenarios: "Design references PRODUCT.md and DESIGN.md when both exist", "Design continues normally when Impeccable docs are missing", "Design phase unchanged when impeccable is disabled".
+- [x] 8.1 `skills/sdd-design/SKILL.md`: Add a flag-gated read-only hook. When `impeccable.enabled: true` and `PRODUCT.md`/`DESIGN.md` exist at target root (or `product_path`/`design_path`), read them as input context before drafting design.md. When docs absent, proceed normally and add a note recommending `/impeccable init` (slash command, not npx). When disabled, no change. Explicitly: MUST NOT run `npx impeccable detect`, MUST NOT run any slash command, MUST NOT overwrite SDD design.md. Mirrors design §7. Covers spec scenarios: "Design references PRODUCT.md and DESIGN.md when both exist", "Design continues normally when Impeccable docs are missing", "Design phase unchanged when impeccable is disabled".
 
 ### Phase 9: Apply-Phase Hook
 
-- [ ] 9.1 `skills/sdd-apply/SKILL.md`: Add a new step parallel to Step 4b. When `impeccable.enabled: true` and the change includes frontend-affecting files, instruct the agent to run `/impeccable <verb>` (craft/polish/harden/animate) as slash commands — NOT npx shell-outs. Add a Rules line: "When impeccable.enabled, run Impeccable design verbs on frontend-affecting changes during apply." Mirrors design §8.1. Covers spec scenario: "Apply step invokes Impeccable on frontend changes when enabled".
+- [x] 9.1 `skills/sdd-apply/SKILL.md`: Add a new step parallel to Step 4b. When `impeccable.enabled: true` and the change includes frontend-affecting files, instruct the agent to run `/impeccable <verb>` (craft/polish/harden/animate) as slash commands — NOT npx shell-outs. Add a Rules line: "When impeccable.enabled, run Impeccable design verbs on frontend-affecting changes during apply." Mirrors design §8.1. Covers spec scenario: "Apply step invokes Impeccable on frontend changes when enabled".
 
 ### Phase 10: Verify-Phase Hook
 
-- [ ] 10.1 `skills/sdd-verify/SKILL.md`: Add a flag-gated advisory check. When `impeccable.enabled: true`, include a NOTE (not CRITICAL) if Impeccable hooks/artifacts are absent. Never blocks. Does NOT run the detection gate. Mirrors design §8.1. Covers spec scenario: "Verify reports missing Impeccable artifacts as advisory".
+- [x] 10.1 `skills/sdd-verify/SKILL.md`: Add a flag-gated advisory check. When `impeccable.enabled: true`, include a NOTE (not CRITICAL) if Impeccable hooks/artifacts are absent. Never blocks. Does NOT run the detection gate. Mirrors design §8.1. Covers spec scenario: "Verify reports missing Impeccable artifacts as advisory".
 
 ### Phase 11: Tasks-Phase Hook
 
-- [ ] 11.1 `skills/sdd-tasks/SKILL.md`: Add conditional logic: when `impeccable.enabled: true` and the change touches frontend files, emit an "Impeccable pass" task in the task list instructing apply to run the relevant Impeccable subcommands. Mirrors design §8.1. Covers spec requirement: "Tasks phase — add Impeccable pass task".
+- [x] 11.1 `skills/sdd-tasks/SKILL.md`: Add conditional logic: when `impeccable.enabled: true` and the change touches frontend files, emit an "Impeccable pass" task in the task list instructing apply to run the relevant Impeccable subcommands. Mirrors design §8.1. Covers spec requirement: "Tasks phase — add Impeccable pass task".
 
 ### Phase 12: Explore and Spec Phase Hooks
 
-- [ ] 12.1 `skills/sdd-explore/SKILL.md`: Add detection logic: when the target project is identified as web/frontend, recommend enabling Impeccable (preflight group F). Recommendation only, not auto-activation. Mirrors design §8.1.
-- [ ] 12.2 `skills/sdd-spec/SKILL.md`: Add lightweight annotation guidance: when writing specs for frontend design-language requirements, suggest a `@design` prose note (not a new hard tag, to avoid coupling with `@web`). Mirrors design §8.1.
+- [x] 12.1 `skills/sdd-explore/SKILL.md`: Add detection logic: when the target project is identified as web/frontend, recommend enabling Impeccable (preflight group F). Recommendation only, not auto-activation. Mirrors design §8.1.
+- [x] 12.2 `skills/sdd-spec/SKILL.md`: Add lightweight annotation guidance: when writing specs for frontend design-language requirements, suggest a `@design` prose note (not a new hard tag, to avoid coupling with `@web`). Mirrors design §8.1.
 
 ---
 

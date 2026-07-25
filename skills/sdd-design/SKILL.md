@@ -61,6 +61,33 @@ Before designing, read the actual code that will be affected:
 - Dependencies and interfaces
 - Test infrastructure (if any)
 
+### Step 2b: Impeccable Design-Language Reference (conditional, read-only)
+
+**Only if `.archon/config.yaml` → `impeccable.enabled: true`.** Load
+`skills/impeccable/SKILL.md` for the full contract; the summary here is the
+minimal hook.
+
+Before drafting `design.md`, look for `PRODUCT.md` and `DESIGN.md` at the
+target-project root (or `impeccable.product_path`/`impeccable.design_path` if
+set):
+
+- If both/either exist: read them and fold their design-language constraints
+  (audience, brand lane, voice, anti-references, colors, type, components)
+  into `design.md` as input context.
+- If neither exists: proceed normally and add a note recommending the user
+  run `/impeccable init` in their AI coding tool (a slash command, not `npx
+  impeccable init`) to generate the design-language foundation docs.
+
+This hook MUST NOT run `npx impeccable detect`, MUST NOT run any `/impeccable`
+slash command, and MUST NOT generate or overwrite the SDD `design.md`
+artifact or any Impeccable output file. `PRODUCT.md`/`DESIGN.md` stay at the
+target-project root; `design.md` stays at
+`openspec/changes/{change-name}/design.md` — distinct paths, neither
+overwrites the other.
+
+When `impeccable.enabled: false`, skip this step entirely — no change to
+today's behavior.
+
 ### Step 3: Write design.md
 
 **IF mode is `openspec` or `hybrid`:** Create the design document:
