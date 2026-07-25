@@ -55,10 +55,10 @@ Required choices:
 
 **Preflight questions (Spanish, arrow-key):**
 
-Ask each group A–E as its OWN separate arrow-key §AskUserQuestion§ — never a single
+Ask each group A–F as its OWN separate arrow-key §AskUserQuestion§ — never a single
 text block, never answer codes like "A1"/"B1", never a global "usar recomendado"
 shortcut. Pre-select the recommended option as the default in each question. Ask all
-five every SDD session.
+six every SDD session.
 
 - **A. Ritmo** — "¿Qué ritmo quieres para las fases?"
   - Interactivo (recomendado): mostrar cada fase y esperar confirmación antes de continuar.
@@ -80,15 +80,24 @@ five every SDD session.
 - **E. Pruebas web (Playwright)** — "¿Generar y correr pruebas Playwright?"
   - No (recomendado): no generar ni ejecutar pruebas Playwright.
   - Sí: generar pruebas Playwright desde los escenarios Gherkin y ejecutarlas tras verify y jueces.
+- **F. Impeccable (Diseño de interfaz)** — "¿Activar Impeccable para calidad visual?"
+  - No (recomendado): no correr verificaciones de diseño.
+  - Sí: activar el gate de Impeccable tras verify/judge cuando esté habilitado.
 
 **Project type & web testing (group E):**
 - Group E maps to §playwright.enabled§ in §.archon/config.yaml§. The §--playwright§ flag at init time or the Playwright tab in §archon tui§ set the same value. When enabled, the harness generates Playwright specs from Gherkin scenarios and runs them after the verify and judge phases.
 
+**Project type & design-language gate (group F):**
+- Group F maps to §impeccable.enabled§ in §.archon/config.yaml§. The §--impeccable§
+  flag at init time or the Impeccable tab in §archon tui§ set the same value. When
+  enabled, the harness invokes Impeccable subcommands during apply and runs the
+  detection gate after the judge phase.
+
 **Hard gate rules:**
 - §openspec/config.yaml§, existing SDD artifacts, or previous §sdd-init§ results do NOT satisfy this preflight.
-- If the session has no preflight decision, ask the five per-group questions above and **STOP**. Do not run init, delegate phases, or apply tasks in the same turn.
+- If the session has no preflight decision, ask the six per-group questions above and **STOP**. Do not run init, delegate phases, or apply tasks in the same turn.
 - Cache the choices for this session and echo them into later phase prompts.
-- If the user explicitly provided all five choices in the current conversation, summarize them as the session preflight block and continue.
+- If the user explicitly provided all six choices in the current conversation, summarize them as the session preflight block and continue.
 
 ## Vague Request Guard (MANDATORY)
 
@@ -173,8 +182,9 @@ const orchestratorRulesClaude = `## Rules
 4. After every phase that produces an editable artifact, run the Human Review Gate
 5. After verify, invoke harness-judge
 6. When playwright.enabled, run the generated Playwright tests after verify and judge pass
-7. On judge fail: re-apply with feedback (max 3 retries)
-8. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution
+7. When impeccable.enabled, run Impeccable subcommands during apply and the detection gate after judge passes
+8. On judge fail: re-apply with feedback (max 3 retries)
+9. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution
 `
 
 // orchestratorRulesOpencode is the Rules block for the opencode harness.
@@ -186,8 +196,9 @@ const orchestratorRulesOpencode = `## Rules
 4. After every phase that produces an editable artifact, run the Human Review Gate
 5. After verify, invoke harness-judge
 6. When playwright.enabled, run the generated Playwright tests after verify and judge pass
-7. On judge fail: re-apply with feedback (max 3 retries)
-8. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution
+7. When impeccable.enabled, run Impeccable subcommands during apply and the detection gate after judge passes
+8. On judge fail: re-apply with feedback (max 3 retries)
+9. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution
 `
 
 // phaseModelsClaude is the Phase Models block for CLAUDE.md. The archon-<phase>

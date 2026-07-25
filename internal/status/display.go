@@ -50,6 +50,20 @@ func DisplayWithUpdate(w io.Writer, cfg *config.Config, n int) {
 	}
 	fmt.Fprintln(w)
 
+	fmt.Fprintln(w, "  Impeccable (Design Language)")
+	fmt.Fprintln(w, "  -----------------------------")
+	fmt.Fprintf(w, "    Enabled:   %t\n", cfg.Impeccable.Enabled)
+	if cfg.Impeccable.Enabled {
+		fmt.Fprintf(w, "    Severity:  %s\n", cfg.Impeccable.Severity)
+		if cfg.Impeccable.ProductPath != "" {
+			fmt.Fprintf(w, "    Product Path: %s\n", cfg.Impeccable.ProductPath)
+		}
+		if cfg.Impeccable.DesignPath != "" {
+			fmt.Fprintf(w, "    Design Path:  %s\n", cfg.Impeccable.DesignPath)
+		}
+	}
+	fmt.Fprintln(w)
+
 	fmt.Fprintln(w, "  Models")
 	fmt.Fprintln(w, "  ------")
 	if cfg.Models.Default.FullID() == "" && len(cfg.Models.Phases) == 0 {

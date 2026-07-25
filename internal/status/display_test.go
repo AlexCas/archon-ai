@@ -134,6 +134,57 @@ func TestDisplay(t *testing.T) {
 	}
 }
 
+// TestDisplay_Impeccable covers spec scenarios "Status shows Impeccable as
+// disabled" and "Status shows Impeccable as enabled with config details".
+func TestDisplay_Impeccable(t *testing.T) {
+	t.Run("disabled shows only Enabled: false", func(t *testing.T) {
+		cfg := &config.Config{
+			Version:         "1.0.0",
+			Agent:           "claude",
+			CreatedAt:       time.Date(2026, 6, 10, 0, 0, 0, 0, time.UTC),
+			MutationTesting: config.MutationTesting{Enabled: false},
+		}
+		var buf bytes.Buffer
+		Display(&buf, cfg)
+		got := buf.String()
+
+		if !strings.Contains(got, "Impeccable (Design Language)") {
+			t.Errorf("output missing Impeccable block:\n%s", got)
+		}
+		if !strings.Contains(got, "Enabled:   false") {
+			t.Errorf("output missing disabled state:\n%s", got)
+		}
+		if strings.Contains(got, "Severity:") {
+			t.Errorf("disabled block should not show Severity:\n%s", got)
+		}
+	})
+
+	t.Run("enabled shows all fields", func(t *testing.T) {
+		cfg := &config.Config{
+			Version:         "1.0.0",
+			Agent:           "claude",
+			CreatedAt:       time.Date(2026, 6, 10, 0, 0, 0, 0, time.UTC),
+			MutationTesting: config.MutationTesting{Enabled: false},
+			Impeccable: config.Impeccable{
+				Enabled:     true,
+				AutoInstall: true,
+				Severity:    "block-all",
+				ProductPath: "PRODUCT.md",
+				DesignPath:  "DESIGN.md",
+			},
+		}
+		var buf bytes.Buffer
+		Display(&buf, cfg)
+		got := buf.String()
+
+		for _, want := range []string{"Enabled:   true", "block-all", "PRODUCT.md", "DESIGN.md"} {
+			if !strings.Contains(got, want) {
+				t.Errorf("output missing %q:\n%s", want, got)
+			}
+		}
+	})
+}
+
 func TestDisplayWithUpdate(t *testing.T) {
 	cfg := &config.Config{
 		Version:         "1.0.0",

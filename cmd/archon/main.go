@@ -81,6 +81,7 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 		dryRunFlag       bool
 		playwrightFlag   bool
 		securityFlag     bool
+		impeccableFlag   bool
 		modelFlag        string
 		modelExploreFlag string
 		modelProposeFlag string
@@ -168,6 +169,7 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 				ModelLeader:       modelLeaderFlag,
 				Playwright:        playwrightFlag,
 				Security:          securityFlag,
+				Impeccable:        impeccableFlag,
 				OverwriteTemplate: forceFlag,
 			}
 
@@ -200,6 +202,7 @@ func newInitCmd(stdout, stderr io.Writer) *cobra.Command {
 	cmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Show what would happen without making changes")
 	cmd.Flags().BoolVar(&playwrightFlag, "playwright", false, "Enable Playwright E2E test generation and execution for web projects")
 	cmd.Flags().BoolVar(&securityFlag, "security", false, "Enable the security-baseline gate (propose/spec/tasks/verify/judge hooks)")
+	cmd.Flags().BoolVar(&impeccableFlag, "impeccable", false, "Enable the Impeccable design-language gate")
 	cmd.Flags().StringVar(&modelFlag, "model", "", "Default AI model for all SDD phases")
 	cmd.Flags().StringVar(&modelExploreFlag, "model-explore", "", "Model for the explore phase")
 	cmd.Flags().StringVar(&modelProposeFlag, "model-propose", "", "Model for the propose phase")

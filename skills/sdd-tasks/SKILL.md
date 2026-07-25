@@ -202,6 +202,9 @@ Phase 4: Testing
   └─ security.enabled: a @security CI task — run SAST, secret detection, and
      dependency vulnerability scans; fail CI on any HIGH or CRITICAL finding;
      do NOT name a specific vendor tool in the task description
+  └─ impeccable.enabled AND the change touches frontend files: an "Impeccable
+     pass" task instructing sdd-apply to run the relevant `/impeccable <verb>`
+     slash commands on the changed frontend files
 
 Phase 5: Cleanup (if needed)
   └─ Documentation, remove dead code, polish
@@ -261,6 +264,12 @@ Return to the orchestrator:
   name a specific vendor tool (e.g., do not write "run gosec" or "run trivy" —
   write "run SAST scan" and "run dependency vulnerability scan"). When
   `security.enabled` is false, omit this task entirely — no change to task behavior.
+- **Impeccable pass task (conditional)**: If `impeccable.enabled` is true and the
+  change touches frontend files, emit one task in Phase 4 titled along the lines
+  of "Run Impeccable design verbs on {affected frontend files}" — this instructs
+  `sdd-apply` to run the relevant `/impeccable <verb>` slash commands (see
+  `skills/impeccable/SKILL.md`). When `impeccable.enabled` is false, or the change
+  has no frontend files, omit this task entirely.
 - Each task should be completable in ONE session (if a task feels too big, split it)
 - Use hierarchical numbering: 1.1, 1.2, 2.1, 2.2, etc.
 - NEVER include vague tasks like "implement feature" or "add tests"
