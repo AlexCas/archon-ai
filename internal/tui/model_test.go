@@ -2,6 +2,7 @@ package tui
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -763,7 +764,7 @@ func TestSaveConfig_OpencodeLeaderMatchesInitMerge(t *testing.T) {
 
 	// Reference path: a direct merge with the same models config into a fresh dir.
 	initDir := t.TempDir()
-	if _, err := initcmd.MergeOpencodeAgent(initDir, config.ModelConfig{Leader: config.ParseModelRef(leader)}); err != nil {
+	if _, err := initcmd.MergeOpencodeAgent(initDir, config.ModelConfig{Leader: config.ParseModelRef(leader)}, io.Discard); err != nil {
 		t.Fatalf("MergeOpencodeAgent() error = %v", err)
 	}
 	initBytes, err := os.ReadFile(filepath.Join(initDir, "opencode.json"))

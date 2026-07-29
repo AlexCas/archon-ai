@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"io"
+	"net/url"
 	"strings"
 	"unicode"
 
@@ -15,6 +17,11 @@ type ModelRef struct {
 	Provider string `yaml:"provider,omitempty"`
 	Model    string `yaml:"model,omitempty"`
 	Effort   string `yaml:"effort,omitempty"`
+	// BaseURL is an optional OpenAI-compatible endpoint (e.g. a local Ollama or
+	// LocalAI server). Empty for every remote/hosted provider. Only the
+	// OpenCode generation path honors it (see internal/initcmd/opencode_mode.go);
+	// the Claude path warns and ignores it.
+	BaseURL string `yaml:"base_url,omitempty"`
 }
 
 // FullID returns the provider-qualified id used by delegations:
@@ -54,17 +61,48 @@ func (r *ModelRef) UnmarshalYAML(node *yaml.Node) error {
 	return nil
 }
 
-// MarshalYAML emits a scalar equal to FullID() when Effort == "", keeping
-// unmigrated flat-string configs byte-identical — both a bare alias ("opus")
-// and a provider-qualified scalar ("anthropic/claude-...") re-serialize to the
-// same one-line form they were loaded from. Only an effort-bearing ref (which
-// has no legacy scalar representation) marshals as a mapping.
+// MarshalYAML emits a scalar equal to FullID() when Effort == "" && BaseURL ==
+// "", keeping unmigrated flat-string configs byte-identical — both a bare
+// alias ("opus") and a provider-qualified scalar ("anthropic/claude-...")
+// re-serialize to the same one-line form they were loaded from. A ref that
+// carries an Effort and/or a BaseURL (neither has a legacy scalar
+// representation) marshals as a mapping.
 func (r ModelRef) MarshalYAML() (any, error) {
-	if r.Effort == "" {
+	if r.Effort == "" && r.BaseURL == "" {
 		return r.FullID(), nil // SCALAR — byte-identical for unmigrated configs
 	}
 	type modelRefAlias ModelRef // mapping, no recursion
 	return modelRefAlias(r), nil
+}
+
+// ValidateBaseURL is an advisory-only check: it never returns an error and
+// never blocks the caller. It warns to w when BaseURL is set but Provider is
+// empty (local routing needs a provider id), and when BaseURL does not parse
+// as an http/https URL with a non-empty host. A ref with an empty BaseURL is
+// always silent — there is nothing to validate.
+func ValidateBaseURL(ref ModelRef, w io.Writer) {
+	if ref.BaseURL == "" {
+		return
+	}
+	if ref.Provider == "" {
+		fmt.Fprintln(w, "warning: base_url is set but provider is empty — provider id required for local model routing")
+	}
+	if !isValidHTTPURL(ref.BaseURL) {
+		fmt.Fprintf(w, "warning: base_url %q is not a valid http/https URL\n", ref.BaseURL)
+	}
+}
+
+// isValidHTTPURL reports whether s parses as an absolute http or https URL
+// with a non-empty host.
+func isValidHTTPURL(s string) bool {
+	u, err := url.Parse(s)
+	if err != nil {
+		return false
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return false
+	}
+	return u.Host != ""
 }
 
 // ParseModelRef splits a user-supplied "provider/model" string into a ModelRef.
@@ -194,9 +232,11 @@ var providerFamilies = []providerFamily{
 
 // PhaseModel pairs an SDD phase with its resolved, normalized model alias.
 type PhaseModel struct {
-	Phase  string
-	Model  string
-	Effort string // resolved ModelRef.Effort (variant); "" = provider default
+	Phase    string
+	Model    string
+	Provider string // resolved ref's raw Provider id; "" when the ref has none
+	Effort   string // resolved ModelRef.Effort (variant); "" = provider default
+	BaseURL  string // resolved ref's BaseURL; "" = no local endpoint
 }
 
 // NormalizeModel maps a configured/display model value to the canonical
@@ -258,7 +298,7 @@ func ResolvePhaseModels(mc ModelConfig) []PhaseModel {
 		if ref.Model == "" {
 			continue
 		}
-		out = append(out, PhaseModel{Phase: p, Model: ref.FullID(), Effort: ref.Effort})
+		out = append(out, PhaseModel{Phase: p, Model: ref.FullID(), Provider: ref.Provider, Effort: ref.Effort, BaseURL: ref.BaseURL})
 	}
 	return out
 }

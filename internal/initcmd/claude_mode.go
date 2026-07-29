@@ -2,6 +2,7 @@ package initcmd
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,8 +14,14 @@ import (
 // package (notably the TUI save path). It delegates to writeClaudeAgents so
 // init and the TUI share a single writer implementation and produce
 // byte-identical .claude/agents output.
-func WriteClaudeAgents(projectDir string, models config.ModelConfig) ([]string, error) {
-	return writeClaudeAgents(projectDir, models)
+//
+// Caller audit (PR-A A1, local-model-provider): grepping every exported
+// symbol in this package across the repo shows exactly one external caller —
+// internal/tui/model.go (line ~381, passes io.Discard). init.go is the
+// same-package caller of the unexported writeClaudeAgents and passes
+// os.Stderr. No third caller exists.
+func WriteClaudeAgents(projectDir string, models config.ModelConfig, w io.Writer) ([]string, error) {
+	return writeClaudeAgents(projectDir, models, w)
 }
 
 // writeClaudeAgents writes one .claude/agents/archon-<phase>.md file per
@@ -25,7 +32,16 @@ func WriteClaudeAgents(projectDir string, models config.ModelConfig) ([]string, 
 // idempotent — re-running with the same config produces byte-identical files.
 // Only archon-<phase>.md files are written; user-defined files under
 // .claude/agents/ are never modified or deleted.
-func writeClaudeAgents(projectDir string, models config.ModelConfig) ([]string, error) {
+//
+// REQ-6 (PR-B): the Claude path cannot honor a resolved ref's BaseURL — Claude
+// Code subagents do not support custom endpoints. For every phase whose
+// resolved PhaseModel.BaseURL != "", writeClaudeAgents emits a visible warning
+// to w before writing the agent file, then writes the file anyway with the
+// bare model id (warn-and-skip: never a hard failure). Callers on the CLI path
+// (init.go) pass os.Stderr so the warning is user-visible; the TUI save path
+// intentionally passes io.Discard because the warning has no display target in
+// the terminal UI and errors are propagated via the error return.
+func writeClaudeAgents(projectDir string, models config.ModelConfig, w io.Writer) ([]string, error) {
 	phases := config.ResolvePhaseModels(models)
 	if len(phases) == 0 {
 		return nil, nil
@@ -38,6 +54,9 @@ func writeClaudeAgents(projectDir string, models config.ModelConfig) ([]string, 
 
 	var written []string
 	for _, pm := range phases {
+		if pm.BaseURL != "" {
+			fmt.Fprintf(w, "warning: phase %q has base_url set but agent is \"claude\" — local endpoint ignored; claude agents do not support custom baseURLs\n", pm.Phase)
+		}
 		path := filepath.Join(dir, "archon-"+pm.Phase+".md")
 		content := renderClaudeAgent(pm)
 

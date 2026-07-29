@@ -103,7 +103,7 @@ func Run(opts Options) (*Result, error) {
 	// This must run before WriteManifest so the written path is registered for
 	// rollback alongside everything else init created.
 	if agentName == "opencode" {
-		mergedPath, err := mergeOpencodeAgent(opts.ProjectDir, cfg.Models)
+		mergedPath, err := mergeOpencodeAgent(opts.ProjectDir, cfg.Models, os.Stderr)
 		if err != nil {
 			return nil, fmt.Errorf("merge opencode agent: %w", err)
 		}
@@ -116,7 +116,7 @@ func Run(opts Options) (*Result, error) {
 	// claude projects. Must run before WriteManifest so all written paths are
 	// registered for rollback.
 	if agentName == "claude" {
-		paths, err := writeClaudeAgents(opts.ProjectDir, cfg.Models)
+		paths, err := writeClaudeAgents(opts.ProjectDir, cfg.Models, os.Stderr)
 		if err != nil {
 			return nil, fmt.Errorf("write claude agents: %w", err)
 		}

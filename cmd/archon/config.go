@@ -47,7 +47,7 @@ func newConfigSetCmd(stdout, stderr io.Writer) *cobra.Command {
 				return fmt.Errorf("load config: %w", err)
 			}
 
-			if strings.HasPrefix(key, "models.") {
+			if strings.HasPrefix(key, "models.") && !strings.HasSuffix(key, ".base_url") {
 				if w := config.Validate(value); w != "" {
 					fmt.Fprintln(stderr, w)
 				}
@@ -55,6 +55,14 @@ func newConfigSetCmd(stdout, stderr io.Writer) *cobra.Command {
 
 			if err := setConfigValue(cfg, key, value); err != nil {
 				return err
+			}
+
+			// REQ-3: advisory BaseURL validation at CLI set-time, after the
+			// value has been written so the ref reflects the new BaseURL.
+			if strings.HasSuffix(key, ".base_url") {
+				if ref, ok := baseURLRefForKey(cfg, key); ok {
+					config.ValidateBaseURL(ref, stderr)
+				}
 			}
 
 			if err := cfg.Save(); err != nil {
@@ -124,6 +132,9 @@ func newConfigListCmd(stdout, stderr io.Writer) *cobra.Command {
 			if cfg.Models.Default.FullID() != "" {
 				fmt.Fprintf(stdout, "models.default = %s\n", cfg.Models.Default.FullID())
 			}
+			if cfg.Models.Default.BaseURL != "" {
+				fmt.Fprintf(stdout, "models.default.base_url = %s\n", cfg.Models.Default.BaseURL)
+			}
 
 			if len(cfg.Models.Phases) > 0 {
 				phases := make([]string, 0, len(cfg.Models.Phases))
@@ -133,11 +144,29 @@ func newConfigListCmd(stdout, stderr io.Writer) *cobra.Command {
 				sort.Strings(phases)
 				for _, phase := range phases {
 					fmt.Fprintf(stdout, "models.phases.%s = %s\n", phase, cfg.Models.Phases[phase].FullID())
+					if baseURL := cfg.Models.Phases[phase].BaseURL; baseURL != "" {
+						fmt.Fprintf(stdout, "models.phases.%s.base_url = %s\n", phase, baseURL)
+					}
 				}
 			}
 
 			return nil
 		},
+	}
+}
+
+// baseURLRefForKey returns the ModelRef addressed by a "*.base_url" set key
+// (models.default.base_url or models.phases.<phase>.base_url) so its current
+// BaseURL can be advisory-validated after the value has been written.
+func baseURLRefForKey(cfg *config.Config, key string) (config.ModelRef, bool) {
+	switch {
+	case key == "models.default.base_url":
+		return cfg.Models.Default, true
+	case strings.HasPrefix(key, "models.phases.") && strings.HasSuffix(key, ".base_url"):
+		phase := strings.TrimSuffix(strings.TrimPrefix(key, "models.phases."), ".base_url")
+		return cfg.Models.Phases[phase], true
+	default:
+		return config.ModelRef{}, false
 	}
 }
 
@@ -153,6 +182,9 @@ func setConfigValue(cfg *config.Config, key, value string) error {
 	switch key {
 	case "models.default":
 		cfg.Models.Default = config.ParseModelRef(value)
+		return nil
+	case "models.default.base_url":
+		cfg.Models.Default.BaseURL = value
 		return nil
 	case "playwright.enabled":
 		b, err := parseBool(key, value)
@@ -215,7 +247,20 @@ func setConfigValue(cfg *config.Config, key, value string) error {
 		return nil
 	default:
 		if strings.HasPrefix(key, "models.phases.") {
-			phase := strings.TrimPrefix(key, "models.phases.")
+			rest := strings.TrimPrefix(key, "models.phases.")
+			if phase, ok := strings.CutSuffix(rest, ".base_url"); ok {
+				if !config.ValidPhases[phase] {
+					return fmt.Errorf("unknown phase %q (valid: explore, propose, spec, design, tasks, apply, verify, judge, archive)", phase)
+				}
+				if cfg.Models.Phases == nil {
+					cfg.Models.Phases = make(map[string]config.ModelRef)
+				}
+				ref := cfg.Models.Phases[phase]
+				ref.BaseURL = value
+				cfg.Models.Phases[phase] = ref
+				return nil
+			}
+			phase := rest
 			if !config.ValidPhases[phase] {
 				return fmt.Errorf("unknown phase %q (valid: explore, propose, spec, design, tasks, apply, verify, judge, archive)", phase)
 			}
@@ -225,7 +270,7 @@ func setConfigValue(cfg *config.Config, key, value string) error {
 			cfg.Models.Phases[phase] = config.ParseModelRef(value)
 			return nil
 		}
-		return fmt.Errorf("unknown config key %q (supported: models.default, models.phases.<phase>, playwright.enabled, playwright.test_dir, playwright.base_url, mutation_testing.enabled, security.enabled, security.profile, impeccable.enabled, impeccable.auto_install, impeccable.severity, impeccable.product_path, impeccable.design_path)", key)
+		return fmt.Errorf("unknown config key %q (supported: models.default, models.default.base_url, models.phases.<phase>, models.phases.<phase>.base_url, playwright.enabled, playwright.test_dir, playwright.base_url, mutation_testing.enabled, security.enabled, security.profile, impeccable.enabled, impeccable.auto_install, impeccable.severity, impeccable.product_path, impeccable.design_path)", key)
 	}
 }
 
@@ -233,6 +278,8 @@ func getConfigValue(cfg *config.Config, key string) (string, error) {
 	switch key {
 	case "models.default":
 		return cfg.Models.Default.FullID(), nil
+	case "models.default.base_url":
+		return cfg.Models.Default.BaseURL, nil
 	case "playwright.enabled":
 		return strconv.FormatBool(cfg.Playwright.Enabled), nil
 	case "playwright.test_dir":
@@ -257,12 +304,19 @@ func getConfigValue(cfg *config.Config, key string) (string, error) {
 		return cfg.Impeccable.DesignPath, nil
 	default:
 		if strings.HasPrefix(key, "models.phases.") {
-			phase := strings.TrimPrefix(key, "models.phases.")
+			rest := strings.TrimPrefix(key, "models.phases.")
+			if phase, ok := strings.CutSuffix(rest, ".base_url"); ok {
+				if !config.ValidPhases[phase] {
+					return "", fmt.Errorf("unknown phase %q (valid: explore, propose, spec, design, tasks, apply, verify, judge, archive)", phase)
+				}
+				return cfg.Models.Phases[phase].BaseURL, nil
+			}
+			phase := rest
 			if !config.ValidPhases[phase] {
 				return "", fmt.Errorf("unknown phase %q (valid: explore, propose, spec, design, tasks, apply, verify, judge, archive)", phase)
 			}
 			return cfg.Models.Phases[phase].FullID(), nil
 		}
-		return "", fmt.Errorf("unknown config key %q (supported: models.default, models.phases.<phase>, playwright.enabled, playwright.test_dir, playwright.base_url, mutation_testing.enabled, security.enabled, security.profile, impeccable.enabled, impeccable.auto_install, impeccable.severity, impeccable.product_path, impeccable.design_path)", key)
+		return "", fmt.Errorf("unknown config key %q (supported: models.default, models.default.base_url, models.phases.<phase>, models.phases.<phase>.base_url, playwright.enabled, playwright.test_dir, playwright.base_url, mutation_testing.enabled, security.enabled, security.profile, impeccable.enabled, impeccable.auto_install, impeccable.severity, impeccable.product_path, impeccable.design_path)", key)
 	}
 }
