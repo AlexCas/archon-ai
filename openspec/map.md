@@ -42,10 +42,11 @@ this preamble is authored prose and is preserved across every regeneration. See
 | [ai-orchestration-harness](changes/ai-orchestration-harness/proposal.md) |  |  |
 | [impeccable-frontend-integration](changes/impeccable-frontend-integration/proposal.md) | tasks | completed |
 | [issue-16-leader-personality](changes/issue-16-leader-personality/proposal.md) |  |  |
-| [local-model-provider](changes/local-model-provider/proposal.md) | explore | completed |
 | [opencode-phase-subagents](changes/opencode-phase-subagents/proposal.md) | design | in_progress |
 
 ## Archive
+### 2026-07-28
+- [local-model-provider](changes/archive/2026-07-28-local-model-provider/proposal.md)
 ### 2026-07-22
 - [obsidian-vault-specs](changes/archive/2026-07-22-obsidian-vault-specs/proposal.md)
 ### 2026-07-15

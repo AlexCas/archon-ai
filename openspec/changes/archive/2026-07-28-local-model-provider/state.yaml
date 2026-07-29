@@ -1,4 +1,4 @@
-phase: judge
+phase: archive
 status: completed
 history:
   - {phase: explore, status: in_progress, ts: "2026-07-29T00:37:42Z"}
