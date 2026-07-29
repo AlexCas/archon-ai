@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/archon-ai/archon/internal/config"
+	"github.com/archon-ai/archon/internal/status"
 )
 
 func setupProjectWithConfig(t *testing.T) string {
@@ -456,6 +459,99 @@ func TestConfigCmd_BaseURLSetGet(t *testing.T) {
 	}
 }
 
+// TestConfigCmd_BaseURLPreservedOnModelSet covers the BaseURL-preservation
+// invariant: setting a model-id AFTER a base_url has been set must not wipe
+// the previously-set BaseURL. This is the primary regression guard for the
+// ref.BaseURL = existing.BaseURL copy in setConfigValue.
+func TestConfigCmd_BaseURLPreservedOnModelSet(t *testing.T) {
+	t.Run("default: set base_url then set model preserves base_url", func(t *testing.T) {
+		tmpDir := setupEmptyProject(t)
+		origDir, _ := os.Getwd()
+		os.Chdir(tmpDir)
+		defer os.Chdir(origDir)
+
+		for _, args := range [][]string{
+			{"config", "set", "models.default.base_url", "http://localhost:11434/v1"},
+			{"config", "set", "models.default", "ollama/llama3"},
+		} {
+			var out, err bytes.Buffer
+			cmd := newRootCmd(&out, &err)
+			cmd.SetArgs(args)
+			if e := cmd.Execute(); e != nil {
+				t.Fatalf("set %v Execute() error = %v, stderr = %s", args, e, err.String())
+			}
+		}
+
+		var out, err bytes.Buffer
+		cmd := newRootCmd(&out, &err)
+		cmd.SetArgs([]string{"config", "get", "models.default.base_url"})
+		if e := cmd.Execute(); e != nil {
+			t.Fatalf("get models.default.base_url Execute() error = %v, stderr = %s", e, err.String())
+		}
+		if got := strings.TrimSpace(out.String()); got != "http://localhost:11434/v1" {
+			t.Errorf("models.default.base_url after model set = %q, want %q (base_url must be preserved)", got, "http://localhost:11434/v1")
+		}
+	})
+
+	t.Run("leader: set base_url then set model preserves base_url", func(t *testing.T) {
+		tmpDir := setupEmptyProject(t)
+		origDir, _ := os.Getwd()
+		os.Chdir(tmpDir)
+		defer os.Chdir(origDir)
+
+		for _, args := range [][]string{
+			{"config", "set", "models.leader.base_url", "http://localhost:11434/v1"},
+			{"config", "set", "models.leader", "ollama/llama3"},
+		} {
+			var out, err bytes.Buffer
+			cmd := newRootCmd(&out, &err)
+			cmd.SetArgs(args)
+			if e := cmd.Execute(); e != nil {
+				t.Fatalf("set %v Execute() error = %v, stderr = %s", args, e, err.String())
+			}
+		}
+
+		var out, err bytes.Buffer
+		cmd := newRootCmd(&out, &err)
+		cmd.SetArgs([]string{"config", "get", "models.leader.base_url"})
+		if e := cmd.Execute(); e != nil {
+			t.Fatalf("get models.leader.base_url Execute() error = %v, stderr = %s", e, err.String())
+		}
+		if got := strings.TrimSpace(out.String()); got != "http://localhost:11434/v1" {
+			t.Errorf("models.leader.base_url after model set = %q, want %q (base_url must be preserved)", got, "http://localhost:11434/v1")
+		}
+	})
+
+	t.Run("phase: set base_url then set model preserves base_url", func(t *testing.T) {
+		tmpDir := setupEmptyProject(t)
+		origDir, _ := os.Getwd()
+		os.Chdir(tmpDir)
+		defer os.Chdir(origDir)
+
+		for _, args := range [][]string{
+			{"config", "set", "models.phases.apply.base_url", "http://localhost:11434/v1"},
+			{"config", "set", "models.phases.apply", "ollama/llama3"},
+		} {
+			var out, err bytes.Buffer
+			cmd := newRootCmd(&out, &err)
+			cmd.SetArgs(args)
+			if e := cmd.Execute(); e != nil {
+				t.Fatalf("set %v Execute() error = %v, stderr = %s", args, e, err.String())
+			}
+		}
+
+		var out, err bytes.Buffer
+		cmd := newRootCmd(&out, &err)
+		cmd.SetArgs([]string{"config", "get", "models.phases.apply.base_url"})
+		if e := cmd.Execute(); e != nil {
+			t.Fatalf("get models.phases.apply.base_url Execute() error = %v, stderr = %s", e, err.String())
+		}
+		if got := strings.TrimSpace(out.String()); got != "http://localhost:11434/v1" {
+			t.Errorf("models.phases.apply.base_url after model set = %q, want %q (base_url must be preserved)", got, "http://localhost:11434/v1")
+		}
+	})
+}
+
 // TestConfigCmd_BaseURLGetUnsetReturnsEmpty covers REQ-2: getting base_url on
 // a ref with no BaseURL exits 0 and prints nothing.
 func TestConfigCmd_BaseURLGetUnsetReturnsEmpty(t *testing.T) {
@@ -536,6 +632,8 @@ agent: opencode
 	}
 }
 
+// setupEmptyProject returns a project with no models.* keys set at all, for
+// tests that build up a base_url-only or leader-only fixture via `config set`.
 func setupEmptyProject(t *testing.T) string {
 	t.Helper()
 	tmpDir := t.TempDir()
@@ -612,6 +710,35 @@ func TestConfigCmd_ListBaseURLOnlyIsConfigured(t *testing.T) {
 			t.Errorf("list output = %q, want contains %q", output, "models.phases.apply.base_url = http://localhost:11434/v1")
 		}
 	})
+
+	t.Run("leader base_url only", func(t *testing.T) {
+		tmpDir := setupEmptyProject(t)
+		origDir, _ := os.Getwd()
+		os.Chdir(tmpDir)
+		defer os.Chdir(origDir)
+
+		var setOut, setErr bytes.Buffer
+		setCmd := newRootCmd(&setOut, &setErr)
+		setCmd.SetArgs([]string{"config", "set", "models.leader.base_url", "http://localhost:11434/v1"})
+		if err := setCmd.Execute(); err != nil {
+			t.Fatalf("set Execute() error = %v, stderr = %s", err, setErr.String())
+		}
+
+		var stdout, stderr bytes.Buffer
+		root := newRootCmd(&stdout, &stderr)
+		root.SetArgs([]string{"config", "list"})
+		if err := root.Execute(); err != nil {
+			t.Fatalf("list Execute() error = %v, stderr = %s", err, stderr.String())
+		}
+
+		output := stdout.String()
+		if strings.Contains(output, "(none configured)") {
+			t.Errorf("list output = %q, want NOT contains %q", output, "(none configured)")
+		}
+		if !strings.Contains(output, "models.leader.base_url = http://localhost:11434/v1") {
+			t.Errorf("list output = %q, want contains %q", output, "models.leader.base_url = http://localhost:11434/v1")
+		}
+	})
 }
 
 // TestConfigCmd_ListSuppressesEmptyPrimary covers REQ-9: the primary
@@ -675,4 +802,243 @@ func TestConfigCmd_ListSuppressesEmptyPrimary(t *testing.T) {
 			t.Errorf("list output = %q, want contains %q", output, "models.phases.apply.base_url = http://localhost:11434/v1")
 		}
 	})
+
+	t.Run("leader base_url-only suppresses primary line", func(t *testing.T) {
+		tmpDir := setupEmptyProject(t)
+		origDir, _ := os.Getwd()
+		os.Chdir(tmpDir)
+		defer os.Chdir(origDir)
+
+		var setOut, setErr bytes.Buffer
+		setCmd := newRootCmd(&setOut, &setErr)
+		setCmd.SetArgs([]string{"config", "set", "models.leader.base_url", "http://localhost:11434/v1"})
+		if err := setCmd.Execute(); err != nil {
+			t.Fatalf("set Execute() error = %v, stderr = %s", err, setErr.String())
+		}
+
+		var stdout, stderr bytes.Buffer
+		root := newRootCmd(&stdout, &stderr)
+		root.SetArgs([]string{"config", "list"})
+		if err := root.Execute(); err != nil {
+			t.Fatalf("list Execute() error = %v, stderr = %s", err, stderr.String())
+		}
+
+		output := stdout.String()
+		if !strings.Contains(output, "models.leader.base_url = ") {
+			t.Errorf("list output = %q, want contains %q", output, "models.leader.base_url = ")
+		}
+		if strings.Contains(output, "models.leader = ") {
+			t.Errorf("list output = %q, want NOT contains %q", output, "models.leader = ")
+		}
+	})
+}
+
+// TestConfigCmd_LeaderSetGet covers REQ-11: set/get round-trip for
+// models.leader and models.leader.base_url, with cross-field isolation.
+func TestConfigCmd_LeaderSetGet(t *testing.T) {
+	tmpDir := setupProjectWithConfig(t)
+	origDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	var setOut, setErr bytes.Buffer
+	setCmd := newRootCmd(&setOut, &setErr)
+	setCmd.SetArgs([]string{"config", "set", "models.leader", "ollama/llama3"})
+	if err := setCmd.Execute(); err != nil {
+		t.Fatalf("set models.leader Execute() error = %v, stderr = %s", err, setErr.String())
+	}
+
+	var getOut, getErr bytes.Buffer
+	getCmd := newRootCmd(&getOut, &getErr)
+	getCmd.SetArgs([]string{"config", "get", "models.leader"})
+	if err := getCmd.Execute(); err != nil {
+		t.Fatalf("get models.leader Execute() error = %v, stderr = %s", err, getErr.String())
+	}
+	if got := strings.TrimSpace(getOut.String()); got != "ollama/llama3" {
+		t.Errorf("models.leader = %q, want %q", got, "ollama/llama3")
+	}
+
+	var setURLOut, setURLErr bytes.Buffer
+	setURLCmd := newRootCmd(&setURLOut, &setURLErr)
+	setURLCmd.SetArgs([]string{"config", "set", "models.leader.base_url", "http://localhost:11434/v1"})
+	if err := setURLCmd.Execute(); err != nil {
+		t.Fatalf("set models.leader.base_url Execute() error = %v, stderr = %s", err, setURLErr.String())
+	}
+
+	var getURLOut, getURLErr bytes.Buffer
+	getURLCmd := newRootCmd(&getURLOut, &getURLErr)
+	getURLCmd.SetArgs([]string{"config", "get", "models.leader.base_url"})
+	if err := getURLCmd.Execute(); err != nil {
+		t.Fatalf("get models.leader.base_url Execute() error = %v, stderr = %s", err, getURLErr.String())
+	}
+	if got := strings.TrimSpace(getURLOut.String()); got != "http://localhost:11434/v1" {
+		t.Errorf("models.leader.base_url = %q, want %q", got, "http://localhost:11434/v1")
+	}
+
+	// Setting the base_url must not have altered the provider/model fields.
+	var getIDOut, getIDErr bytes.Buffer
+	getIDCmd := newRootCmd(&getIDOut, &getIDErr)
+	getIDCmd.SetArgs([]string{"config", "get", "models.leader"})
+	if err := getIDCmd.Execute(); err != nil {
+		t.Fatalf("get models.leader Execute() error = %v, stderr = %s", err, getIDErr.String())
+	}
+	if got := strings.TrimSpace(getIDOut.String()); got != "ollama/llama3" {
+		t.Errorf("models.leader after base_url set = %q, want unchanged %q", got, "ollama/llama3")
+	}
+}
+
+// TestConfigCmd_ListShowsLeaderBlock covers REQ-11: `config list` renders the
+// leader id and base_url lines, ordered before any models.phases. line.
+func TestConfigCmd_ListShowsLeaderBlock(t *testing.T) {
+	tmpDir := setupProjectWithConfig(t)
+	origDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	for _, args := range [][]string{
+		{"config", "set", "models.leader", "ollama/llama3"},
+		{"config", "set", "models.leader.base_url", "http://localhost:11434/v1"},
+	} {
+		var setOut, setErr bytes.Buffer
+		setCmd := newRootCmd(&setOut, &setErr)
+		setCmd.SetArgs(args)
+		if err := setCmd.Execute(); err != nil {
+			t.Fatalf("set %v Execute() error = %v, stderr = %s", args, err, setErr.String())
+		}
+	}
+
+	var stdout, stderr bytes.Buffer
+	root := newRootCmd(&stdout, &stderr)
+	root.SetArgs([]string{"config", "list"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("list Execute() error = %v, stderr = %s", err, stderr.String())
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "models.leader = ollama/llama3") {
+		t.Errorf("list output = %q, want contains %q", output, "models.leader = ollama/llama3")
+	}
+	if !strings.Contains(output, "models.leader.base_url = http://localhost:11434/v1") {
+		t.Errorf("list output = %q, want contains %q", output, "models.leader.base_url = http://localhost:11434/v1")
+	}
+
+	defaultIdx := strings.Index(output, "models.default = ")
+	leaderIdx := strings.Index(output, "models.leader = ")
+	phaseIdx := strings.Index(output, "models.phases.")
+	if defaultIdx == -1 || leaderIdx == -1 || phaseIdx == -1 || !(defaultIdx < leaderIdx && leaderIdx < phaseIdx) {
+		t.Errorf("list output = %q, want order: models.default < models.leader < models.phases.", output)
+	}
+}
+
+// TestConfigCmd_LeaderBaseURLAdvisory covers REQ-11: leader base_url
+// validation is advisory-only — an invalid scheme warns but never blocks.
+func TestConfigCmd_LeaderBaseURLAdvisory(t *testing.T) {
+	tmpDir := setupProjectWithConfig(t)
+	origDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	var setOut, setErr bytes.Buffer
+	setCmd := newRootCmd(&setOut, &setErr)
+	setCmd.SetArgs([]string{"config", "set", "models.leader.base_url", "ftp://bad-url"})
+	if err := setCmd.Execute(); err != nil {
+		t.Fatalf("set models.leader.base_url Execute() error = %v (want exit 0), stderr = %s", err, setErr.String())
+	}
+	if !strings.Contains(setErr.String(), "warning") {
+		t.Errorf("stderr = %q, want contains 'warning'", setErr.String())
+	}
+
+	var getOut, getErr bytes.Buffer
+	getCmd := newRootCmd(&getOut, &getErr)
+	getCmd.SetArgs([]string{"config", "get", "models.leader.base_url"})
+	if err := getCmd.Execute(); err != nil {
+		t.Fatalf("get models.leader.base_url Execute() error = %v, stderr = %s", err, getErr.String())
+	}
+	if got := strings.TrimSpace(getOut.String()); got != "ftp://bad-url" {
+		t.Errorf("models.leader.base_url = %q, want %q (stored despite advisory warning)", got, "ftp://bad-url")
+	}
+}
+
+// TestConfigCmd_LeaderUnknownKey covers REQ-11: an unrecognized
+// models.leader.* key is rejected on both set and get, with the new leader
+// keys listed in the supported-keys error message.
+func TestConfigCmd_LeaderUnknownKey(t *testing.T) {
+	tmpDir := setupProjectWithConfig(t)
+	origDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	var setOut, setErr bytes.Buffer
+	setCmd := newRootCmd(&setOut, &setErr)
+	setCmd.SetArgs([]string{"config", "set", "models.leader.typo", "somevalue"})
+	setErrResult := setCmd.Execute()
+	if setErrResult == nil {
+		t.Fatal("set models.leader.typo: expected error, got none")
+	}
+	if !strings.Contains(setErrResult.Error(), "models.leader, models.leader.base_url") {
+		t.Errorf("set error = %q, want contains %q", setErrResult.Error(), "models.leader, models.leader.base_url")
+	}
+
+	var getOut, getErr bytes.Buffer
+	getCmd := newRootCmd(&getOut, &getErr)
+	getCmd.SetArgs([]string{"config", "get", "models.leader.typo"})
+	getErrResult := getCmd.Execute()
+	if getErrResult == nil {
+		t.Fatal("get models.leader.typo: expected error, got none")
+	}
+	if !strings.Contains(getErrResult.Error(), "models.leader, models.leader.base_url") {
+		t.Errorf("get error = %q, want contains %q", getErrResult.Error(), "models.leader, models.leader.base_url")
+	}
+}
+
+// TestConfigCmd_LeaderSymmetry covers REQ-12's cross-surface invariant:
+// `config list` and `status.Format` must agree on the leader id and base_url
+// values (Invariant 4).
+func TestConfigCmd_LeaderSymmetry(t *testing.T) {
+	tmpDir := setupProjectWithConfig(t)
+	origDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	for _, args := range [][]string{
+		{"config", "set", "models.leader", "ollama/llama3"},
+		{"config", "set", "models.leader.base_url", "http://localhost:11434/v1"},
+	} {
+		var setOut, setErr bytes.Buffer
+		setCmd := newRootCmd(&setOut, &setErr)
+		setCmd.SetArgs(args)
+		if err := setCmd.Execute(); err != nil {
+			t.Fatalf("set %v Execute() error = %v, stderr = %s", args, err, setErr.String())
+		}
+	}
+
+	var listOut, listErr bytes.Buffer
+	listCmd := newRootCmd(&listOut, &listErr)
+	listCmd.SetArgs([]string{"config", "list"})
+	if err := listCmd.Execute(); err != nil {
+		t.Fatalf("list Execute() error = %v, stderr = %s", err, listErr.String())
+	}
+	listOutput := listOut.String()
+
+	cfg := &config.Config{HomeDir: tmpDir}
+	if err := cfg.Load(os.DirFS(tmpDir)); err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	statusOutput := status.Format(cfg)
+
+	if !strings.Contains(listOutput, "models.leader = ollama/llama3") {
+		t.Errorf("list output = %q, want contains %q", listOutput, "models.leader = ollama/llama3")
+	}
+	if !strings.Contains(listOutput, "models.leader.base_url = http://localhost:11434/v1") {
+		t.Errorf("list output = %q, want contains %q", listOutput, "models.leader.base_url = http://localhost:11434/v1")
+	}
+	if !strings.Contains(statusOutput, "Leader:") {
+		t.Errorf("status output = %q, want contains %q", statusOutput, "Leader:")
+	}
+	if !strings.Contains(statusOutput, "ollama/llama3") {
+		t.Errorf("status output = %q, want contains %q", statusOutput, "ollama/llama3")
+	}
+	if !strings.Contains(statusOutput, "http://localhost:11434/v1") {
+		t.Errorf("status output = %q, want contains %q", statusOutput, "http://localhost:11434/v1")
+	}
 }

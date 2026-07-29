@@ -340,3 +340,63 @@ func TestDisplay_ModelsBaseURLLines(t *testing.T) {
 		}
 	})
 }
+
+// TestDisplay_LeaderBlock covers REQ-12: the Leader sub-block renders
+// symmetrically with Default and sits between Default and the phases block.
+func TestDisplay_LeaderBlock(t *testing.T) {
+	t.Run("leader with id and base_url", func(t *testing.T) {
+		cfg := baseCfg()
+		cfg.Models = config.ModelConfig{
+			Default: config.ModelRef{Provider: "anthropic", Model: "claude-opus-4-8"},
+			Leader:  config.ModelRef{Provider: "ollama", Model: "llama3", BaseURL: "http://localhost:11434/v1"},
+			Phases:  map[string]config.ModelRef{"apply": {Model: "gpt-4o"}},
+		}
+		var buf bytes.Buffer
+		Display(&buf, cfg)
+		got := buf.String()
+		if !strings.Contains(got, "Leader:") {
+			t.Errorf("output missing 'Leader:':\n%s", got)
+		}
+		if !strings.Contains(got, "ollama/llama3") {
+			t.Errorf("output missing leader id:\n%s", got)
+		}
+		if !strings.Contains(got, "http://localhost:11434/v1") {
+			t.Errorf("output missing leader base_url:\n%s", got)
+		}
+
+		defaultIdx := strings.Index(got, "Default:")
+		leaderIdx := strings.Index(got, "Leader:")
+		phaseIdx := strings.Index(got, "apply:")
+		if defaultIdx == -1 || leaderIdx == -1 || phaseIdx == -1 || !(defaultIdx < leaderIdx && leaderIdx < phaseIdx) {
+			t.Errorf("expected order Default < Leader < phases:\n%s", got)
+		}
+	})
+
+	t.Run("leader with only base_url has no blank id line", func(t *testing.T) {
+		cfg := baseCfg()
+		cfg.Models = config.ModelConfig{Leader: config.ModelRef{BaseURL: "http://localhost:11434/v1"}}
+		var buf bytes.Buffer
+		Display(&buf, cfg)
+		got := buf.String()
+		if !strings.Contains(got, "Leader:") {
+			t.Errorf("output missing 'Leader:':\n%s", got)
+		}
+		if strings.Contains(got, "Leader:  \n") {
+			t.Errorf("output should not contain a blank Leader id line:\n%s", got)
+		}
+		if !strings.Contains(got, "http://localhost:11434/v1") {
+			t.Errorf("output missing leader base_url:\n%s", got)
+		}
+	})
+
+	t.Run("genuinely empty leader omits the block", func(t *testing.T) {
+		cfg := baseCfg()
+		cfg.Models = config.ModelConfig{Default: config.ModelRef{Provider: "anthropic", Model: "claude-opus-4-8"}}
+		var buf bytes.Buffer
+		Display(&buf, cfg)
+		got := buf.String()
+		if strings.Contains(got, "Leader:") {
+			t.Errorf("output should not contain 'Leader:':\n%s", got)
+		}
+	})
+}
