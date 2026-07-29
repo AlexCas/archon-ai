@@ -535,3 +535,144 @@ agent: opencode
 		t.Errorf("list output = %q, want %q", output, "(none configured)")
 	}
 }
+
+func setupEmptyProject(t *testing.T) string {
+	t.Helper()
+	tmpDir := t.TempDir()
+	archonDir := filepath.Join(tmpDir, ".archon")
+	if err := os.MkdirAll(archonDir, 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	configContent := `harness_version: "1.0.0"
+agent: opencode
+`
+	if err := os.WriteFile(filepath.Join(archonDir, "config.yaml"), []byte(configContent), 0o644); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	return tmpDir
+}
+
+// TestConfigCmd_ListBaseURLOnlyIsConfigured covers REQ-8: a ref with only a
+// BaseURL (no provider/model) counts as configured on both surfaces.
+func TestConfigCmd_ListBaseURLOnlyIsConfigured(t *testing.T) {
+	t.Run("default base_url only", func(t *testing.T) {
+		tmpDir := setupEmptyProject(t)
+		origDir, _ := os.Getwd()
+		os.Chdir(tmpDir)
+		defer os.Chdir(origDir)
+
+		var setOut, setErr bytes.Buffer
+		setCmd := newRootCmd(&setOut, &setErr)
+		setCmd.SetArgs([]string{"config", "set", "models.default.base_url", "http://localhost:11434/v1"})
+		if err := setCmd.Execute(); err != nil {
+			t.Fatalf("set Execute() error = %v, stderr = %s", err, setErr.String())
+		}
+
+		var stdout, stderr bytes.Buffer
+		root := newRootCmd(&stdout, &stderr)
+		root.SetArgs([]string{"config", "list"})
+		if err := root.Execute(); err != nil {
+			t.Fatalf("list Execute() error = %v, stderr = %s", err, stderr.String())
+		}
+
+		output := stdout.String()
+		if strings.Contains(output, "(none configured)") {
+			t.Errorf("list output = %q, want NOT contains %q", output, "(none configured)")
+		}
+		if !strings.Contains(output, "models.default.base_url = http://localhost:11434/v1") {
+			t.Errorf("list output = %q, want contains %q", output, "models.default.base_url = http://localhost:11434/v1")
+		}
+	})
+
+	t.Run("phase base_url only", func(t *testing.T) {
+		tmpDir := setupEmptyProject(t)
+		origDir, _ := os.Getwd()
+		os.Chdir(tmpDir)
+		defer os.Chdir(origDir)
+
+		var setOut, setErr bytes.Buffer
+		setCmd := newRootCmd(&setOut, &setErr)
+		setCmd.SetArgs([]string{"config", "set", "models.phases.apply.base_url", "http://localhost:11434/v1"})
+		if err := setCmd.Execute(); err != nil {
+			t.Fatalf("set Execute() error = %v, stderr = %s", err, setErr.String())
+		}
+
+		var stdout, stderr bytes.Buffer
+		root := newRootCmd(&stdout, &stderr)
+		root.SetArgs([]string{"config", "list"})
+		if err := root.Execute(); err != nil {
+			t.Fatalf("list Execute() error = %v, stderr = %s", err, stderr.String())
+		}
+
+		output := stdout.String()
+		if strings.Contains(output, "(none configured)") {
+			t.Errorf("list output = %q, want NOT contains %q", output, "(none configured)")
+		}
+		if !strings.Contains(output, "models.phases.apply.base_url = http://localhost:11434/v1") {
+			t.Errorf("list output = %q, want contains %q", output, "models.phases.apply.base_url = http://localhost:11434/v1")
+		}
+	})
+}
+
+// TestConfigCmd_ListSuppressesEmptyPrimary covers REQ-9: the primary
+// `models.X = ` line is omitted when FullID() is empty, while the base_url
+// line is always printed when set.
+func TestConfigCmd_ListSuppressesEmptyPrimary(t *testing.T) {
+	t.Run("base_url-only default suppresses primary line", func(t *testing.T) {
+		tmpDir := setupEmptyProject(t)
+		origDir, _ := os.Getwd()
+		os.Chdir(tmpDir)
+		defer os.Chdir(origDir)
+
+		var setOut, setErr bytes.Buffer
+		setCmd := newRootCmd(&setOut, &setErr)
+		setCmd.SetArgs([]string{"config", "set", "models.default.base_url", "http://localhost:11434/v1"})
+		if err := setCmd.Execute(); err != nil {
+			t.Fatalf("set Execute() error = %v, stderr = %s", err, setErr.String())
+		}
+
+		var stdout, stderr bytes.Buffer
+		root := newRootCmd(&stdout, &stderr)
+		root.SetArgs([]string{"config", "list"})
+		if err := root.Execute(); err != nil {
+			t.Fatalf("list Execute() error = %v, stderr = %s", err, stderr.String())
+		}
+
+		output := stdout.String()
+		if !strings.Contains(output, "models.default.base_url = ") {
+			t.Errorf("list output = %q, want contains %q", output, "models.default.base_url = ")
+		}
+		if strings.Contains(output, "models.default = ") {
+			t.Errorf("list output = %q, want NOT contains %q", output, "models.default = ")
+		}
+	})
+
+	t.Run("phase with both id and base_url emits both lines", func(t *testing.T) {
+		tmpDir := setupProjectWithConfig(t)
+		origDir, _ := os.Getwd()
+		os.Chdir(tmpDir)
+		defer os.Chdir(origDir)
+
+		var setOut, setErr bytes.Buffer
+		setCmd := newRootCmd(&setOut, &setErr)
+		setCmd.SetArgs([]string{"config", "set", "models.phases.apply.base_url", "http://localhost:11434/v1"})
+		if err := setCmd.Execute(); err != nil {
+			t.Fatalf("set Execute() error = %v, stderr = %s", err, setErr.String())
+		}
+
+		var stdout, stderr bytes.Buffer
+		root := newRootCmd(&stdout, &stderr)
+		root.SetArgs([]string{"config", "list"})
+		if err := root.Execute(); err != nil {
+			t.Fatalf("list Execute() error = %v, stderr = %s", err, stderr.String())
+		}
+
+		output := stdout.String()
+		if !strings.Contains(output, "models.phases.apply = gpt-4o") {
+			t.Errorf("list output = %q, want contains %q", output, "models.phases.apply = gpt-4o")
+		}
+		if !strings.Contains(output, "models.phases.apply.base_url = http://localhost:11434/v1") {
+			t.Errorf("list output = %q, want contains %q", output, "models.phases.apply.base_url = http://localhost:11434/v1")
+		}
+	})
+}

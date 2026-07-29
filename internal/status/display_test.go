@@ -254,3 +254,89 @@ func TestFormat(t *testing.T) {
 		t.Errorf("Format() missing skill name")
 	}
 }
+
+func baseCfg() *config.Config {
+	return &config.Config{
+		Version:         "1.0.0",
+		Agent:           "claude",
+		CreatedAt:       time.Date(2026, 6, 10, 0, 0, 0, 0, time.UTC),
+		MutationTesting: config.MutationTesting{Enabled: false},
+	}
+}
+
+// TestDisplay_ModelsNoneConfigured covers REQ-8: the "(none configured)" guard
+// broadens to HasAny(), so a base_url-only ref is treated as configured.
+func TestDisplay_ModelsNoneConfigured(t *testing.T) {
+	t.Run("all-empty config shows (none configured)", func(t *testing.T) {
+		cfg := baseCfg()
+		var buf bytes.Buffer
+		Display(&buf, cfg)
+		if !strings.Contains(buf.String(), "(none configured)") {
+			t.Errorf("output missing '(none configured)':\n%s", buf.String())
+		}
+	})
+
+	t.Run("base_url-only default does not show (none configured)", func(t *testing.T) {
+		cfg := baseCfg()
+		cfg.Models = config.ModelConfig{Default: config.ModelRef{BaseURL: "http://localhost:11434/v1"}}
+		var buf bytes.Buffer
+		Display(&buf, cfg)
+		got := buf.String()
+		if strings.Contains(got, "(none configured)") {
+			t.Errorf("output should not contain '(none configured)':\n%s", got)
+		}
+		if !strings.Contains(got, "http://localhost:11434/v1") {
+			t.Errorf("output missing base_url:\n%s", got)
+		}
+	})
+}
+
+// TestDisplay_ModelsBaseURLLines covers REQ-10: status renders a base_url
+// sub-line for default and phase refs, and suppresses an empty primary line.
+func TestDisplay_ModelsBaseURLLines(t *testing.T) {
+	t.Run("default with id and base_url shows both", func(t *testing.T) {
+		cfg := baseCfg()
+		cfg.Models = config.ModelConfig{
+			Default: config.ModelRef{Provider: "ollama", Model: "llama3", BaseURL: "http://localhost:11434/v1"},
+		}
+		var buf bytes.Buffer
+		Display(&buf, cfg)
+		got := buf.String()
+		if !strings.Contains(got, "Default:") {
+			t.Errorf("output missing 'Default:':\n%s", got)
+		}
+		if !strings.Contains(got, "http://localhost:11434/v1") {
+			t.Errorf("output missing base_url:\n%s", got)
+		}
+	})
+
+	t.Run("default with only base_url has no blank id line", func(t *testing.T) {
+		cfg := baseCfg()
+		cfg.Models = config.ModelConfig{Default: config.ModelRef{BaseURL: "http://localhost:11434/v1"}}
+		var buf bytes.Buffer
+		Display(&buf, cfg)
+		got := buf.String()
+		if strings.Contains(got, "Default:  \n") {
+			t.Errorf("output should not contain a blank Default id line:\n%s", got)
+		}
+		if !strings.Contains(got, "http://localhost:11434/v1") {
+			t.Errorf("output missing base_url:\n%s", got)
+		}
+	})
+
+	t.Run("phase with base_url shows label and URL", func(t *testing.T) {
+		cfg := baseCfg()
+		cfg.Models = config.ModelConfig{
+			Phases: map[string]config.ModelRef{"apply": {Provider: "ollama", Model: "llama3", BaseURL: "http://localhost:11434/v1"}},
+		}
+		var buf bytes.Buffer
+		Display(&buf, cfg)
+		got := buf.String()
+		if !strings.Contains(got, "apply:") {
+			t.Errorf("output missing 'apply:':\n%s", got)
+		}
+		if !strings.Contains(got, "http://localhost:11434/v1") {
+			t.Errorf("output missing base_url:\n%s", got)
+		}
+	})
+}

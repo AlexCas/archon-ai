@@ -124,7 +124,7 @@ func newConfigListCmd(stdout, stderr io.Writer) *cobra.Command {
 				return fmt.Errorf("load config: %w", err)
 			}
 
-			if cfg.Models.Default.FullID() == "" && len(cfg.Models.Phases) == 0 {
+			if !cfg.Models.HasAny() {
 				fmt.Fprintln(stdout, "(none configured)")
 				return nil
 			}
@@ -143,7 +143,9 @@ func newConfigListCmd(stdout, stderr io.Writer) *cobra.Command {
 				}
 				sort.Strings(phases)
 				for _, phase := range phases {
-					fmt.Fprintf(stdout, "models.phases.%s = %s\n", phase, cfg.Models.Phases[phase].FullID())
+					if cfg.Models.Phases[phase].FullID() != "" {
+						fmt.Fprintf(stdout, "models.phases.%s = %s\n", phase, cfg.Models.Phases[phase].FullID())
+					}
 					if baseURL := cfg.Models.Phases[phase].BaseURL; baseURL != "" {
 						fmt.Fprintf(stdout, "models.phases.%s.base_url = %s\n", phase, baseURL)
 					}
