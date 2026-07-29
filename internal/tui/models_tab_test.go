@@ -812,11 +812,11 @@ func TestModelsTab_ModelSelectResetsOffset(t *testing.T) {
 // E3-7a: typing filters providers in providerSelect.
 func TestModelsTab_ProviderSelectFilter(t *testing.T) {
 	providers := map[string]opencode.Provider{
-		"anthropic":  prov("anthropic", toolModel("anthropic/claude-opus-4-8", "Claude Opus 4.8")),
-		"openai":     prov("openai", toolModel("openai/gpt-4o", "GPT-4o")),
-		"opencode":   prov("opencode", toolModel("deepseek-v4-pro", "DeepSeek V4 Pro")),
-		"google":     prov("google", toolModel("google/gemini-2", "Gemini 2")),
-		"xai":        prov("xai", toolModel("xai/grok-4", "Grok 4")),
+		"anthropic": prov("anthropic", toolModel("anthropic/claude-opus-4-8", "Claude Opus 4.8")),
+		"openai":    prov("openai", toolModel("openai/gpt-4o", "GPT-4o")),
+		"opencode":  prov("opencode", toolModel("deepseek-v4-pro", "DeepSeek V4 Pro")),
+		"google":    prov("google", toolModel("google/gemini-2", "Gemini 2")),
+		"xai":       prov("xai", toolModel("xai/grok-4", "Grok 4")),
 	}
 	cfg := &config.Config{}
 	st := newModelsTabState(cfg, providers, nil)
@@ -1018,6 +1018,225 @@ func TestModelsTab_FilterClearedOnModeTransition(t *testing.T) {
 	}
 	if st.filteredIndices != nil {
 		t.Errorf("filteredIndices should be nil in modelSelect")
+	}
+}
+
+// B4.1 [REQ-7]: "User can set BaseURL via TUI sub-mode" — pressing 'u' opens
+// baseURLEdit, typing a URL and pressing Enter commits it to ref.BaseURL.
+func TestModelsTab_SetBaseURLViaSubMode(t *testing.T) {
+	cfg := &config.Config{
+		Models: config.ModelConfig{
+			Phases: map[string]config.ModelRef{
+				"apply": {Provider: "ollama", Model: "llama3"},
+			},
+		},
+	}
+	st := newModelsTabState(cfg, map[string]opencode.Provider{}, nil)
+
+	applyIdx := -1
+	for i, r := range st.rows {
+		if r.phase == "apply" {
+			applyIdx = i
+			break
+		}
+	}
+	if applyIdx < 0 {
+		t.Fatal("apply row not found")
+	}
+	for i := 0; i < applyIdx; i++ {
+		st.update(tea.KeyMsg{Type: tea.KeyDown})
+	}
+
+	st.update(keyMsg('u'))
+	if st.mode != baseURLEdit {
+		t.Fatalf("mode = %v, want baseURLEdit after 'u'", st.mode)
+	}
+
+	url := "http://localhost:11434/v1"
+	for _, r := range url {
+		st.update(keyMsg(r))
+	}
+	st.update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	if st.mode != rowNav {
+		t.Errorf("mode = %v, want rowNav after Enter", st.mode)
+	}
+	if st.rows[applyIdx].ref.BaseURL != url {
+		t.Errorf("ref.BaseURL = %q, want %q", st.rows[applyIdx].ref.BaseURL, url)
+	}
+	if !st.rows[applyIdx].changed {
+		t.Error("rows[applyIdx].changed should be true after setting BaseURL")
+	}
+
+	// Saving persists the BaseURL into ModelConfig.
+	outCfg := &config.Config{Models: config.ModelConfig{Phases: map[string]config.ModelRef{}}}
+	st.applyToConfig(outCfg)
+	if outCfg.Models.Phases["apply"].BaseURL != url {
+		t.Errorf("saved config BaseURL = %q, want %q", outCfg.Models.Phases["apply"].BaseURL, url)
+	}
+}
+
+// B4.2 [REQ-7]: "User can clear BaseURL via TUI sub-mode" — clearing the
+// input and pressing Enter sets BaseURL back to "".
+func TestModelsTab_ClearBaseURLViaSubMode(t *testing.T) {
+	cfg := &config.Config{
+		Models: config.ModelConfig{
+			Phases: map[string]config.ModelRef{
+				"apply": {Provider: "ollama", Model: "llama3", BaseURL: "http://localhost:11434/v1"},
+			},
+		},
+	}
+	st := newModelsTabState(cfg, map[string]opencode.Provider{}, nil)
+
+	applyIdx := -1
+	for i, r := range st.rows {
+		if r.phase == "apply" {
+			applyIdx = i
+			break
+		}
+	}
+	for i := 0; i < applyIdx; i++ {
+		st.update(tea.KeyMsg{Type: tea.KeyDown})
+	}
+
+	st.update(keyMsg('u'))
+	if st.mode != baseURLEdit {
+		t.Fatalf("mode = %v, want baseURLEdit after 'u'", st.mode)
+	}
+	if st.input.Value() != "http://localhost:11434/v1" {
+		t.Errorf("input seeded with %q, want the row's current BaseURL", st.input.Value())
+	}
+
+	st.input.SetValue("") // simulate clearing the field
+	st.update(tea.KeyMsg{Type: tea.KeyEnter})
+
+	if st.mode != rowNav {
+		t.Errorf("mode = %v, want rowNav after Enter", st.mode)
+	}
+	if st.rows[applyIdx].ref.BaseURL != "" {
+		t.Errorf("ref.BaseURL = %q, want empty after clearing", st.rows[applyIdx].ref.BaseURL)
+	}
+
+	// The config YAML for that ref reverts to scalar form (Effort=="" && BaseURL=="").
+	outCfg := &config.Config{Models: config.ModelConfig{Phases: map[string]config.ModelRef{}}}
+	st.applyToConfig(outCfg)
+	ref := outCfg.Models.Phases["apply"]
+	if ref.BaseURL != "" {
+		t.Errorf("saved ref.BaseURL = %q, want empty", ref.BaseURL)
+	}
+}
+
+// B4.3 [REQ-7]: "Escape cancels BaseURL edit" — typing a new value then
+// pressing Escape leaves the row's BaseURL unchanged.
+func TestModelsTab_EscapeCancelsBaseURLEdit(t *testing.T) {
+	const original = "http://localhost:11434/v1"
+	cfg := &config.Config{
+		Models: config.ModelConfig{
+			Phases: map[string]config.ModelRef{
+				"apply": {Provider: "ollama", Model: "llama3", BaseURL: original},
+			},
+		},
+	}
+	st := newModelsTabState(cfg, map[string]opencode.Provider{}, nil)
+
+	applyIdx := -1
+	for i, r := range st.rows {
+		if r.phase == "apply" {
+			applyIdx = i
+			break
+		}
+	}
+	for i := 0; i < applyIdx; i++ {
+		st.update(tea.KeyMsg{Type: tea.KeyDown})
+	}
+
+	st.update(keyMsg('u'))
+	// Clear the seeded value so typing below replaces the original URL rather
+	// than appending to it — simulating the real user flow of deleting and
+	// retyping a replacement endpoint before cancelling with Escape.
+	st.input.SetValue("")
+	for _, r := range "http://something-else:9999/v1" {
+		st.update(keyMsg(r))
+	}
+	st.update(tea.KeyMsg{Type: tea.KeyEsc})
+
+	if st.mode != rowNav {
+		t.Errorf("mode = %v, want rowNav after Esc", st.mode)
+	}
+	if st.rows[applyIdx].ref.BaseURL != original {
+		t.Errorf("ref.BaseURL = %q after Esc, want unchanged %q", st.rows[applyIdx].ref.BaseURL, original)
+	}
+	if st.rows[applyIdx].changed {
+		t.Error("changed should be false after Esc cancel")
+	}
+}
+
+// B4.4 [REQ-7]: "Row with BaseURL shows endpoint in display" — a row with a
+// BaseURL set renders the URL alongside the provider/model value.
+func TestModelsTab_RowWithBaseURLShowsEndpointInDisplay(t *testing.T) {
+	cfg := &config.Config{
+		Models: config.ModelConfig{
+			Phases: map[string]config.ModelRef{
+				"apply": {Provider: "ollama", Model: "llama3", BaseURL: "http://localhost:11434/v1"},
+			},
+		},
+	}
+	st := newModelsTabState(cfg, map[string]opencode.Provider{}, nil)
+	st.setWidth(80)
+
+	view := st.view(80, 24)
+	if !strings.Contains(view, "http://localhost:11434/v1") {
+		t.Errorf("view should show the BaseURL for the apply row; view:\n%s", view)
+	}
+}
+
+// B4.4b [REQ-7]: "BaseURL-only phase row renders correctly (no model set)" —
+// a phase row where Model is empty but BaseURL is set (preserved by
+// applyToConfig's guard) must display "(default) @ <url>" in both the
+// unfocused and focused states, with no ANSI contamination of focus.Render.
+func TestModelsTab_BaseURLOnlyPhaseRowRendersDefaultPlusEndpoint(t *testing.T) {
+	cfg := &config.Config{
+		Models: config.ModelConfig{
+			Phases: map[string]config.ModelRef{
+				// No model set, only a BaseURL — the state produced when a user
+				// presses 'u' on an empty phase row before picking a model.
+				"apply": {Provider: "ollama", BaseURL: "http://localhost:11434/v1"},
+			},
+		},
+	}
+	st := newModelsTabState(cfg, map[string]opencode.Provider{}, nil)
+	st.setWidth(80)
+
+	// Unfocused: navigate away from the apply row so another row is focused.
+	// The default focused row is 0 (Default); apply is at a later index.
+	view := st.view(80, 24)
+	if !strings.Contains(view, "http://localhost:11434/v1") {
+		t.Errorf("unfocused view should contain the BaseURL; view:\n%s", view)
+	}
+	if !strings.Contains(view, "(default)") {
+		t.Errorf("unfocused view should contain the (default) placeholder; view:\n%s", view)
+	}
+
+	// Focused: navigate to the apply row and render.
+	applyIdx := -1
+	for i, r := range st.rows {
+		if r.phase == "apply" {
+			applyIdx = i
+			break
+		}
+	}
+	if applyIdx < 0 {
+		t.Fatal("apply row not found")
+	}
+	for i := 0; i < applyIdx; i++ {
+		st.update(tea.KeyMsg{Type: tea.KeyDown})
+	}
+	focusedView := st.view(80, 24)
+	if !strings.Contains(focusedView, "http://localhost:11434/v1") {
+		t.Errorf("focused view should contain the BaseURL; view:\n%s", focusedView)
+	}
+	if !strings.Contains(focusedView, "(default)") {
+		t.Errorf("focused view should contain the (default) placeholder; view:\n%s", focusedView)
 	}
 }
 

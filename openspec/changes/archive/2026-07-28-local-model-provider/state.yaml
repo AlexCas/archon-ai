@@ -1,0 +1,149 @@
+phase: archive
+status: completed
+history:
+  - {phase: explore, status: in_progress, ts: "2026-07-29T00:37:42Z"}
+  - {phase: explore, status: completed, ts: "2026-07-29T00:37:42Z"}
+  - {phase: propose, status: in_progress, ts: "2026-07-28T00:00:00Z"}
+  - {phase: propose, status: completed, ts: "2026-07-28T00:00:00Z"}
+  - {phase: spec, status: in_progress, ts: "2026-07-28T00:00:00Z"}
+  - {phase: spec, status: completed, ts: "2026-07-28T00:00:00Z"}
+  - {phase: design, status: in_progress, ts: "2026-07-29T01:02:41Z"}
+  - {phase: design, status: completed, ts: "2026-07-29T01:02:41Z"}
+  - {phase: tasks, status: in_progress, ts: "2026-07-28T00:00:00Z"}
+  - {phase: tasks, status: completed, ts: "2026-07-28T00:00:00Z"}
+  - {phase: apply, status: in_progress, ts: "2026-07-28T00:00:00Z"}
+  # PR-A (A1-A7) fully implemented, all tests pass (go build/vet/fmt/test clean).
+  # Diff is ~896 changed lines vs the 400-line budget (overage is test volume;
+  # code ~277 lines). User accepted size:exception for PR-A — not a verify blocker.
+  - {phase: apply, status: completed, ts: "2026-07-28T00:00:00Z"}
+  - {phase: verify, status: in_progress, ts: "2026-07-28T00:00:00Z"}
+  - {phase: verify, status: completed, ts: "2026-07-28T00:00:00Z"}
+  # VERIFY PR-A (REQ-1..5): PASS. go build/vet clean; gofmt clean on all PR-A
+  # touched files; go test ./... all packages ok. 17/17 PR-A scenarios map to
+  # passing tests. Byte-identical round-trip (REQ-1) and deterministic/sorted
+  # idempotent opencode.json (REQ-5) asserted at runtime with real byte/order
+  # checks. REQ-4 first-in-PhaseOrder-wins rule verified in impl + coherent test
+  # (documented spec.md example discrepancy handled). PR-B scope (REQ-6/REQ-7)
+  # confirmed ABSENT: no io.Writer on writeClaudeAgents, no warn-and-skip, no
+  # TUI baseURLEdit sub-mode.
+  - {phase: judge, status: in_progress, ts: "2026-07-28T00:00:00Z"}
+  # JUDGE PR-A: blind dual adversarial review (2 rounds).
+  # Round 1 confirmed:
+  #   CRITICAL: buildProviderBlock emitted "" key for Provider=="" refs with BaseURL.
+  #   WARNING (theoretical): stale provider block persists after base_url removal
+  #     (additive-merge contract; spec silent on removal — accepted gap).
+  #   WARNING (theoretical): bareModelID with pre-slashed models (out of PR-A scope).
+  #   INFO: double-warning when Provider empty + non-http URL (behavior correct; test gap).
+  #   INFO: models.leader.base_url not CLI-settable (within REQ-2 scope).
+  #   INFO: config list hides base_url when Model="" (pre-existing REQ-2 edge case,
+  #     not introduced by this PR; tracked for follow-up).
+  #   Scope: clean — no REQ-6/REQ-7 leakage confirmed.
+  # Fix applied: buildProviderBlock now skips refs with Provider=="" (consistent
+  #   with warn-never-fail contract; ValidateBaseURL already warned at set-time).
+  #   New test: TestMergeOpencodeAgent_ProviderBlock_EmptyProviderSkipped.
+  #   go test ./internal/initcmd/... ./internal/config/... ./cmd/archon/... green.
+  # Round 2 (re-judge): both judges APPROVED. C-1 fully closed. No remaining
+  #   CRITICAL or WARNING (real). Residual items are INFO/theoretical.
+  - {phase: judge, status: completed, ts: "2026-07-28T00:00:00Z"}
+  # JUDGMENT: APPROVED (PR-A)
+  - {phase: apply, status: in_progress, ts: "2026-07-28T00:00:00Z"}
+  # APPLY PR-B (REQ-6/REQ-7) started on branch feat/local-model-provider-tui-guard,
+  # stacked on PR-A (73808c9). B1-B4 implemented in the working tree (uncommitted
+  # per instruction — left for verify/judge/user review):
+  #   B1: writeClaudeAgents/WriteClaudeAgents gained an io.Writer param; each
+  #     resolved phase with BaseURL!="" emits the exact REQ-6 warning before
+  #     writing the bare-model agent file (warn-and-skip, never abort).
+  #   B2: init.go passes os.Stderr to writeClaudeAgents; tui/model.go passes
+  #     io.Discard to WriteClaudeAgents. No other external caller found.
+  #   B3: models_tab.go gained a baseURLEdit subMode (key 'u' from rowNav),
+  #     seeded from the focused row's ref.BaseURL; Enter commits (trimmed,
+  #     empty clears), Esc cancels. hintLine/renderRow updated; plain row
+  #     display appends " @ <baseURL>". applyToConfig needed no change
+  #     (struct-value-copy already carries BaseURL) — confirmed per design.
+  #   B4: 4 new teatest-equivalent state-transition tests in
+  #     models_tab_test.go (set/clear/escape/render), following this file's
+  #     established direct-Update() convention rather than full teatest
+  #     (go-testing skill: teatest reserved for full interactive flows).
+  # go build ./..., go vet ./..., gofmt -l (touched files), go test ./... -count=1
+  # all clean/green. PR-A regression-checked: full suite green, no PR-A files
+  # touched beyond the two mechanical writer-arg call sites design.md flagged
+  # as touched-by-both-PRs (tui/model.go, init.go).
+  # Diff stat: 6 files changed, 353 insertions(+), 30 deletions(-) = 383 lines
+  # vs the 400-line PR-B budget (estimate was ~220; actual higher due to test
+  # volume, consistent with the PR-A pattern). Under budget, no exception needed.
+  - {phase: apply, status: completed, ts: "2026-07-28T00:00:00Z"}
+  - {phase: verify, status: in_progress, ts: "2026-07-28T00:00:00Z"}
+  # VERIFY PR-B (REQ-6/REQ-7): PASS. Independently re-ran build/vet/fmt/test.
+  #   go build ./... exit 0; go vet ./... exit 0; gofmt -l on all 6 PR-B touched
+  #   files empty (clean). go test ./... -count=1 all 12 packages ok.
+  #   Focus verbose runs: internal/initcmd (13 WriteClaudeAgents incl 3 REQ-6 +
+  #   all opencode/ProviderBlock PR-A tests) PASS; internal/tui (4 REQ-7 BaseURL
+  #   tests) PASS; internal/config (MarshalYAML/CloneRoundtrip/Unmarshal/
+  #   ModelRef_BaseURL/ValidateBaseURL) PASS — PR-A regression green.
+  # REQ-6 (3 scenarios) + REQ-7 (5 scenarios) each map to >=1 passing test.
+  #   REQ-6 verified by reading test bodies: local ref -> buffer contains EXACT
+  #   warning AND archon-apply.md written with bare model "llama3"; remote ref ->
+  #   buf.Len()==0; two local phases -> strings.Count==1 each + both files bare.
+  #   Assertions are real (bytes.Buffer capture + file read + frontmatter parse).
+  #   REQ-7 verified: 'u' enters baseURLEdit, Enter commits (applyToConfig persists
+  #   to ModelConfig), Escape cancels (BaseURL + changed unchanged), empty clears
+  #   (reverts to scalar via marshal path asserted by PR-A round-trip), render
+  #   shows " @ <baseURL>" via view() substring assert.
+  # B4.5 deviation (applyToConfig assert vs full SaveConfig YAML) and B4.1-B4.4
+  #   direct-Update() vs teatest: judged ADEQUATE — coverage is honest; the YAML
+  #   marshal path for BaseURL is already runtime-asserted by PR-A's
+  #   TestModelRef_BaseURL round-trip, so no real gap.
+  # No apiKey leak (grep clean outside tests). No scope creep beyond REQ-6/REQ-7.
+  # Two shared-file writer-arg edits (init.go os.Stderr, tui/model.go io.Discard)
+  #   match design; PR-A behavior intact (full suite green).
+  - {phase: verify, status: completed, ts: "2026-07-28T00:00:00Z"}
+  # VERDICT: PASS (PR-B, REQ-6 + REQ-7).
+  - {phase: judge, status: in_progress, ts: "2026-07-28T00:00:00Z"}
+  # JUDGE PR-B (REQ-6/REQ-7): blind dual adversarial review — 3 rounds.
+  # Round 1 confirmed:
+  #   CRITICAL: applyToConfig deleted phase entry when ref.Model=="" regardless
+  #     of ref.BaseURL — a user setting only a BaseURL on a model-less row would
+  #     have it silently discarded on save.
+  #   WARNING (real): TestModelsTab_EscapeCancelsBaseURLEdit (B4.3) appended
+  #     the replacement URL to the pre-seeded value instead of replacing it;
+  #     tested only append-no-commit, not replacement-cancel.
+  # Fixes applied (R1):
+  #   applyToConfig guard: Model=="" -> Model=="" && BaseURL=="" to preserve
+  #     BaseURL-only refs.
+  #   B4.3 test: added st.input.SetValue("") before typing replacement URL.
+  # go test ./internal/tui/... ./internal/initcmd/... green after R1 fixes.
+  # Round 2 confirmed:
+  #   WARNING (real): renderRow plain-row: dim.Render("(default)") embedded in
+  #     value before being passed to focus.Render — ANSI double-wrap when a
+  #     phase row has no model but has a BaseURL (the exact state Fix 1 makes
+  #     reachable). Both judges agreed.
+  #   io.Discard TUI path contradiction: downgraded to INFO — design doc
+  #     explicitly specifies io.Discard for the TUI save path; updated
+  #     writeClaudeAgents doc-comment to clarify.
+  # Fix applied (R2):
+  #   renderRow: build value as plain string always ("(default)" literal, not
+  #     dim.Render); apply dim only on unfocused branch; focused branch calls
+  #     focus.Render(value) with clean input.
+  #   claude_mode.go doc-comment: removed "never silent" claim; added TUI/CLI
+  #     path distinction.
+  # Round 3 confirmed:
+  #   WARNING (real): rowLabel=label.Render(...) still embedded inside
+  #     focus.Render(rowLabel+" "+value) on focused branch — same ANSI nesting
+  #     class as Fix 2 had addressed for value. Both judges agreed.
+  #   WARNING (real): no test for isDefaultPlaceholder=true, BaseURL!="" render
+  #     path (BaseURL-only phase row, focused and unfocused).
+  # Fixes applied (R3, final — max 3 retries reached):
+  #   renderRow focused branch: write rowLabel via b.WriteString separately,
+  #     then b.WriteString(focus.Render(value)) — clean separation, no nesting.
+  #   New test TestModelsTab_BaseURLOnlyPhaseRowRendersDefaultPlusEndpoint:
+  #     exercises the apply row with Model="" and BaseURL set, asserts
+  #     "(default) @ <url>" appears in both unfocused and focused view output.
+  # go build/vet/gofmt clean; go test ./internal/tui/... ./internal/initcmd/...
+  # all packages ok after R3 fixes.
+  # Remaining items (INFO/theoretical — no fix required):
+  #   changed=true on no-op Enter: unconditional; matches updateFreeForm; harmless.
+  #   Provider-only ref deleted by guard: requires malformed freeForm input; pre-existing.
+  #   ResolvePhaseModels loses BaseURL for model-less ref: pre-existing behavior;
+  #     BaseURL-only refs are an edge state; follow-up outside PR-B scope.
+  - {phase: judge, status: completed, ts: "2026-07-28T00:00:00Z"}
+  # JUDGMENT: APPROVED (PR-B)

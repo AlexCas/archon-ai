@@ -379,7 +379,7 @@ func (m Model) saveConfig() tea.Cmd {
 		// files using the same writer as init so both paths produce
 		// byte-identical output. No-op when no models are resolvable.
 		if cfg.Agent == "claude" {
-			if _, err := initcmd.WriteClaudeAgents(m.projectDir, cfg.Models); err != nil {
+			if _, err := initcmd.WriteClaudeAgents(m.projectDir, cfg.Models, io.Discard); err != nil {
 				return fmt.Errorf("saved config but failed to write claude agents: %w", err)
 			}
 		}

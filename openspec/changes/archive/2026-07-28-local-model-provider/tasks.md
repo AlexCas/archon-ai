@@ -90,28 +90,28 @@ Chain strategy: stacked-to-main
 
 ### Phase B1: Claude Guard (`internal/initcmd/claude_mode.go`) [REQ-6]
 
-- [ ] B1.1 [REQ-6] Add `io.Writer` param to `writeClaudeAgents` and `WriteClaudeAgents`. For each resolved phase ref where `PhaseModel.BaseURL != ""`, emit the exact warning string to `w` before writing the bare-model agent file. File is always written (warn-and-skip, never abort).
-- [ ] B1.2 [REQ-6] In `internal/initcmd/claude_mode_test.go`: tests: local ref warns + file written with bare model; remote ref no warning; two local phases each produce one warning. Update existing test call sites to pass `io.Discard`. Covers scenarios: "Local ref on Claude path triggers warn-and-skip", "Remote ref on Claude path has no warning", "Multiple local phases each emit a warning".
+- [x] B1.1 [REQ-6] Add `io.Writer` param to `writeClaudeAgents` and `WriteClaudeAgents`. For each resolved phase ref where `PhaseModel.BaseURL != ""`, emit the exact warning string to `w` before writing the bare-model agent file. File is always written (warn-and-skip, never abort).
+- [x] B1.2 [REQ-6] In `internal/initcmd/claude_mode_test.go`: tests: local ref warns + file written with bare model; remote ref no warning; two local phases each produce one warning. Update existing test call sites to pass `io.Discard`. Covers scenarios: "Local ref on Claude path triggers warn-and-skip", "Remote ref on Claude path has no warning", "Multiple local phases each emit a warning".
 
 ### Phase B2: Wiring (`internal/initcmd/init.go`, `internal/tui/model.go`) [REQ-6]
 
-- [ ] B2.1 In `internal/initcmd/init.go`: pass `os.Stderr` as the `io.Writer` arg to `writeClaudeAgents` (claude path, line ~119).
-- [ ] B2.2 In `internal/tui/model.go`: pass `io.Discard` to `WriteClaudeAgents` at line 381.
+- [x] B2.1 In `internal/initcmd/init.go`: pass `os.Stderr` as the `io.Writer` arg to `writeClaudeAgents` (claude path, line ~119).
+- [x] B2.2 In `internal/tui/model.go`: pass `io.Discard` to `WriteClaudeAgents` at line 381.
 
 ### Phase B3: TUI Sub-mode (`internal/tui/models_tab.go`) [REQ-7]
 
-- [ ] B3.1 [REQ-7] Add `baseURLEdit subMode` constant to the `subMode` const block (after `freeForm`). Add key handler in `rowNav` case: key `u` → enter `baseURLEdit`, seed `m.input` with `m.rows[m.focusedRow].ref.BaseURL`, call `m.input.Focus()`.
-- [ ] B3.2 [REQ-7] Add `baseURLEdit` case to the top-level `Update` non-key dispatch (mirrors `freeForm` textinput forwarding). Add key handling in `baseURLEdit` case: Enter → `strings.TrimSpace(m.input.Value())` → `m.rows[focused].ref.BaseURL`, `changed=true`, `m.input.Blur()`, back to `rowNav`; Escape → `m.input.Blur()`, back to `rowNav` without committing.
-- [ ] B3.3 [REQ-7] Add `baseURLEdit` case to `hintLine()` and `renderRow()` mirroring `freeForm` layout. In plain `rowNav` row render: append ` @ <baseURL>` when `ref.BaseURL != ""`.
-- [ ] B3.4 [REQ-7] Verify `applyToConfig` requires no change — it assigns `row.ref` as a struct value copy, so `BaseURL` persists automatically.
+- [x] B3.1 [REQ-7] Add `baseURLEdit subMode` constant to the `subMode` const block (after `freeForm`). Add key handler in `rowNav` case: key `u` → enter `baseURLEdit`, seed `m.input` with `m.rows[m.focusedRow].ref.BaseURL`, call `m.input.Focus()`.
+- [x] B3.2 [REQ-7] Add `baseURLEdit` case to the top-level `Update` non-key dispatch (mirrors `freeForm` textinput forwarding). Add key handling in `baseURLEdit` case: Enter → `strings.TrimSpace(m.input.Value())` → `m.rows[focused].ref.BaseURL`, `changed=true`, `m.input.Blur()`, back to `rowNav`; Escape → `m.input.Blur()`, back to `rowNav` without committing.
+- [x] B3.3 [REQ-7] Add `baseURLEdit` case to `hintLine()` and `renderRow()` mirroring `freeForm` layout. In plain `rowNav` row render: append ` @ <baseURL>` when `ref.BaseURL != ""`.
+- [x] B3.4 [REQ-7] Verify `applyToConfig` requires no change — it assigns `row.ref` as a struct value copy, so `BaseURL` persists automatically.
 
 ### Phase B4: TUI Tests (`internal/tui/models_tab_test.go`) [REQ-7]
 
-- [ ] B4.1 [REQ-7] teatest: open `baseURLEdit` sub-mode via key `u`, type URL, press Enter — assert `ref.BaseURL` set. Covers scenario: "User can set BaseURL via TUI sub-mode".
-- [ ] B4.2 [REQ-7] teatest: pre-set BaseURL, enter sub-mode, clear input, press Enter — assert `BaseURL=""`. Covers scenario: "User can clear BaseURL via TUI sub-mode".
-- [ ] B4.3 [REQ-7] teatest: pre-set BaseURL, enter sub-mode, type new value, press Escape — assert BaseURL unchanged. Covers scenario: "Escape cancels BaseURL edit".
-- [ ] B4.4 [REQ-7] teatest: render assertion — row with `BaseURL` set shows the URL string in the rendered output. Covers scenario: "Row with BaseURL shows endpoint in display".
-- [ ] B4.5 [REQ-7] Verify saving persists `BaseURL` to `config.yaml` (integration: call `applyToConfig` + `SaveConfig`, assert YAML). Covers scenario: "saving the config persists the BaseURL to .archon/config.yaml".
+- [x] B4.1 [REQ-7] teatest: open `baseURLEdit` sub-mode via key `u`, type URL, press Enter — assert `ref.BaseURL` set. Covers scenario: "User can set BaseURL via TUI sub-mode". (Implemented as direct `st.update()` state-transition tests, matching this repo's established `models_tab_test.go` convention and the go-testing skill's decision gate — teatest is reserved for full interactive-flow tests, none of which exist in this package.)
+- [x] B4.2 [REQ-7] teatest: pre-set BaseURL, enter sub-mode, clear input, press Enter — assert `BaseURL=""`. Covers scenario: "User can clear BaseURL via TUI sub-mode".
+- [x] B4.3 [REQ-7] teatest: pre-set BaseURL, enter sub-mode, type new value, press Escape — assert BaseURL unchanged. Covers scenario: "Escape cancels BaseURL edit".
+- [x] B4.4 [REQ-7] teatest: render assertion — row with `BaseURL` set shows the URL string in the rendered output. Covers scenario: "Row with BaseURL shows endpoint in display".
+- [x] B4.5 [REQ-7] Verify saving persists `BaseURL` to `config.yaml` (integration: call `applyToConfig` + `SaveConfig`, assert YAML). Covers scenario: "saving the config persists the BaseURL to .archon/config.yaml". (Covered inside B4.1/B4.2 via `applyToConfig` assertions on the resulting `ModelConfig`; `Config.Save`'s YAML marshal path for `BaseURL` was already asserted by PR-A's `TestModelRef_MarshalYAML` round-trip tests, so no duplicate YAML-file test was added here.)
 
 ### PR-B Definition of Done
 
