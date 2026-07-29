@@ -388,6 +388,123 @@ func TestConfigCmd_ImpeccableSeverityInvalid(t *testing.T) {
 	}
 }
 
+// TestConfigCmd_BaseURLSetGet covers REQ-2: set/get base_url for a phase and
+// for models.default, and asserts the sibling provider/model fields are
+// untouched by a base_url set.
+func TestConfigCmd_BaseURLSetGet(t *testing.T) {
+	tmpDir := setupProjectWithConfig(t)
+	origDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	// Scenario: Set and get base_url for a phase.
+	var setOut, setErr bytes.Buffer
+	setCmd := newRootCmd(&setOut, &setErr)
+	setCmd.SetArgs([]string{"config", "set", "models.phases.apply.base_url", "http://localhost:11434/v1"})
+	if err := setCmd.Execute(); err != nil {
+		t.Fatalf("set models.phases.apply.base_url Execute() error = %v, stderr = %s", err, setErr.String())
+	}
+
+	var getOut, getErr bytes.Buffer
+	getCmd := newRootCmd(&getOut, &getErr)
+	getCmd.SetArgs([]string{"config", "get", "models.phases.apply.base_url"})
+	if err := getCmd.Execute(); err != nil {
+		t.Fatalf("get models.phases.apply.base_url Execute() error = %v, stderr = %s", err, getErr.String())
+	}
+	if got := strings.TrimSpace(getOut.String()); got != "http://localhost:11434/v1" {
+		t.Errorf("models.phases.apply.base_url = %q, want %q", got, "http://localhost:11434/v1")
+	}
+
+	// The provider/model fields of the apply ref must be unchanged (fixture: gpt-4o).
+	var modelOut, modelErr bytes.Buffer
+	modelCmd := newRootCmd(&modelOut, &modelErr)
+	modelCmd.SetArgs([]string{"config", "get", "models.phases.apply"})
+	if err := modelCmd.Execute(); err != nil {
+		t.Fatalf("get models.phases.apply Execute() error = %v, stderr = %s", err, modelErr.String())
+	}
+	if got := strings.TrimSpace(modelOut.String()); got != "gpt-4o" {
+		t.Errorf("models.phases.apply = %q, want unchanged %q", got, "gpt-4o")
+	}
+
+	// Set and get models.default.base_url.
+	var setDefOut, setDefErr bytes.Buffer
+	setDefCmd := newRootCmd(&setDefOut, &setDefErr)
+	setDefCmd.SetArgs([]string{"config", "set", "models.default.base_url", "http://localhost:8080/v1"})
+	if err := setDefCmd.Execute(); err != nil {
+		t.Fatalf("set models.default.base_url Execute() error = %v, stderr = %s", err, setDefErr.String())
+	}
+
+	var getDefOut, getDefErr bytes.Buffer
+	getDefCmd := newRootCmd(&getDefOut, &getDefErr)
+	getDefCmd.SetArgs([]string{"config", "get", "models.default.base_url"})
+	if err := getDefCmd.Execute(); err != nil {
+		t.Fatalf("get models.default.base_url Execute() error = %v, stderr = %s", err, getDefErr.String())
+	}
+	if got := strings.TrimSpace(getDefOut.String()); got != "http://localhost:8080/v1" {
+		t.Errorf("models.default.base_url = %q, want %q", got, "http://localhost:8080/v1")
+	}
+
+	// The models.default model field must be unchanged (fixture: claude-sonnet-4).
+	var defModelOut, defModelErr bytes.Buffer
+	defModelCmd := newRootCmd(&defModelOut, &defModelErr)
+	defModelCmd.SetArgs([]string{"config", "get", "models.default"})
+	if err := defModelCmd.Execute(); err != nil {
+		t.Fatalf("get models.default Execute() error = %v, stderr = %s", err, defModelErr.String())
+	}
+	if got := strings.TrimSpace(defModelOut.String()); got != "claude-sonnet-4" {
+		t.Errorf("models.default = %q, want unchanged %q", got, "claude-sonnet-4")
+	}
+}
+
+// TestConfigCmd_BaseURLGetUnsetReturnsEmpty covers REQ-2: getting base_url on
+// a ref with no BaseURL exits 0 and prints nothing.
+func TestConfigCmd_BaseURLGetUnsetReturnsEmpty(t *testing.T) {
+	tmpDir := setupProjectWithConfig(t)
+	origDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	var stdout, stderr bytes.Buffer
+	root := newRootCmd(&stdout, &stderr)
+	root.SetArgs([]string{"config", "get", "models.default.base_url"})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v, stderr = %s", err, stderr.String())
+	}
+
+	if got := strings.TrimSpace(stdout.String()); got != "" {
+		t.Errorf("models.default.base_url = %q, want empty", got)
+	}
+}
+
+// TestConfigCmd_ListShowsBaseURLLines covers REQ-2: `config list` includes a
+// base_url line grouped with its sibling models.phases.<phase> line.
+func TestConfigCmd_ListShowsBaseURLLines(t *testing.T) {
+	tmpDir := setupProjectWithConfig(t)
+	origDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	var setOut, setErr bytes.Buffer
+	setCmd := newRootCmd(&setOut, &setErr)
+	setCmd.SetArgs([]string{"config", "set", "models.phases.apply.base_url", "http://localhost:11434/v1"})
+	if err := setCmd.Execute(); err != nil {
+		t.Fatalf("set Execute() error = %v, stderr = %s", err, setErr.String())
+	}
+
+	var stdout, stderr bytes.Buffer
+	root := newRootCmd(&stdout, &stderr)
+	root.SetArgs([]string{"config", "list"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("list Execute() error = %v, stderr = %s", err, stderr.String())
+	}
+
+	output := stdout.String()
+	if !strings.Contains(output, "models.phases.apply.base_url = http://localhost:11434/v1") {
+		t.Errorf("list output = %q, want contains %q", output, "models.phases.apply.base_url = http://localhost:11434/v1")
+	}
+}
+
 func TestConfigCmd_ListEmpty(t *testing.T) {
 	tmpDir := t.TempDir()
 	archonDir := filepath.Join(tmpDir, ".archon")

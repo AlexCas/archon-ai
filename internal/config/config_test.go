@@ -239,7 +239,7 @@ func TestConfig_CloneRoundtrip(t *testing.T) {
 			Default: ModelRef{Provider: "anthropic", Model: "claude-sonnet-4-20250514"},
 			Leader:  ModelRef{Provider: "anthropic", Model: "claude-opus-4-8"},
 			Phases: map[string]ModelRef{
-				"apply":  {Model: "claude-sonnet-4-6"},
+				"apply":  {Provider: "ollama", Model: "llama3", BaseURL: "http://localhost:11434/v1"},
 				"verify": {Model: "claude-haiku-4-5"},
 				"judge":  {Model: "claude-opus-4-8"},
 			},

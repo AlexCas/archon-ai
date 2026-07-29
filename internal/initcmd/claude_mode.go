@@ -13,6 +13,14 @@ import (
 // package (notably the TUI save path). It delegates to writeClaudeAgents so
 // init and the TUI share a single writer implementation and produce
 // byte-identical .claude/agents output.
+//
+// Caller audit (PR-A A1, local-model-provider): grepping every exported
+// symbol in this package across the repo shows exactly one external caller —
+// internal/tui/model.go (line ~381, will pass io.Discard once PR-B adds the
+// io.Writer param here for the REQ-6 warn-and-skip guard). init.go is the
+// same-package caller of the unexported writeClaudeAgents and will pass
+// os.Stderr. No third caller exists, so widening this signature in PR-B is
+// safe. No signature change lands in this PR (PR-A) — see PR-B (REQ-6).
 func WriteClaudeAgents(projectDir string, models config.ModelConfig) ([]string, error) {
 	return writeClaudeAgents(projectDir, models)
 }

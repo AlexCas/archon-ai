@@ -1,0 +1,48 @@
+phase: judge
+status: completed
+history:
+  - {phase: explore, status: in_progress, ts: "2026-07-29T00:37:42Z"}
+  - {phase: explore, status: completed, ts: "2026-07-29T00:37:42Z"}
+  - {phase: propose, status: in_progress, ts: "2026-07-28T00:00:00Z"}
+  - {phase: propose, status: completed, ts: "2026-07-28T00:00:00Z"}
+  - {phase: spec, status: in_progress, ts: "2026-07-28T00:00:00Z"}
+  - {phase: spec, status: completed, ts: "2026-07-28T00:00:00Z"}
+  - {phase: design, status: in_progress, ts: "2026-07-29T01:02:41Z"}
+  - {phase: design, status: completed, ts: "2026-07-29T01:02:41Z"}
+  - {phase: tasks, status: in_progress, ts: "2026-07-28T00:00:00Z"}
+  - {phase: tasks, status: completed, ts: "2026-07-28T00:00:00Z"}
+  - {phase: apply, status: in_progress, ts: "2026-07-28T00:00:00Z"}
+  # PR-A (A1-A7) fully implemented, all tests pass (go build/vet/fmt/test clean).
+  # Diff is ~896 changed lines vs the 400-line budget (overage is test volume;
+  # code ~277 lines). User accepted size:exception for PR-A — not a verify blocker.
+  - {phase: apply, status: completed, ts: "2026-07-28T00:00:00Z"}
+  - {phase: verify, status: in_progress, ts: "2026-07-28T00:00:00Z"}
+  - {phase: verify, status: completed, ts: "2026-07-28T00:00:00Z"}
+  # VERIFY PR-A (REQ-1..5): PASS. go build/vet clean; gofmt clean on all PR-A
+  # touched files; go test ./... all packages ok. 17/17 PR-A scenarios map to
+  # passing tests. Byte-identical round-trip (REQ-1) and deterministic/sorted
+  # idempotent opencode.json (REQ-5) asserted at runtime with real byte/order
+  # checks. REQ-4 first-in-PhaseOrder-wins rule verified in impl + coherent test
+  # (documented spec.md example discrepancy handled). PR-B scope (REQ-6/REQ-7)
+  # confirmed ABSENT: no io.Writer on writeClaudeAgents, no warn-and-skip, no
+  # TUI baseURLEdit sub-mode.
+  - {phase: judge, status: in_progress, ts: "2026-07-28T00:00:00Z"}
+  # JUDGE PR-A: blind dual adversarial review (2 rounds).
+  # Round 1 confirmed:
+  #   CRITICAL: buildProviderBlock emitted "" key for Provider=="" refs with BaseURL.
+  #   WARNING (theoretical): stale provider block persists after base_url removal
+  #     (additive-merge contract; spec silent on removal — accepted gap).
+  #   WARNING (theoretical): bareModelID with pre-slashed models (out of PR-A scope).
+  #   INFO: double-warning when Provider empty + non-http URL (behavior correct; test gap).
+  #   INFO: models.leader.base_url not CLI-settable (within REQ-2 scope).
+  #   INFO: config list hides base_url when Model="" (pre-existing REQ-2 edge case,
+  #     not introduced by this PR; tracked for follow-up).
+  #   Scope: clean — no REQ-6/REQ-7 leakage confirmed.
+  # Fix applied: buildProviderBlock now skips refs with Provider=="" (consistent
+  #   with warn-never-fail contract; ValidateBaseURL already warned at set-time).
+  #   New test: TestMergeOpencodeAgent_ProviderBlock_EmptyProviderSkipped.
+  #   go test ./internal/initcmd/... ./internal/config/... ./cmd/archon/... green.
+  # Round 2 (re-judge): both judges APPROVED. C-1 fully closed. No remaining
+  #   CRITICAL or WARNING (real). Residual items are INFO/theoretical.
+  - {phase: judge, status: completed, ts: "2026-07-28T00:00:00Z"}
+  # JUDGMENT: APPROVED

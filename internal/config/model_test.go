@@ -1,6 +1,7 @@
 package config
 
 import (
+	"bytes"
 	"reflect"
 	"strings"
 	"testing"
@@ -284,7 +285,7 @@ func TestResolvePhaseModels(t *testing.T) {
 			},
 		}
 		got := ResolvePhaseModels(mc)
-		want := []PhaseModel{{Phase: "propose", Model: "opencode/deepseek-v4-pro"}}
+		want := []PhaseModel{{Phase: "propose", Model: "opencode/deepseek-v4-pro", Provider: "opencode"}}
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("got %v, want %v", got, want)
 		}
@@ -338,7 +339,7 @@ func TestResolvePhaseModels(t *testing.T) {
 		got := ResolvePhaseModels(mc)
 		want := []PhaseModel{
 			{Phase: "explore", Model: "opus"},
-			{Phase: "design", Model: "opencode/deepseek-v4-pro"},
+			{Phase: "design", Model: "opencode/deepseek-v4-pro", Provider: "opencode"},
 			{Phase: "archive", Model: "haiku"},
 		}
 		if !reflect.DeepEqual(got, want) {
@@ -473,6 +474,160 @@ func TestResolvePhaseModels(t *testing.T) {
 		}
 		if judgeModel != verifyModel {
 			t.Errorf("judge model = %q, verify model = %q; judge must default to verify's model", judgeModel, verifyModel)
+		}
+	})
+
+	// REQ-1: BaseURL flows from the resolved ref into PhaseModel.BaseURL.
+	t.Run("BaseURL carried from resolved ref into PhaseModel", func(t *testing.T) {
+		mc := ModelConfig{
+			Phases: map[string]ModelRef{
+				"apply": {Provider: "ollama", Model: "llama3", BaseURL: "http://localhost:11434/v1"},
+			},
+		}
+		got := ResolvePhaseModels(mc)
+		if len(got) != 1 {
+			t.Fatalf("got %d phases, want 1", len(got))
+		}
+		if got[0].BaseURL != "http://localhost:11434/v1" {
+			t.Errorf("PhaseModel.BaseURL = %q, want %q", got[0].BaseURL, "http://localhost:11434/v1")
+		}
+		if got[0].Provider != "ollama" {
+			t.Errorf("PhaseModel.Provider = %q, want %q", got[0].Provider, "ollama")
+		}
+	})
+
+	// REQ-1: a ref without BaseURL resolves with PhaseModel.BaseURL == "".
+	t.Run("empty BaseURL stays empty on resolved PhaseModel", func(t *testing.T) {
+		mc := ModelConfig{
+			Phases: map[string]ModelRef{
+				"apply": {Provider: "openai", Model: "gpt-4o"},
+			},
+		}
+		got := ResolvePhaseModels(mc)
+		if len(got) != 1 {
+			t.Fatalf("got %d phases, want 1", len(got))
+		}
+		if got[0].BaseURL != "" {
+			t.Errorf("PhaseModel.BaseURL = %q, want empty", got[0].BaseURL)
+		}
+	})
+}
+
+// TestModelRef_BaseURL covers REQ-1: the BaseURL field's YAML round-trip and
+// the scalar-vs-mapping marshal switch.
+func TestModelRef_BaseURL(t *testing.T) {
+	t.Run("scalar ref round-trips byte-identically", func(t *testing.T) {
+		const input = "ollama/llama3\n"
+		var r ModelRef
+		if err := yaml.Unmarshal([]byte(input), &r); err != nil {
+			t.Fatalf("Unmarshal(%q) error = %v", input, err)
+		}
+		if r.BaseURL != "" {
+			t.Fatalf("Unmarshal(%q).BaseURL = %q, want empty", input, r.BaseURL)
+		}
+		out, err := yaml.Marshal(r)
+		if err != nil {
+			t.Fatalf("Marshal() error = %v", err)
+		}
+		if string(out) != input {
+			t.Errorf("round-trip = %q, want byte-identical %q", out, input)
+		}
+	})
+
+	t.Run("BaseURL ref marshals as mapping", func(t *testing.T) {
+		r := ModelRef{Provider: "ollama", Model: "llama3", BaseURL: "http://localhost:11434/v1"}
+		out, err := yaml.Marshal(r)
+		if err != nil {
+			t.Fatalf("Marshal() error = %v", err)
+		}
+		got := string(out)
+		for _, key := range []string{"provider:", "model:", "base_url:"} {
+			if !strings.Contains(got, key) {
+				t.Errorf("Marshal() = %q, missing mapping key %q", got, key)
+			}
+		}
+		if strings.TrimSpace(got) == "ollama/llama3" {
+			t.Errorf("Marshal() emitted scalar form %q, want mapping", got)
+		}
+	})
+
+	t.Run("scalar input decodes with empty BaseURL", func(t *testing.T) {
+		var r ModelRef
+		if err := yaml.Unmarshal([]byte("anthropic/claude-sonnet-4-6"), &r); err != nil {
+			t.Fatalf("Unmarshal() error = %v", err)
+		}
+		if r.Provider != "anthropic" || r.Model != "claude-sonnet-4-6" || r.BaseURL != "" {
+			t.Errorf("got {%q,%q,%q}, want {%q,%q,\"\"}", r.Provider, r.Model, r.BaseURL, "anthropic", "claude-sonnet-4-6")
+		}
+	})
+
+	t.Run("BaseURL survives a marshal->unmarshal round-trip", func(t *testing.T) {
+		in := ModelRef{Provider: "localai", Model: "gpt-4-vision", BaseURL: "http://localhost:8080/v1"}
+		out, err := yaml.Marshal(in)
+		if err != nil {
+			t.Fatalf("Marshal() error = %v", err)
+		}
+		var got ModelRef
+		if err := yaml.Unmarshal(out, &got); err != nil {
+			t.Fatalf("Unmarshal() error = %v", err)
+		}
+		if got != in {
+			t.Errorf("round-trip = %+v, want %+v", got, in)
+		}
+	})
+
+	t.Run("BaseURL with Effort still marshals as mapping", func(t *testing.T) {
+		r := ModelRef{Provider: "ollama", Model: "llama3", Effort: "high", BaseURL: "http://localhost:11434/v1"}
+		out, err := yaml.Marshal(r)
+		if err != nil {
+			t.Fatalf("Marshal() error = %v", err)
+		}
+		got := string(out)
+		if !strings.Contains(got, "effort:") || !strings.Contains(got, "base_url:") {
+			t.Errorf("Marshal() = %q, want mapping with effort and base_url keys", got)
+		}
+	})
+}
+
+// TestValidateBaseURL covers REQ-3: advisory-only validation, never an error.
+func TestValidateBaseURL(t *testing.T) {
+	tests := []struct {
+		name     string
+		ref      ModelRef
+		wantWarn bool
+	}{
+		{name: "valid http BaseURL produces no warning", ref: ModelRef{Provider: "ollama", BaseURL: "http://localhost:11434/v1"}, wantWarn: false},
+		{name: "valid https BaseURL produces no warning", ref: ModelRef{Provider: "ollama", BaseURL: "https://models.internal/v1"}, wantWarn: false},
+		{name: "non-http scheme triggers a warning", ref: ModelRef{Provider: "ollama", BaseURL: "ftp://localhost/v1"}, wantWarn: true},
+		{name: "BaseURL set but provider empty triggers a warning", ref: ModelRef{Provider: "", BaseURL: "http://localhost:11434/v1"}, wantWarn: true},
+		{name: "empty BaseURL is always silent", ref: ModelRef{Provider: "", BaseURL: ""}, wantWarn: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			ValidateBaseURL(tt.ref, &buf)
+			gotWarn := buf.Len() > 0
+			if gotWarn != tt.wantWarn {
+				t.Errorf("ValidateBaseURL(%+v) warned = %v (msg %q), want %v", tt.ref, gotWarn, buf.String(), tt.wantWarn)
+			}
+		})
+	}
+
+	t.Run("exact message for non-http/https BaseURL", func(t *testing.T) {
+		var buf bytes.Buffer
+		ValidateBaseURL(ModelRef{Provider: "ollama", BaseURL: "ftp://localhost/v1"}, &buf)
+		want := "warning: base_url \"ftp://localhost/v1\" is not a valid http/https URL\n"
+		if buf.String() != want {
+			t.Errorf("got %q, want %q", buf.String(), want)
+		}
+	})
+
+	t.Run("exact message for empty provider", func(t *testing.T) {
+		var buf bytes.Buffer
+		ValidateBaseURL(ModelRef{Provider: "", BaseURL: "http://localhost:11434/v1"}, &buf)
+		want := "warning: base_url is set but provider is empty — provider id required for local model routing\n"
+		if buf.String() != want {
+			t.Errorf("got %q, want %q", buf.String(), want)
 		}
 	})
 }
