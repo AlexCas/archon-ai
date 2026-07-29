@@ -3,6 +3,7 @@ package initcmd
 import (
 	"bufio"
 	"bytes"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -57,7 +58,7 @@ func TestWriteClaudeAgents_WritesOneFilePerResolvablePhase(t *testing.T) {
 		Phases:  map[string]config.ModelRef{"spec": config.ParseModelRef("anthropic/claude-opus-4-8")},
 	}
 
-	written, err := writeClaudeAgents(dir, models)
+	written, err := writeClaudeAgents(dir, models, io.Discard)
 	if err != nil {
 		t.Fatalf("writeClaudeAgents() error = %v", err)
 	}
@@ -91,7 +92,7 @@ func TestWriteClaudeAgents_OmitsPhaseWithNoModel(t *testing.T) {
 		Phases: map[string]config.ModelRef{"spec": config.ParseModelRef("anthropic/claude-opus-4-8")},
 	}
 
-	written, err := writeClaudeAgents(dir, models)
+	written, err := writeClaudeAgents(dir, models, io.Discard)
 	if err != nil {
 		t.Fatalf("writeClaudeAgents() error = %v", err)
 	}
@@ -127,7 +128,7 @@ func TestWriteClaudeAgents_FrontmatterModelStripsProvider(t *testing.T) {
 		Phases: map[string]config.ModelRef{"spec": config.ParseModelRef("anthropic/claude-opus-4-8")},
 	}
 
-	if _, err := writeClaudeAgents(dir, models); err != nil {
+	if _, err := writeClaudeAgents(dir, models, io.Discard); err != nil {
 		t.Fatalf("writeClaudeAgents() error = %v", err)
 	}
 
@@ -153,7 +154,7 @@ func TestWriteClaudeAgents_PhaseFallsBackToDefault(t *testing.T) {
 		// No phases.tasks entry — should fall back to Default.
 	}
 
-	if _, err := writeClaudeAgents(dir, models); err != nil {
+	if _, err := writeClaudeAgents(dir, models, io.Discard); err != nil {
 		t.Fatalf("writeClaudeAgents() error = %v", err)
 	}
 
@@ -174,7 +175,7 @@ func TestWriteClaudeAgents_BareAliasModelUnchanged(t *testing.T) {
 		Phases: map[string]config.ModelRef{"spec": config.ParseModelRef("opus")},
 	}
 
-	if _, err := writeClaudeAgents(dir, models); err != nil {
+	if _, err := writeClaudeAgents(dir, models, io.Discard); err != nil {
 		t.Fatalf("writeClaudeAgents() error = %v", err)
 	}
 
@@ -193,7 +194,7 @@ func TestWriteClaudeAgents_BodyPointsAtPhaseSkill(t *testing.T) {
 		Phases: map[string]config.ModelRef{"design": config.ParseModelRef("anthropic/claude-opus-4-8")},
 	}
 
-	if _, err := writeClaudeAgents(dir, models); err != nil {
+	if _, err := writeClaudeAgents(dir, models, io.Discard); err != nil {
 		t.Fatalf("writeClaudeAgents() error = %v", err)
 	}
 
@@ -227,7 +228,7 @@ func TestWriteClaudeAgents_JudgeExemptFromSkillRef(t *testing.T) {
 		Default: config.ParseModelRef("anthropic/claude-opus-4-8"),
 	}
 
-	if _, err := writeClaudeAgents(dir, models); err != nil {
+	if _, err := writeClaudeAgents(dir, models, io.Discard); err != nil {
 		t.Fatalf("writeClaudeAgents() error = %v", err)
 	}
 
@@ -258,7 +259,7 @@ func TestWriteClaudeAgents_JudgeBodyIsWrapper(t *testing.T) {
 		Phases: map[string]config.ModelRef{"judge": config.ParseModelRef("anthropic/claude-opus-4-8")},
 	}
 
-	if _, err := writeClaudeAgents(dir, models); err != nil {
+	if _, err := writeClaudeAgents(dir, models, io.Discard); err != nil {
 		t.Fatalf("writeClaudeAgents() error = %v", err)
 	}
 
@@ -294,7 +295,7 @@ func TestWriteClaudeAgents_JudgeBodyIsWrapper(t *testing.T) {
 func TestWriteClaudeAgents_NothingResolvableWritesNothing(t *testing.T) {
 	dir := t.TempDir()
 
-	written, err := writeClaudeAgents(dir, config.ModelConfig{})
+	written, err := writeClaudeAgents(dir, config.ModelConfig{}, io.Discard)
 	if err != nil {
 		t.Fatalf("writeClaudeAgents() error = %v", err)
 	}
@@ -354,7 +355,7 @@ func TestWriteClaudeAgents_ReRunByteIdenticalAndPreservesUserFiles(t *testing.T)
 	}
 
 	// First run.
-	if _, err := writeClaudeAgents(dir, models); err != nil {
+	if _, err := writeClaudeAgents(dir, models, io.Discard); err != nil {
 		t.Fatalf("first writeClaudeAgents() error = %v", err)
 	}
 
@@ -376,7 +377,7 @@ func TestWriteClaudeAgents_ReRunByteIdenticalAndPreservesUserFiles(t *testing.T)
 	}
 
 	// Second run.
-	if _, err := writeClaudeAgents(dir, models); err != nil {
+	if _, err := writeClaudeAgents(dir, models, io.Discard); err != nil {
 		t.Fatalf("second writeClaudeAgents() error = %v", err)
 	}
 
@@ -507,5 +508,104 @@ func TestRun_ClaudeUndoRemovesGeneratedAgentFiles(t *testing.T) {
 		if _, err := os.Stat(path); !os.IsNotExist(err) {
 			t.Errorf("archon agent file %q still exists after Cleanup(); stat err = %v", path, err)
 		}
+	}
+}
+
+// B1.2 [REQ-6]: "Local ref on Claude path triggers warn-and-skip" — a phase ref
+// with BaseURL set emits the exact warning to the injected writer AND the
+// agent file is still written with the bare model id (warn-and-skip, never
+// silent, never a hard failure).
+func TestWriteClaudeAgents_LocalRefWarnsAndStillWritesBareModel(t *testing.T) {
+	dir := t.TempDir()
+
+	models := config.ModelConfig{
+		Phases: map[string]config.ModelRef{
+			"apply": {Provider: "ollama", Model: "llama3", BaseURL: "http://localhost:11434/v1"},
+		},
+	}
+
+	var buf bytes.Buffer
+	written, err := writeClaudeAgents(dir, models, &buf)
+	if err != nil {
+		t.Fatalf("writeClaudeAgents() error = %v", err)
+	}
+	if len(written) != 1 {
+		t.Fatalf("written %d paths, want 1", len(written))
+	}
+
+	const wantWarning = `warning: phase "apply" has base_url set but agent is "claude" — local endpoint ignored; claude agents do not support custom baseURLs`
+	if !strings.Contains(buf.String(), wantWarning) {
+		t.Errorf("warning output = %q, want it to contain %q", buf.String(), wantWarning)
+	}
+
+	data := readAgentFile(t, dir, "apply")
+	fm := parseFrontmatter(t, data)
+	if fm["model"] != "llama3" {
+		t.Errorf("archon-apply.md frontmatter model = %q, want %q (bare model, BaseURL dropped)", fm["model"], "llama3")
+	}
+}
+
+// B1.2 [REQ-6]: "Remote ref on Claude path has no warning" — a ref with no
+// BaseURL produces no warning output at all.
+func TestWriteClaudeAgents_RemoteRefNoWarning(t *testing.T) {
+	dir := t.TempDir()
+
+	models := config.ModelConfig{
+		Phases: map[string]config.ModelRef{
+			"apply": config.ParseModelRef("anthropic/claude-sonnet-4-6"),
+		},
+	}
+
+	var buf bytes.Buffer
+	if _, err := writeClaudeAgents(dir, models, &buf); err != nil {
+		t.Fatalf("writeClaudeAgents() error = %v", err)
+	}
+
+	if buf.Len() != 0 {
+		t.Errorf("expected no warning output for a remote ref, got %q", buf.String())
+	}
+
+	data := readAgentFile(t, dir, "apply")
+	fm := parseFrontmatter(t, data)
+	if fm["model"] != "claude-sonnet-4-6" {
+		t.Errorf("archon-apply.md frontmatter model = %q, want %q", fm["model"], "claude-sonnet-4-6")
+	}
+}
+
+// B1.2 [REQ-6]: "Multiple local phases each emit a warning" — two phases each
+// with a BaseURL produce one warning per phase, and both agent files are
+// written with bare model ids.
+func TestWriteClaudeAgents_MultipleLocalPhasesEachWarn(t *testing.T) {
+	dir := t.TempDir()
+
+	models := config.ModelConfig{
+		Phases: map[string]config.ModelRef{
+			"apply":  {Provider: "ollama", Model: "llama3", BaseURL: "http://localhost:11434/v1"},
+			"verify": {Provider: "ollama", Model: "mistral", BaseURL: "http://localhost:11434/v1"},
+		},
+	}
+
+	var buf bytes.Buffer
+	if _, err := writeClaudeAgents(dir, models, &buf); err != nil {
+		t.Fatalf("writeClaudeAgents() error = %v", err)
+	}
+
+	out := buf.String()
+	wantApply := `warning: phase "apply" has base_url set but agent is "claude"`
+	wantVerify := `warning: phase "verify" has base_url set but agent is "claude"`
+	if strings.Count(out, wantApply) != 1 {
+		t.Errorf("expected exactly one warning for phase apply, got output %q", out)
+	}
+	if strings.Count(out, wantVerify) != 1 {
+		t.Errorf("expected exactly one warning for phase verify, got output %q", out)
+	}
+
+	applyFM := parseFrontmatter(t, readAgentFile(t, dir, "apply"))
+	if applyFM["model"] != "llama3" {
+		t.Errorf("archon-apply.md frontmatter model = %q, want %q", applyFM["model"], "llama3")
+	}
+	verifyFM := parseFrontmatter(t, readAgentFile(t, dir, "verify"))
+	if verifyFM["model"] != "mistral" {
+		t.Errorf("archon-verify.md frontmatter model = %q, want %q", verifyFM["model"], "mistral")
 	}
 }

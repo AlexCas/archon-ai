@@ -21,6 +21,7 @@ const (
 	modelSelect                   // choosing a model within the picked provider
 	freeForm                      // typing a raw provider/model string
 	effortSelect                  // choosing an effort/reasoning level for a reasoning model
+	baseURLEdit                   // typing/clearing the local-endpoint BaseURL for the focused row
 )
 
 // effortOptions are the fixed effort levels offered for reasoning-capable models.
@@ -138,8 +139,8 @@ func newModelsTabState(cfg *config.Config, providers map[string]opencode.Provide
 func (m *modelsTabState) update(msg tea.Msg) (tea.Cmd, bool) {
 	key, ok := msg.(tea.KeyMsg)
 	if !ok {
-		// Non-key msgs only matter to the textinput while in freeForm.
-		if m.mode == freeForm {
+		// Non-key msgs only matter to the textinput while in freeForm/baseURLEdit.
+		if m.mode == freeForm || m.mode == baseURLEdit {
 			var cmd tea.Cmd
 			m.input, cmd = m.input.Update(msg)
 			return cmd, true
@@ -158,6 +159,8 @@ func (m *modelsTabState) update(msg tea.Msg) (tea.Cmd, bool) {
 		return m.updateFreeForm(key)
 	case effortSelect:
 		return m.updateEffortSelect(key)
+	case baseURLEdit:
+		return m.updateBaseURLEdit(key)
 	}
 	return nil, true
 }
@@ -190,6 +193,10 @@ func (m *modelsTabState) updateRowNav(key tea.KeyMsg) (tea.Cmd, bool) {
 			m.openFreeForm()
 			return nil, true
 		}
+		if len(key.Runes) == 1 && key.Runes[0] == 'u' {
+			m.openBaseURLEdit()
+			return nil, true
+		}
 	}
 	return nil, true
 }
@@ -197,6 +204,15 @@ func (m *modelsTabState) updateRowNav(key tea.KeyMsg) (tea.Cmd, bool) {
 func (m *modelsTabState) openFreeForm() {
 	m.mode = freeForm
 	m.input.SetValue(m.rows[m.focusedRow].ref.FullID())
+	m.input.CursorEnd()
+	m.input.Focus()
+}
+
+// openBaseURLEdit enters the baseURLEdit sub-mode (REQ-7), seeding the shared
+// textinput with the focused row's current BaseURL (empty when unset).
+func (m *modelsTabState) openBaseURLEdit() {
+	m.mode = baseURLEdit
+	m.input.SetValue(m.rows[m.focusedRow].ref.BaseURL)
 	m.input.CursorEnd()
 	m.input.Focus()
 }
@@ -434,6 +450,27 @@ func (m *modelsTabState) updateFreeForm(key tea.KeyMsg) (tea.Cmd, bool) {
 	return cmd, true
 }
 
+// updateBaseURLEdit handles the baseURLEdit sub-mode (REQ-7). Enter commits
+// the trimmed input into the focused row's ref.BaseURL (empty input clears
+// it) and marks the row changed; Escape cancels without committing.
+func (m *modelsTabState) updateBaseURLEdit(key tea.KeyMsg) (tea.Cmd, bool) {
+	switch key.Type {
+	case tea.KeyEnter:
+		m.rows[m.focusedRow].ref.BaseURL = strings.TrimSpace(m.input.Value())
+		m.rows[m.focusedRow].changed = true
+		m.input.Blur()
+		m.mode = rowNav
+		return nil, true
+	case tea.KeyEsc:
+		m.input.Blur()
+		m.mode = rowNav
+		return nil, true
+	}
+	var cmd tea.Cmd
+	m.input, cmd = m.input.Update(key)
+	return cmd, true
+}
+
 // hintLine returns the mode-specific keyboard hint.
 func (m *modelsTabState) hintLine() string {
 	switch m.mode {
@@ -445,11 +482,13 @@ func (m *modelsTabState) hintLine() string {
 		return "type provider/model · Enter: set · Esc: cancel"
 	case effortSelect:
 		return "↑/↓: choose effort · Enter: set · Esc: back"
+	case baseURLEdit:
+		return "type a local endpoint URL (empty clears it) · Enter: set · Esc: cancel"
 	default:
 		if len(m.available) == 0 {
-			return "No detected models — press e to type a provider/model"
+			return "No detected models — press e to type a provider/model · u: set base URL"
 		}
-		return "↑/↓: move · Enter: pick provider/model · e: type a model"
+		return "↑/↓: move · Enter: pick provider/model · e: type a model · u: set base URL"
 	}
 }
 
@@ -594,6 +633,14 @@ func (m *modelsTabState) renderRow(i int, label, focus, dim lipgloss.Style) stri
 			b.WriteString(dim.Render("Enter to set · Esc to cancel"))
 			return b.String()
 
+		case baseURLEdit:
+			b.WriteString(label.Render(row.label + ":"))
+			b.WriteString(" ")
+			b.WriteString(m.input.View())
+			b.WriteString("  ")
+			b.WriteString(dim.Render("Enter to set · Esc to cancel"))
+			return b.String()
+
 		case effortSelect:
 			b.WriteString(label.Render(row.label + ":"))
 			b.WriteString(" Effort:\n")
@@ -610,23 +657,45 @@ func (m *modelsTabState) renderRow(i int, label, focus, dim lipgloss.Style) stri
 		}
 	}
 
-	// Plain row display.
+	// Plain row display. Build value as a plain string first so that focus.Render
+	// never receives embedded ANSI escape codes. dim styling is applied only on
+	// the unfocused branch, never concatenated into value before focus.Render.
 	marker := "  "
 	rowLabel := label.Render(row.label + ":")
 	value := row.ref.FullID()
-	if value == "" && row.kind == rowPhase {
-		value = dim.Render("(default)")
+	isDefaultPlaceholder := value == "" && row.kind == rowPhase
+	if isDefaultPlaceholder {
+		// Use a plain-text sentinel when the model is unset; append BaseURL if set.
+		// The "(default)" label is rendered plain here so focus.Render receives no
+		// embedded ANSI. On the unfocused branch below, dim styling wraps the whole
+		// segment instead.
+		value = "(default)"
+		if row.ref.BaseURL != "" {
+			value += " @ " + row.ref.BaseURL
+		}
+	} else if row.ref.BaseURL != "" {
+		value += " @ " + row.ref.BaseURL
 	}
 
 	if i == m.focusedRow {
+		// Write rowLabel separately so focus.Render receives only plain text (value).
+		// Embedding a pre-rendered label string (which carries lipgloss ANSI codes)
+		// inside focus.Render causes nested escape sequences that corrupt the
+		// focus highlight. The unfocused branch already writes rowLabel separately.
 		marker = "▸ "
 		b.WriteString(marker)
-		b.WriteString(focus.Render(rowLabel + " " + value))
+		b.WriteString(rowLabel)
+		b.WriteString(" ")
+		b.WriteString(focus.Render(value))
 	} else {
 		b.WriteString(marker)
 		b.WriteString(rowLabel)
 		b.WriteString(" ")
-		b.WriteString(value)
+		if isDefaultPlaceholder {
+			b.WriteString(dim.Render(value))
+		} else {
+			b.WriteString(value)
+		}
 	}
 	return b.String()
 }
@@ -642,8 +711,10 @@ func (m *modelsTabState) applyToConfig(cfg *config.Config) {
 		case rowLeader:
 			cfg.Models.Leader = row.ref
 		case rowPhase:
-			if row.ref.Model == "" {
-				// Empty: delete the phase entry (whether seeded-empty or cleared).
+			if row.ref.Model == "" && row.ref.BaseURL == "" {
+				// Truly empty ref: delete the phase entry (whether seeded-empty or cleared).
+				// A ref with only BaseURL set (no model yet) is preserved so the
+				// user-typed endpoint is not silently discarded on save.
 				delete(cfg.Models.Phases, row.phase)
 			} else {
 				cfg.Models.Phases[row.phase] = row.ref
