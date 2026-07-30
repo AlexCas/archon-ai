@@ -27,6 +27,8 @@ doubt, keep it.
 ## Phase Order
 explore → propose → spec → design → tasks → apply → verify → judge → archive
 
+In the single-PR flow the archive commit is staged BEFORE the PR is opened, so archive history travels inside the change's PR.
+
 ## SDD Session Preflight (HARD GATE)
 
 Before executing ANY SDD command or natural-language SDD request, ensure this session has an explicit preflight decision block.
@@ -134,7 +136,7 @@ Rules:
 - One file per session, kept at the repo ROOT while the session is active.
 - Update it at the START and END of each phase (explore → propose → spec → design → tasks → apply → verify → judge → archive), recording: active change name, current phase + status, preflight choices, completed phases with timestamps, key artifacts/paths, open questions, and the next recommended step.
 - If the agent is closed unexpectedly, `SESSION_STATUS.md` stays at the root. On the next session, READ it FIRST to restore context before doing anything else.
-- During `archive`, MOVE `SESSION_STATUS.md` into the archived change folder alongside the feature artifacts, then remove it from the root.
+- During `archive`, MOVE `SESSION_STATUS.md` into the archived change folder as part of the staged archive commit, before the PR is opened, then remove it from the root.
 - Follow the `session-status-contract` shared module for the exact format.
 
 ## Commit Attribution (HARD RULE)
@@ -152,7 +154,8 @@ When committing on the user's behalf through the harness or any sub-agent:
 6. When playwright.enabled, run the generated Playwright tests after verify and judge pass
 7. When impeccable.enabled, run Impeccable subcommands during apply and the detection gate after judge passes
 8. On judge fail: re-apply with feedback (max 3 retries)
-9. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution
+9. In the single-PR flow, run archive (spec merge, folder move, `archon map`, SESSION_STATUS.md move) as one commit AFTER judge passes and BEFORE opening the PR
+10. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution
 
 ## Configuration
 - Skills: 25 (embedded via archon init)

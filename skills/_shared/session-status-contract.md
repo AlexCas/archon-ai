@@ -20,9 +20,10 @@ work is in progress.
   root. The next session MUST read it FIRST, before any other action, to restore
   context.
 - **Archive**: during `sdd-archive`, MOVE the file into the archived change folder
-  (`openspec/changes/archive/YYYY-MM-DD-{change-name}/SESSION_STATUS.md`) alongside
-  the feature artifacts, then delete it from the root. In Engram-only mode, store
-  its final contents as an observation and remove the root file.
+  (`openspec/changes/archive/YYYY-MM-DD-{change-name}/SESSION_STATUS.md`) as part of
+  the staged archive commit, before the PR is opened, then delete it from the root.
+  In Engram-only mode, store its final contents as an observation and remove the
+  root file.
 - **One file per session**: if a new change starts in the same session, the file
   is updated to reflect the active change. The header always names the current
   change.

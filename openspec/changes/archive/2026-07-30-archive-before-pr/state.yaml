@@ -1,0 +1,14 @@
+change: archive-before-pr
+phase: archive
+status: completed
+updated_at: "2026-07-30T00:00:00Z"
+phases_completed:
+  - explore
+  - propose
+  - spec
+  - design
+  - tasks
+  - apply
+  - verify
+  - judge
+  - archive
