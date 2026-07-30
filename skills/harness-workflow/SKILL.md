@@ -20,6 +20,10 @@ explore → propose → spec → design → tasks → apply → verify → judge
 
 Each phase has two statuses: `in_progress` | `completed`.
 
+**Terminal ordering (single-PR)**: in the single-PR flow, the sequence after `judge`
+passes is: archive commit staged (spec merge, folder move, `SESSION_STATUS.md` move,
+`archon map`) → PR opened. Judge gating is unchanged.
+
 ## Activation Contract
 
 Load when the orchestrator needs to:
@@ -151,4 +155,4 @@ If blocked, append:
 - NEVER allow concurrent phase execution — one phase at a time per change.
 - Timestamps MUST use ISO 8601 format (UTC).
 - On session resume, READ `SESSION_STATUS.md` (repo root) FIRST to restore context before evaluating any transition. See `session-status-contract`.
-- `SESSION_STATUS.md` is updated on every transition and is MOVED into the archived change folder during `sdd-archive`.
+- `SESSION_STATUS.md` is updated on every transition and is MOVED into the archived change folder during `sdd-archive`, within the staged archive commit, before the PR is opened.
