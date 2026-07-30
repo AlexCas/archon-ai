@@ -66,12 +66,30 @@ func DisplayWithUpdate(w io.Writer, cfg *config.Config, n int) {
 
 	fmt.Fprintln(w, "  Models")
 	fmt.Fprintln(w, "  ------")
-	if cfg.Models.Default.FullID() == "" && len(cfg.Models.Phases) == 0 {
+	if !cfg.Models.HasAny() {
 		fmt.Fprintln(w, "    (none configured)")
 	} else {
 		if cfg.Models.Default.FullID() != "" {
 			fmt.Fprintf(w, "    Default:  %s\n", cfg.Models.Default.FullID())
 		}
+		if cfg.Models.Default.BaseURL != "" {
+			fmt.Fprintf(w, "    default base_url:  %s\n", cfg.Models.Default.BaseURL)
+		}
+
+		if cfg.Models.Leader.FullID() != "" || cfg.Models.Leader.BaseURL != "" {
+			if cfg.Models.Leader.FullID() != "" {
+				fmt.Fprintf(w, "    Leader:  %s\n", cfg.Models.Leader.FullID())
+				if cfg.Models.Leader.BaseURL != "" {
+					fmt.Fprintf(w, "    leader base_url:  %s\n", cfg.Models.Leader.BaseURL)
+				}
+			} else {
+				// FullID is empty but BaseURL is set: keep the "Leader:" label
+				// on the value line so the block stays identifiable even
+				// without a model id (REQ-12).
+				fmt.Fprintf(w, "    Leader:  %s\n", cfg.Models.Leader.BaseURL)
+			}
+		}
+
 		if len(cfg.Models.Phases) > 0 {
 			phases := make([]string, 0, len(cfg.Models.Phases))
 			for k := range cfg.Models.Phases {
@@ -79,7 +97,12 @@ func DisplayWithUpdate(w io.Writer, cfg *config.Config, n int) {
 			}
 			sort.Strings(phases)
 			for _, phase := range phases {
-				fmt.Fprintf(w, "    %-8s %s\n", phase+":", cfg.Models.Phases[phase].FullID())
+				if cfg.Models.Phases[phase].FullID() != "" {
+					fmt.Fprintf(w, "    %-8s %s\n", phase+":", cfg.Models.Phases[phase].FullID())
+				}
+				if baseURL := cfg.Models.Phases[phase].BaseURL; baseURL != "" {
+					fmt.Fprintf(w, "    %-8s %s\n", "base_url:", baseURL)
+				}
 			}
 		}
 	}

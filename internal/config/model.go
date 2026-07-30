@@ -121,6 +121,24 @@ type ModelConfig struct {
 	Phases  map[string]ModelRef `yaml:"phases,omitempty"`
 }
 
+// HasAny reports whether any ref carries a model id OR a base_url. It is the
+// single source of truth for the "(none configured)" guard on both the
+// `config list` and `status` surfaces (Invariant 4).
+func (mc ModelConfig) HasAny() bool {
+	if mc.Default.FullID() != "" || mc.Default.BaseURL != "" {
+		return true
+	}
+	if mc.Leader.FullID() != "" || mc.Leader.BaseURL != "" {
+		return true
+	}
+	for _, r := range mc.Phases {
+		if r.FullID() != "" || r.BaseURL != "" {
+			return true
+		}
+	}
+	return false
+}
+
 // ClaudeModels is the curated, ordered list of Claude models offered as static
 // choices in the TUI. The list is intentionally small and current; users who
 // need another model can always type a free-form string instead.

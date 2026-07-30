@@ -631,3 +631,37 @@ func TestValidateBaseURL(t *testing.T) {
 		}
 	})
 }
+
+// TestModelConfig_HasAny covers REQ-8: the shared emptiness guard used by both
+// `config list` and `status`.
+func TestModelConfig_HasAny(t *testing.T) {
+	tests := []struct {
+		name string
+		mc   ModelConfig
+		want bool
+	}{
+		{name: "all empty", mc: ModelConfig{}, want: false},
+		{name: "default id only", mc: ModelConfig{Default: ModelRef{Provider: "ollama", Model: "llama3"}}, want: true},
+		{name: "default BaseURL only", mc: ModelConfig{Default: ModelRef{BaseURL: "http://localhost:11434/v1"}}, want: true},
+		{name: "leader id only", mc: ModelConfig{Leader: ModelRef{Provider: "ollama", Model: "llama3"}}, want: true},
+		{name: "leader BaseURL only", mc: ModelConfig{Leader: ModelRef{BaseURL: "http://localhost:11434/v1"}}, want: true},
+		{name: "phase id only", mc: ModelConfig{Phases: map[string]ModelRef{"apply": {Provider: "ollama", Model: "llama3"}}}, want: true},
+		{name: "phase BaseURL only", mc: ModelConfig{Phases: map[string]ModelRef{"apply": {BaseURL: "http://localhost:11434/v1"}}}, want: true},
+		{
+			name: "all fields set",
+			mc: ModelConfig{
+				Default: ModelRef{Provider: "anthropic", Model: "claude-opus-4-8", BaseURL: "http://localhost:11434/v1"},
+				Leader:  ModelRef{Provider: "ollama", Model: "llama3", BaseURL: "http://localhost:11434/v1"},
+				Phases:  map[string]ModelRef{"apply": {Provider: "ollama", Model: "llama3", BaseURL: "http://localhost:11434/v1"}},
+			},
+			want: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.mc.HasAny(); got != tt.want {
+				t.Errorf("HasAny() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

@@ -1,0 +1,37 @@
+phase: archive
+status: completed
+change: config-cli-baseurl-followups
+archived: true
+archived_date: "2026-07-29"
+issues: ["#90", "#91"]
+preflight:
+  ritmo: interactive
+  artifacts: openspec
+  prs: ask-always
+  review_budget_lines: 400
+  playwright: disabled
+  impeccable: disabled
+history:
+  - {phase: explore, status: completed, ts: "2026-07-28T00:00:00Z"}
+  - {phase: propose, status: in_progress, ts: "2026-07-28T00:00:00Z"}
+  - {phase: propose, status: completed, ts: "2026-07-28T00:00:00Z"}
+  - {phase: spec, status: in_progress, ts: "2026-07-28T01:00:00Z"}
+  - {phase: spec, status: completed, ts: "2026-07-28T01:30:00Z"}
+  - {phase: design, status: in_progress, ts: "2026-07-28T02:00:00Z"}
+  - {phase: design, status: completed, ts: "2026-07-28T02:30:00Z"}
+  - {phase: tasks, status: in_progress, ts: "2026-07-28T03:00:00Z"}
+  - {phase: tasks, status: completed, ts: "2026-07-28T03:00:00Z"}
+  - {phase: apply, status: in_progress, ts: "2026-07-28T04:00:00Z"}
+  - {phase: apply, status: completed, ts: "2026-07-28T04:30:00Z"}
+  - {phase: verify, status: in_progress, ts: "2026-07-28T05:00:00Z"}
+  - {phase: verify, status: completed, ts: "2026-07-28T05:30:00Z"}
+  - {phase: judge, status: in_progress, ts: "2026-07-28T06:00:00Z"}
+  - {phase: judge, status: completed, ts: "2026-07-28T06:30:00Z"}
+  - {phase: archive, status: in_progress, ts: "2026-07-29T00:00:00Z"}
+  - {phase: archive, status: completed, ts: "2026-07-29T00:00:00Z"}
+notes:
+  - "Actual diff is 603 changed lines across 6 Go files (production ~47, tests ~556) — exceeds the 400-line hard ceiling despite the tasks-phase estimate of ~265. Flagged to orchestrator/user for a delivery-strategy decision (size:exception vs split) before PR."
+  - "REQ-12 status Leader block: spec.md Gherkin scenario requires the 'Leader:' label to appear even when only base_url is set; design.md's literal code snippet (task 6.1) would have omitted it in that case. Implemented per spec (see internal/status/display.go Leader block) — deviation noted for verify."
+  - "Task 8.4 symmetry test implemented as TestConfigCmd_LeaderSymmetry in cmd/archon/config_test.go (not display_test.go) since package status cannot import package main; matches design.md's own testing-table name."
+  - "VERIFY: PASS. gofmt -l (touched) empty, go vet clean, go build clean, go test ./... all pass (fresh -count=1 on config/cmd/status packages). All 24 Gherkin scenarios covered by passing tests. Both apply-flagged deviations confirmed spec-correct (not defects). No internal/config schema/Clone/Validate change beyond additive HasAny(). Ordering default->leader->phases confirmed on both surfaces. See verify-report.md. Verdict: ready for judge."
+  - "JUDGE: APPROVED. Round-1 dual review confirmed 4 issues (0 CRITICAL, 2+2 WARNING test-quality). Fix agent applied: (1) BaseURL-preservation in setConfigValue for all 3 tiers; (2-3) leader base_url-only sub-cases in ListBaseURLOnlyIsConfigured and ListSuppressesEmptyPrimary; (4) full 3-way ordering assertion in ListShowsLeaderBlock. Round-2 confirmed 1 remaining WARNING: no regression test for set-base_url-then-set-model scenario. Added TestConfigCmd_BaseURLPreservedOnModelSet (3 sub-tests: default/leader/phase). Phase label ambiguity in status (base_url: without phase name) downgraded to INFO — spec-conformant per design.md inline decision. Final build+vet+test: all clean. Verdict: APPROVED, ready for archive + PR split."

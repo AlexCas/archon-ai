@@ -124,7 +124,7 @@ func newConfigListCmd(stdout, stderr io.Writer) *cobra.Command {
 				return fmt.Errorf("load config: %w", err)
 			}
 
-			if cfg.Models.Default.FullID() == "" && len(cfg.Models.Phases) == 0 {
+			if !cfg.Models.HasAny() {
 				fmt.Fprintln(stdout, "(none configured)")
 				return nil
 			}
@@ -136,6 +136,13 @@ func newConfigListCmd(stdout, stderr io.Writer) *cobra.Command {
 				fmt.Fprintf(stdout, "models.default.base_url = %s\n", cfg.Models.Default.BaseURL)
 			}
 
+			if cfg.Models.Leader.FullID() != "" {
+				fmt.Fprintf(stdout, "models.leader = %s\n", cfg.Models.Leader.FullID())
+			}
+			if cfg.Models.Leader.BaseURL != "" {
+				fmt.Fprintf(stdout, "models.leader.base_url = %s\n", cfg.Models.Leader.BaseURL)
+			}
+
 			if len(cfg.Models.Phases) > 0 {
 				phases := make([]string, 0, len(cfg.Models.Phases))
 				for k := range cfg.Models.Phases {
@@ -143,7 +150,9 @@ func newConfigListCmd(stdout, stderr io.Writer) *cobra.Command {
 				}
 				sort.Strings(phases)
 				for _, phase := range phases {
-					fmt.Fprintf(stdout, "models.phases.%s = %s\n", phase, cfg.Models.Phases[phase].FullID())
+					if cfg.Models.Phases[phase].FullID() != "" {
+						fmt.Fprintf(stdout, "models.phases.%s = %s\n", phase, cfg.Models.Phases[phase].FullID())
+					}
 					if baseURL := cfg.Models.Phases[phase].BaseURL; baseURL != "" {
 						fmt.Fprintf(stdout, "models.phases.%s.base_url = %s\n", phase, baseURL)
 					}
@@ -162,6 +171,8 @@ func baseURLRefForKey(cfg *config.Config, key string) (config.ModelRef, bool) {
 	switch {
 	case key == "models.default.base_url":
 		return cfg.Models.Default, true
+	case key == "models.leader.base_url":
+		return cfg.Models.Leader, true
 	case strings.HasPrefix(key, "models.phases.") && strings.HasSuffix(key, ".base_url"):
 		phase := strings.TrimSuffix(strings.TrimPrefix(key, "models.phases."), ".base_url")
 		return cfg.Models.Phases[phase], true
@@ -181,10 +192,20 @@ func parseBool(key, value string) (bool, error) {
 func setConfigValue(cfg *config.Config, key, value string) error {
 	switch key {
 	case "models.default":
-		cfg.Models.Default = config.ParseModelRef(value)
+		ref := config.ParseModelRef(value)
+		ref.BaseURL = cfg.Models.Default.BaseURL
+		cfg.Models.Default = ref
 		return nil
 	case "models.default.base_url":
 		cfg.Models.Default.BaseURL = value
+		return nil
+	case "models.leader":
+		ref := config.ParseModelRef(value)
+		ref.BaseURL = cfg.Models.Leader.BaseURL
+		cfg.Models.Leader = ref
+		return nil
+	case "models.leader.base_url":
+		cfg.Models.Leader.BaseURL = value
 		return nil
 	case "playwright.enabled":
 		b, err := parseBool(key, value)
@@ -267,10 +288,13 @@ func setConfigValue(cfg *config.Config, key, value string) error {
 			if cfg.Models.Phases == nil {
 				cfg.Models.Phases = make(map[string]config.ModelRef)
 			}
-			cfg.Models.Phases[phase] = config.ParseModelRef(value)
+			existing := cfg.Models.Phases[phase]
+			ref := config.ParseModelRef(value)
+			ref.BaseURL = existing.BaseURL
+			cfg.Models.Phases[phase] = ref
 			return nil
 		}
-		return fmt.Errorf("unknown config key %q (supported: models.default, models.default.base_url, models.phases.<phase>, models.phases.<phase>.base_url, playwright.enabled, playwright.test_dir, playwright.base_url, mutation_testing.enabled, security.enabled, security.profile, impeccable.enabled, impeccable.auto_install, impeccable.severity, impeccable.product_path, impeccable.design_path)", key)
+		return fmt.Errorf("unknown config key %q (supported: models.default, models.default.base_url, models.leader, models.leader.base_url, models.phases.<phase>, models.phases.<phase>.base_url, playwright.enabled, playwright.test_dir, playwright.base_url, mutation_testing.enabled, security.enabled, security.profile, impeccable.enabled, impeccable.auto_install, impeccable.severity, impeccable.product_path, impeccable.design_path)", key)
 	}
 }
 
@@ -280,6 +304,10 @@ func getConfigValue(cfg *config.Config, key string) (string, error) {
 		return cfg.Models.Default.FullID(), nil
 	case "models.default.base_url":
 		return cfg.Models.Default.BaseURL, nil
+	case "models.leader":
+		return cfg.Models.Leader.FullID(), nil
+	case "models.leader.base_url":
+		return cfg.Models.Leader.BaseURL, nil
 	case "playwright.enabled":
 		return strconv.FormatBool(cfg.Playwright.Enabled), nil
 	case "playwright.test_dir":
@@ -317,6 +345,6 @@ func getConfigValue(cfg *config.Config, key string) (string, error) {
 			}
 			return cfg.Models.Phases[phase].FullID(), nil
 		}
-		return "", fmt.Errorf("unknown config key %q (supported: models.default, models.default.base_url, models.phases.<phase>, models.phases.<phase>.base_url, playwright.enabled, playwright.test_dir, playwright.base_url, mutation_testing.enabled, security.enabled, security.profile, impeccable.enabled, impeccable.auto_install, impeccable.severity, impeccable.product_path, impeccable.design_path)", key)
+		return "", fmt.Errorf("unknown config key %q (supported: models.default, models.default.base_url, models.leader, models.leader.base_url, models.phases.<phase>, models.phases.<phase>.base_url, playwright.enabled, playwright.test_dir, playwright.base_url, mutation_testing.enabled, security.enabled, security.profile, impeccable.enabled, impeccable.auto_install, impeccable.severity, impeccable.product_path, impeccable.design_path)", key)
 	}
 }
