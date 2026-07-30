@@ -86,6 +86,15 @@ OpenSpec permits archiving with incomplete artifacts or tasks after a user confi
 ### Step 1: Load Skills
 Follow **Section A** from `skills/_shared/sdd-phase-common.md`.
 
+### Timing
+
+Archive runs AFTER judge passes and BEFORE the PR is opened. Stage the results of
+Step 2 (spec merge), Step 3 (folder move), Step 3c (`SESSION_STATUS.md` move), and
+Step 3b (`archon map --backfill` + `--check`) into ONE archive commit on the change
+branch. The PR is opened only after this commit is staged. The archive-internal
+order (merge → move → SESSION_STATUS move → map) is unchanged; PR-open is EXTERNAL
+to this sequence.
+
 ### Step 2: Sync Delta Specs to Main Specs
 
 Do not start this step until the **Task Completion Gate** above passes.
@@ -163,7 +172,8 @@ The session-level resume file lives at the repository ROOT during work. Finalize
 as part of the change's audit trail (see `session-status-contract`):
 
 **IF mode is `openspec` or `hybrid`:** MOVE `SESSION_STATUS.md` from the repo root
-into the archived change folder, then ensure it no longer exists at the root:
+into the archived change folder as part of the archive commit staging (before the
+PR is opened), then ensure it no longer exists at the root:
 
 ```
 SESSION_STATUS.md  → openspec/changes/archive/YYYY-MM-DD-{change-name}/SESSION_STATUS.md
@@ -186,6 +196,7 @@ If `SESSION_STATUS.md` is absent at the root (e.g., already archived), note it a
 - [ ] `SESSION_STATUS.md` no longer exists at the repo root
 - [ ] Archived `tasks.md` has no unchecked implementation tasks, unless the orchestrator explicitly approved archive-time stale-checkbox reconciliation backed by apply-progress/verify-report proof
 - [ ] Active changes directory no longer has this change
+- [ ] PR has NOT been opened before this archive commit is staged (single-PR flow)
 
 **IF mode is `engram`:** Confirm all artifact observation IDs are recorded in the archive report and the tasks observation has no unchecked implementation tasks unless the orchestrator explicitly approved archive-time stale-checkbox reconciliation backed by apply-progress/verify-report proof.
 
@@ -242,5 +253,6 @@ Ready for the next change.
 - If the merge would be destructive (removing large sections), WARN the orchestrator and ask for confirmation
 - The archive is an AUDIT TRAIL — never delete or modify archived changes
 - If `openspec/changes/archive/` doesn't exist, create it
+- Archive is pre-PR in the single-PR flow — never open the PR before the archive commit is staged
 - Apply any `rules.archive` from `openspec/config.yaml`
 - Return envelope per **Section D** from `skills/_shared/sdd-phase-common.md`.

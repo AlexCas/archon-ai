@@ -32,9 +32,12 @@ Use this skill when:
 2. Create branch: type/description (see Branch Naming below)
 3. Implement changes with conventional commits
 4. Run shellcheck on modified scripts
-5. Open PR using the template
-6. Add exactly one type:* label
-7. Wait for automated checks to pass
+5. If this is an SDD single-PR change, the archive commit (spec merge, folder
+   move, SESSION_STATUS.md move, `archon map`) MUST already be staged on the
+   branch before opening the PR.
+6. Open PR using the template
+7. Add exactly one type:* label
+8. Wait for automated checks to pass
 ```
 
 ---
@@ -194,6 +197,7 @@ git checkout -b feat/my-feature main
 shellcheck scripts/*.sh
 
 # Push and create PR
+# (For SDD single-PR changes, run after the archive commit is on the branch.)
 git push -u origin feat/my-feature
 gh pr create --title "feat(scope): description" --body "Closes #N"
 

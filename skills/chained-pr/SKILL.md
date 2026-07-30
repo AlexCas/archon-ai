@@ -21,6 +21,7 @@ Load this skill when a planned PR may exceed **400 changed lines**, SDD forecast
 - In Feature Branch Chain, create a draft/no-merge tracker PR; child PR #1 targets the tracker branch, later children target the immediate parent branch.
 - Treat polluted diffs as base bugs: retarget or rebase until only the current work unit appears.
 - Do not mix chain strategies after the user chooses one.
+- The archive-before-PR single-PR rule does NOT apply to chained/stacked flows. Which PR owns the archive move in a stacked sequence is a slice-2 non-goal (deferred); do not enforce archive position on chained PRs. See `proposal.md` for context.
 
 ## Decision Gates
 

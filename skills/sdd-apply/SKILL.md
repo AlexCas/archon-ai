@@ -270,6 +270,11 @@ If none, say "None."}
 {N}/{total} tasks complete. {Ready for next batch / Ready for verify / Blocked by X}
 ```
 
+For a single-PR change, apply's work ends with the implementation ready for
+archive-then-PR. The archive commit (spec merge, folder move, SESSION_STATUS.md
+move, `archon map`) is staged after judge passes and before the PR is opened — it
+is NOT part of apply's workload.
+
 ## Rules
 
 - ALWAYS read specs before implementing — specs are your acceptance criteria
@@ -284,6 +289,7 @@ If none, say "None."}
 - If workload forecast requires a decision and none was provided, STOP before writing code
 - When applying a chained/stacked PR slice, keep the batch autonomous: one deliverable scope, verification included, and clear rollback boundary
 - When applying `size:exception`, state it explicitly in apply-progress and the return summary
+- In the single-PR flow, the PR is opened only after the archive commit is staged on the branch; apply's scope ends before archive
 - NEVER implement tasks that weren't assigned to you
 - When `playwright.enabled` and the project is web, GENERATE Playwright specs from the Gherkin `.feature` files (Step 4b); never execute them here
 - When `impeccable.enabled`, run Impeccable design verbs on frontend-affecting changes during apply (Step 4c)
