@@ -76,6 +76,20 @@ func DisplayWithUpdate(w io.Writer, cfg *config.Config, n int) {
 			fmt.Fprintf(w, "    default base_url:  %s\n", cfg.Models.Default.BaseURL)
 		}
 
+		if cfg.Models.Leader.FullID() != "" || cfg.Models.Leader.BaseURL != "" {
+			if cfg.Models.Leader.FullID() != "" {
+				fmt.Fprintf(w, "    Leader:  %s\n", cfg.Models.Leader.FullID())
+				if cfg.Models.Leader.BaseURL != "" {
+					fmt.Fprintf(w, "    leader base_url:  %s\n", cfg.Models.Leader.BaseURL)
+				}
+			} else {
+				// FullID is empty but BaseURL is set: keep the "Leader:" label
+				// on the value line so the block stays identifiable even
+				// without a model id (REQ-12).
+				fmt.Fprintf(w, "    Leader:  %s\n", cfg.Models.Leader.BaseURL)
+			}
+		}
+
 		if len(cfg.Models.Phases) > 0 {
 			phases := make([]string, 0, len(cfg.Models.Phases))
 			for k := range cfg.Models.Phases {
