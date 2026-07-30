@@ -24,7 +24,9 @@ openspec/
         └── verify-report.md <- from sdd-verify
 
 # SESSION_STATUS.md lives at the REPO ROOT during a session and is MOVED into the
-# archived change folder by sdd-archive (see session-status-contract).
+# archived change folder by sdd-archive (see session-status-contract). The move
+# into the archived change folder happens as part of the staged archive commit,
+# before the PR is opened (single-PR flow).
 ```
 
 `openspec/map.md` is the vault's entry node — a generated overview of every
@@ -55,7 +57,7 @@ and the `.feature`-stays-put rule.
 | sdd-tasks | Creates | `openspec/changes/{change-name}/tasks.md` |
 | sdd-apply | Updates | `openspec/changes/{change-name}/tasks.md` (marks `[x]`) |
 | sdd-verify | Creates | `openspec/changes/{change-name}/verify-report.md` |
-| sdd-archive | Moves | `openspec/changes/{change-name}/` → `openspec/changes/archive/YYYY-MM-DD-{change-name}/` |
+| sdd-archive | Moves | `openspec/changes/{change-name}/` → `openspec/changes/archive/YYYY-MM-DD-{change-name}/` (move is staged into the pre-PR archive commit in the single-PR flow) |
 | sdd-archive | Updates | `openspec/specs/{domain}/spec.md` (merges deltas into main specs) |
 
 ## Reading Artifacts
