@@ -154,7 +154,7 @@ When committing on the user's behalf through the harness or any sub-agent:
 6. When playwright.enabled, run the generated Playwright tests after verify and judge pass
 7. When impeccable.enabled, run Impeccable subcommands during apply and the detection gate after judge passes
 8. On judge fail: re-apply with feedback (max 3 retries)
-9. In the single-PR flow, run archive (spec merge, folder move, SESSION_STATUS.md move, `archon map`) as one commit AFTER judge passes and BEFORE opening the PR
+9. In the single-PR flow, run archive (spec merge, folder move, `archon map`, SESSION_STATUS.md move) as one commit AFTER judge passes and BEFORE opening the PR
 10. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution
 
 ## Configuration

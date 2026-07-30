@@ -122,8 +122,8 @@ The archive-internal operation order MUST be preserved:
 
 1. Spec merge (delta spec merged into `openspec/specs/{domain}/spec.md`)
 2. Folder move (`openspec/changes/{name}/` → `openspec/changes/archive/YYYY-MM-DD-{name}/`)
-3. `SESSION_STATUS.md` move into the archived folder (within the same commit)
-4. `archon map --backfill` + `archon map --check`
+3. `archon map --backfill` + `archon map --check`
+4. `SESSION_STATUS.md` move into the archived folder (within the same commit)
 
 All four steps MUST be staged into a single archive commit. PR-open is EXTERNAL to
 this sequence — the PR is opened only after the archive commit is on the branch.
@@ -139,7 +139,7 @@ commit is being staged, satisfying the `[[session-status-contract]]` invariant
 - GIVEN the change has reached `judge` phase with status `completed` (judge passed)
 - AND `SESSION_STATUS.md` exists at the repository root
 - WHEN the orchestrator begins the terminal sequence
-- THEN archive operations run (spec merge, folder move, SESSION_STATUS.md move, archon map)
+- THEN archive operations run (spec merge, folder move, archon map, SESSION_STATUS.md move)
 - AND all archive operations are staged into a single archive commit on the change branch
 - AND ONLY AFTER the archive commit is staged, the PR is opened
 - AND the archive commit is part of the change's PR (no separate archive-only commit after PR creation)
@@ -177,6 +177,7 @@ commit is being staged, satisfying the `[[session-status-contract]]` invariant
 - THEN spec merge completes before folder move begins
 - AND folder move completes before `archon map --backfill` is invoked
 - AND `archon map --check` runs after `--backfill` completes
+- AND `archon map --check` passes before `SESSION_STATUS.md` is moved
 - AND PR-open is not invoked until all four sub-operations and the archive commit are done
 
 #### Scenario: Chained-PR flow is out of scope (deferred to slice 2)

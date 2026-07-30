@@ -89,10 +89,11 @@ Follow **Section A** from `skills/_shared/sdd-phase-common.md`.
 ### Timing
 
 Archive runs AFTER judge passes and BEFORE the PR is opened. Stage the results of
-Step 2 (spec merge), Step 3 (folder move), Step 3c (`SESSION_STATUS.md` move), and
-Step 3b (`archon map --backfill` + `--check`) into ONE archive commit on the change
-branch. The PR is opened only after this commit is staged. The archive-internal
-order (merge → move → SESSION_STATUS move → map) is unchanged; PR-open is EXTERNAL
+Step 2 (spec merge), Step 3 (folder move), Step 3b (`archon map --backfill` +
+`--check`), and Step 3c (`SESSION_STATUS.md` move) into ONE archive commit on the
+change branch (Step 3d performs the actual `git add`/`git commit`). The PR is
+opened only after this commit is staged. The archive-internal order
+(merge → move → map → SESSION_STATUS move) is unchanged; PR-open is EXTERNAL
 to this sequence.
 
 ### Step 2: Sync Delta Specs to Main Specs
@@ -186,6 +187,26 @@ SESSION_STATUS.md  → openspec/changes/archive/YYYY-MM-DD-{change-name}/SESSION
 
 If `SESSION_STATUS.md` is absent at the root (e.g., already archived), note it and continue.
 
+### Step 3d: Stage and Commit Archive Changes
+
+**IF mode is `openspec` or `hybrid`:** Stage and commit all archive changes onto the change branch as ONE commit:
+
+1. `git add` the merged main spec(s) (Step 2), the moved change folder (Step 3),
+   the regenerated `openspec/map.md` (Step 3b), and the moved `SESSION_STATUS.md`
+   (Step 3c).
+2. Create ONE commit with subject `chore(archive): archive {change-name}`
+   (conventional commit format). Keep the body focused on what was archived
+   (specs synced, folder moved, map regenerated) — not on the tooling that
+   produced it.
+3. **Commit Attribution HARD RULE**: the commit is authored SOLELY by the
+   user's git account. Do NOT add `Co-Authored-By` trailers, "Generated with"
+   lines, or any agent/assistant/tool attribution.
+4. This commit satisfies the branch-PR precondition: the archive commit MUST
+   be staged on the change branch BEFORE the PR is opened (single-PR flow).
+
+**IF mode is `engram` or `none`:** Skip — there is no branch commit in these
+modes; the archive report (Step 5) is the audit trail.
+
 ### Step 4: Verify Archive
 
 **IF mode is `openspec` or `hybrid`:** Confirm:
@@ -196,6 +217,7 @@ If `SESSION_STATUS.md` is absent at the root (e.g., already archived), note it a
 - [ ] `SESSION_STATUS.md` no longer exists at the repo root
 - [ ] Archived `tasks.md` has no unchecked implementation tasks, unless the orchestrator explicitly approved archive-time stale-checkbox reconciliation backed by apply-progress/verify-report proof
 - [ ] Active changes directory no longer has this change
+- [ ] Archive commit created on the change branch (Step 3d) with subject `chore(archive): archive {change-name}`, authored solely by the user's git account
 - [ ] PR has NOT been opened before this archive commit is staged (single-PR flow)
 
 **IF mode is `engram`:** Confirm all artifact observation IDs are recorded in the archive report and the tasks observation has no unchecked implementation tasks unless the orchestrator explicitly approved archive-time stale-checkbox reconciliation backed by apply-progress/verify-report proof.

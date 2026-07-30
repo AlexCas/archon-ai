@@ -16,7 +16,7 @@ Orchestrate the judge phase: invoke `judgment-day` for dual adversarial review, 
 
 Load when the orchestrator reaches the `judge` phase after `sdd-verify` passes. This skill wraps existing skills — it does NOT reimplement review or apply logic.
 
-The FIRST action on activation is to read the judge flag (Step 0). If the judge phase is disabled, this skill returns `skipped` immediately and the orchestrator advances to `archive`, then, after archive stages its commit on the branch, the PR is opened (single-PR flow).
+The FIRST action on activation is to read the judge flag (Step 0). If the judge phase is disabled, this skill returns `skipped` immediately and the orchestrator advances to `archive`, then, after archive stages its commit on the branch (openspec/hybrid mode), the PR is opened (single-PR flow).
 
 ## Hard Rules
 
@@ -44,7 +44,7 @@ judge:
 ```
 
 - `judge.enabled: true` (or the `judge` section is absent → default `true`): proceed to Step 1.
-- `judge.enabled: false`: STOP. Do NOT invoke `judgment-day` or any gate. Return the report below with **Verdict: `skipped`**, leave `state.yaml` for the orchestrator to advance to `archive`, and exit — then, after archive stages its commit on the branch, the PR is opened (single-PR flow).
+- `judge.enabled: false`: STOP. Do NOT invoke `judgment-day` or any gate. Return the report below with **Verdict: `skipped`**, leave `state.yaml` for the orchestrator to advance to `archive`, and exit — then, after archive stages its commit on the branch (openspec/hybrid mode), the PR is opened (single-PR flow).
 
 ```markdown
 ## Judge Phase Report
@@ -171,7 +171,7 @@ requires judgment-day to pass AND every enabled gate to pass.
 
 | judgment-day | mutation gate | playwright gate | impeccable gate | result |
 |---|---|---|---|---|
-| pass | pass (or skipped) | pass (or skipped) | pass (or skipped) | `pass` → advance to archive, then, after archive stages its commit on the branch, the PR is opened (single-PR flow) |
+| pass | pass (or skipped) | pass (or skipped) | pass (or skipped) | `pass` → advance to archive, then, after archive stages its commit on the branch (openspec/hybrid mode), the PR is opened (single-PR flow) |
 | pass | fail | any | any | `fail` → enter re-apply loop |
 | pass | pass (or skipped) | fail | any | `fail` → enter re-apply loop |
 | pass | pass (or skipped) | pass (or skipped) | fail or blocked | `fail` → enter re-apply loop |
@@ -181,7 +181,7 @@ requires judgment-day to pass AND every enabled gate to pass.
 
 1. Update `openspec/changes/{change-name}/state.yaml`: set `phase: judge, status: completed`
 2. Return success verdict
-3. Orchestrator may proceed to `archive` phase, then, after archive stages its commit on the branch, the PR is opened (single-PR flow)
+3. Orchestrator may proceed to `archive` phase, then, after archive stages its commit on the branch (openspec/hybrid mode), the PR is opened (single-PR flow)
 
 ### Step 6: On Fail — Auto Re-Apply Loop
 

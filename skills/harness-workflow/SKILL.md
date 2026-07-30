@@ -21,8 +21,8 @@ explore → propose → spec → design → tasks → apply → verify → judge
 Each phase has two statuses: `in_progress` | `completed`.
 
 **Terminal ordering (single-PR)**: in the single-PR flow, the sequence after `judge`
-passes is: archive commit staged (spec merge, folder move, `SESSION_STATUS.md` move,
-`archon map`) → PR opened. Judge gating is unchanged.
+passes is: archive commit staged (spec merge, folder move, `archon map`,
+`SESSION_STATUS.md` move) → PR opened. Judge gating is unchanged.
 
 ## Activation Contract
 
