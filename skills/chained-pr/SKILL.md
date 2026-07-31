@@ -53,9 +53,14 @@ Load this skill when a planned PR may exceed **400 changed lines**, SDD forecast
    into the tracker branch.
 7. After the LAST child PR merges into the tracker branch, run the **integrated
    judge on the tracker branch** (evaluate all change files as a unified whole via
-   `[[harness-judge]]`). The integrated judge is the gate for BOTH the archive step
+   `[[harness-judge]]`). Detect the "last child merged" state explicitly, not by
+   waiting on a GitHub event: in interactive mode confirm it with the user; in auto
+   mode verify on the tracker branch that every child PR is merged (e.g. `gh pr view`
+   per child, or that the tracker contains each child's commits) before triggering
+   the integrated judge. The integrated judge is the gate for BOTH the archive step
    and the tracker merge. If it fails, re-apply on the tracker and re-judge before
-   proceeding — do NOT archive and do NOT merge the tracker.
+   proceeding (bounded by the same max-3-retries cap as Rule 8, applied to the
+   integrated judge on the tracker) — do NOT archive and do NOT merge the tracker.
 8. Once the integrated judge passes, stage the archive commit on the tracker branch
    (spec merge → folder move → `archon map --backfill`/`--check` STOP gate →
    `SESSION_STATUS.md` move, one commit), THEN merge the tracker PR to `main`. See
