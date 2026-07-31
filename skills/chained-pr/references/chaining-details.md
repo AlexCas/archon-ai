@@ -24,13 +24,21 @@ main
                 └── feat/my-feature-03-slice
 ```
 
+The tracker branch (`feat/my-feature`) owns the archive commit: it is staged there
+after the integrated judge passes, before the tracker merges to `main`.
+
 Steps:
 
 1. Create the feature/tracker branch from `main`.
 2. Open the tracker PR to `main`; mark it draft/no-merge.
 3. Create PR #1 from a child branch and target it to the tracker branch.
 4. Create each later child branch from the previous PR branch and target it to that parent branch.
-5. Merge/integrate children in order; merge the tracker only after the chain is complete.
+5. Merge/integrate children in order into the tracker branch.
+6. After the last child merges, run the integrated judge on the tracker branch; it
+   must pass before archive or tracker merge (gate for both).
+7. Stage the archive commit on the tracker branch (spec merge, folder move,
+   `archon map`, `SESSION_STATUS.md` move — one commit), THEN merge the tracker PR
+   to `main`. Archive lives inside the tracker PR, not a child PR.
 
 ## Stacked PRs to Main
 
@@ -43,6 +51,9 @@ main <- PR 1: foundation
 ```
 
 After a parent PR merges, rebase/retarget the next PR so GitHub shows only the current slice.
+
+Archive ownership for Stacked PRs to main is NOT yet defined (deferred to slice
+2b); there is no tracker branch to host the archive commit.
 
 ## Chain Context Section
 
