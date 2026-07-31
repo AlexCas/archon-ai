@@ -29,6 +29,11 @@ explore → propose → spec → design → tasks → apply → verify → judge
 
 In the single-PR flow the archive commit is staged BEFORE the PR is opened, so archive history travels inside the change's PR.
 
+In the Feature Branch Chain flow the archive commit is staged on the tracker branch
+after the integrated judge passes and before the tracker merges to `main` (full
+rule: `harness-workflow` spec "Terminal Phase Ordering (Feature Branch Chain)" and
+the `chained-pr` skill). Stacked-to-Main archive ownership is deferred to slice 2b.
+
 ## SDD Session Preflight (HARD GATE)
 
 Before executing ANY SDD command or natural-language SDD request, ensure this session has an explicit preflight decision block.
