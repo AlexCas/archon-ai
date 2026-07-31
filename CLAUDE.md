@@ -29,6 +29,12 @@ explore → propose → spec → design → tasks → apply → verify → judge
 
 In the single-PR flow the archive commit is staged BEFORE the PR is opened, so archive history travels inside the change's PR.
 
+In the Feature Branch Chain flow the archive commit is staged on the tracker branch
+after the integrated judge passes and before the tracker merges to `main` (Full
+rule: `openspec/specs/harness-workflow/spec.md` "Terminal Phase Ordering (Feature
+Branch Chain)" and the `chained-pr` skill). Stacked-to-Main archive ownership is
+deferred to slice 2b.
+
 ## SDD Session Preflight (HARD GATE)
 
 Before executing ANY SDD command or natural-language SDD request, ensure this session has an explicit preflight decision block.
@@ -136,7 +142,7 @@ Rules:
 - One file per session, kept at the repo ROOT while the session is active.
 - Update it at the START and END of each phase (explore → propose → spec → design → tasks → apply → verify → judge → archive), recording: active change name, current phase + status, preflight choices, completed phases with timestamps, key artifacts/paths, open questions, and the next recommended step.
 - If the agent is closed unexpectedly, `SESSION_STATUS.md` stays at the root. On the next session, READ it FIRST to restore context before doing anything else.
-- During `archive`, MOVE `SESSION_STATUS.md` into the archived change folder as part of the staged archive commit, before the PR is opened, then remove it from the root.
+- During `archive`, MOVE `SESSION_STATUS.md` into the archived change folder as part of the staged archive commit, before the PR is opened (single-PR flow) or on the tracker branch before the tracker PR merges to `main` (Feature Branch Chain flow), then remove it from the root.
 - Follow the `session-status-contract` shared module for the exact format.
 
 ## Commit Attribution (HARD RULE)
@@ -162,22 +168,6 @@ When committing on the user's behalf through the harness or any sub-agent:
 - Config: .archon/config.yaml
 - Agent: claude
 - Harness Version: dev
-
-## Phase Models
-
-Each phase runs in its named `archon-<phase>` subagent. The `model` field in that
-subagent's frontmatter is the binding hard gate — Claude Code selects the model
-from the subagent definition, not from a per-call parameter.
-
-- explore: anthropic/claude-sonnet-4-6
-- propose: anthropic/claude-opus-4-8
-- spec: anthropic/claude-opus-4-8
-- design: anthropic/claude-opus-4-8
-- tasks: anthropic/claude-sonnet-4-6
-- apply: anthropic/claude-sonnet-4-6
-- verify: anthropic/claude-opus-4-8
-- judge: anthropic/claude-opus-4-8
-- archive: anthropic/claude-haiku-4-5-20251001
 
 ## Phase Models
 

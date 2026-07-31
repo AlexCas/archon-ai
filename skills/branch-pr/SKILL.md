@@ -35,6 +35,10 @@ Use this skill when:
 5. If this is an SDD single-PR change, the archive commit (spec merge, folder
    move, SESSION_STATUS.md move, `archon map`) MUST already be staged on the
    branch before opening the PR.
+5b. If this is an SDD Feature Branch Chain change, the integrated judge MUST have
+   passed on the tracker branch and the archive commit MUST already be staged on the
+   **tracker branch** before the tracker PR is merged to `main`. Child PRs carry no
+   archive commit.
 6. Open PR using the template
 7. Add exactly one type:* label
 8. Wait for automated checks to pass
