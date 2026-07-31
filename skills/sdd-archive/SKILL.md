@@ -229,7 +229,7 @@ modes; the archive report (Step 5) is the audit trail.
 - [ ] Active changes directory no longer has this change
 - [ ] Archive commit created on the change branch (Step 3d) with subject `chore(archive): archive {change-name}`, authored solely by the user's git account
 - [ ] PR has NOT been opened before this archive commit is staged (single-PR flow)
-- [ ] Feature Branch Chain flow ONLY: the archive commit is created on the
+- [ ] (Feature Branch Chain flow only) The archive commit is created on the
   **tracker branch**, and the **tracker PR has NOT been merged to `main` before
   the archive commit is staged on the tracker branch**; the integrated judge
   passed on the tracker before archive ran.

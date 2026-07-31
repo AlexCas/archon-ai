@@ -37,8 +37,9 @@ Steps:
 6. After the last child merges, run the integrated judge on the tracker branch; it
    must pass before archive or tracker merge (gate for both).
 7. Stage the archive commit on the tracker branch (spec merge, folder move,
-   `archon map`, `SESSION_STATUS.md` move — one commit), THEN merge the tracker PR
-   to `main`. Archive lives inside the tracker PR, not a child PR.
+   `archon map` — halt on `archon map --check` failure, `SESSION_STATUS.md` move —
+   one commit), THEN merge the tracker PR to `main`. Archive lives inside the
+   tracker PR, not a child PR.
 
 ## Stacked PRs to Main
 

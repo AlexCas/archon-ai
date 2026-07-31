@@ -27,8 +27,9 @@ passes is: archive commit staged (spec merge, folder move, `archon map`,
 **Terminal ordering (Feature Branch Chain)**: in the Feature Branch Chain flow the
 archive commit is staged on the **tracker branch** after the integrated judge
 passes on the tracker and before the tracker PR merges to `main`. Full rule:
-`harness-workflow` spec "Terminal Phase Ordering (Feature Branch Chain)" and the
-`chained-pr` skill. Stacked-to-Main archive ownership is deferred to slice 2b.
+`openspec/specs/harness-workflow/spec.md` "Terminal Phase Ordering (Feature Branch
+Chain)" and the `chained-pr` skill. Stacked-to-Main archive ownership is deferred
+to slice 2b.
 
 ## Activation Contract
 
