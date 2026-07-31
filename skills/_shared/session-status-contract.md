@@ -21,9 +21,11 @@ work is in progress.
   context.
 - **Archive**: during `sdd-archive`, MOVE the file into the archived change folder
   (`openspec/changes/archive/YYYY-MM-DD-{change-name}/SESSION_STATUS.md`) as part of
-  the staged archive commit, before the PR is opened, then delete it from the root.
-  In Engram-only mode, store its final contents as an observation and remove the
-  root file.
+  the staged archive commit — before the PR is opened in the single-PR flow, or on
+  the **tracker branch** before the tracker PR merges to `main` in the Feature
+  Branch Chain flow — then delete it from the root. It stays root-resident through
+  the integrated judge in the chain flow. In Engram-only mode, store its final
+  contents as an observation and remove the root file.
 - **One file per session**: if a new change starts in the same session, the file
   is updated to reflect the active change. The header always names the current
   change.

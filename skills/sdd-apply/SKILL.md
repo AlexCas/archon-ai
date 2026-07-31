@@ -96,6 +96,9 @@ Then you MUST confirm the orchestrator/user provided a resolved delivery path:
 Also check for `Chain strategy` in the tasks artifact. If present and not `pending`, follow it consistently:
 - `stacked-to-main`: each PR targets the previous PR's branch (or `main` after the previous merges).
 - `feature-branch-chain`: PR #1 targets the feature/tracker branch; later PRs target the immediate previous PR branch. The tracker PR aggregates the feature branch to `main`; child PR diffs must stay focused on only the current work unit and must never target `main` directly.
+  For `feature-branch-chain`, the archive commit is NOT part of any child slice; it is
+  staged on the tracker branch after the integrated judge passes and before the
+  tracker merges to `main` (see `[[sdd-archive]]` and `[[chained-pr]]`).
 
 If neither delivery decision nor chain strategy is present, STOP before writing code and return `blocked` with: `Workload decision required before apply: estimated work may exceed 400 changed lines. Ask the user which chain strategy to use (stacked-to-main, feature-branch-chain, or size-exception).`
 
@@ -275,6 +278,10 @@ archive-then-PR. The archive commit (spec merge, folder move, SESSION_STATUS.md
 move, `archon map`) is staged after judge passes and before the PR is opened — it
 is NOT part of apply's workload.
 
+For a Feature Branch Chain change, each apply batch delivers one child work unit;
+the archive commit belongs to the tracker integration (staged after the integrated
+judge, before the tracker merges), never to a child apply batch.
+
 ## Rules
 
 - ALWAYS read specs before implementing — specs are your acceptance criteria
@@ -290,6 +297,10 @@ is NOT part of apply's workload.
 - When applying a chained/stacked PR slice, keep the batch autonomous: one deliverable scope, verification included, and clear rollback boundary
 - When applying `size:exception`, state it explicitly in apply-progress and the return summary
 - In the single-PR flow, the PR is opened only after the archive commit is staged on the branch; apply's scope ends before archive
+- In the Feature Branch Chain flow, the archive commit is staged on the tracker
+  branch after the integrated judge passes and before the tracker PR merges to
+  `main`; it is never part of a child apply batch and never appears in a child PR
+  diff.
 - NEVER implement tasks that weren't assigned to you
 - When `playwright.enabled` and the project is web, GENERATE Playwright specs from the Gherkin `.feature` files (Step 4b); never execute them here
 - When `impeccable.enabled`, run Impeccable design verbs on frontend-affecting changes during apply (Step 4c)

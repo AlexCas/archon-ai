@@ -88,10 +88,14 @@ Follow **Section A** from `skills/_shared/sdd-phase-common.md`.
 
 ### Timing
 
-Archive runs AFTER judge passes and BEFORE the PR is opened. Stage the results of
+Archive runs AFTER judge passes and BEFORE the PR is opened. **In the Feature
+Branch Chain flow, "judge" means the integrated judge on the tracker branch, the
+owning branch is the tracker branch (not the change branch), and "before the PR is
+opened" becomes "before the tracker PR merges to `main`."** Stage the results of
 Step 2 (spec merge), Step 3 (folder move), Step 3b (`archon map --backfill` +
 `--check`), and Step 3c (`SESSION_STATUS.md` move) into ONE archive commit on the
-change branch (Step 3d performs the actual `git add`/`git commit`). The PR is
+owning branch (change branch for single-PR, tracker branch for Feature Branch
+Chain) (Step 3d performs the actual `git add`/`git commit`). The PR is
 opened only after this commit is staged. The archive-internal order
 (merge → move → map → SESSION_STATUS move) is unchanged; PR-open is EXTERNAL
 to this sequence.
@@ -180,6 +184,10 @@ PR is opened), then ensure it no longer exists at the root:
 SESSION_STATUS.md  → openspec/changes/archive/YYYY-MM-DD-{change-name}/SESSION_STATUS.md
 ```
 
+In the Feature Branch Chain flow this move happens on the tracker branch, staged
+into the tracker archive commit (before the tracker merges to `main`), not on an
+individual child branch.
+
 **IF mode is `engram`:** Store the final `SESSION_STATUS.md` contents as the
 `sdd/{change-name}/session-status` observation, then delete the root file.
 
@@ -189,7 +197,7 @@ If `SESSION_STATUS.md` is absent at the root (e.g., already archived), note it a
 
 ### Step 3d: Stage and Commit Archive Changes
 
-**IF mode is `openspec` or `hybrid`:** Stage and commit all archive changes onto the change branch as ONE commit:
+**IF mode is `openspec` or `hybrid`:** Stage and commit all archive changes onto the **owning branch** (change branch for single-PR; tracker branch for Feature Branch Chain) as ONE commit:
 
 1. `git add` the merged main spec(s) (Step 2), the moved change folder (Step 3),
    the regenerated `openspec/map.md` (Step 3b), and the moved `SESSION_STATUS.md`
@@ -202,7 +210,9 @@ If `SESSION_STATUS.md` is absent at the root (e.g., already archived), note it a
    user's git account. Do NOT add `Co-Authored-By` trailers, "Generated with"
    lines, or any agent/assistant/tool attribution.
 4. This commit satisfies the branch-PR precondition: the archive commit MUST
-   be staged on the change branch BEFORE the PR is opened (single-PR flow).
+   be staged on the owning branch BEFORE the change is opened/merged — on the change
+   branch before the PR is opened (single-PR flow), or on the tracker branch
+   before the tracker PR merges to `main` (Feature Branch Chain flow).
 
 **IF mode is `engram` or `none`:** Skip — there is no branch commit in these
 modes; the archive report (Step 5) is the audit trail.
@@ -219,6 +229,10 @@ modes; the archive report (Step 5) is the audit trail.
 - [ ] Active changes directory no longer has this change
 - [ ] Archive commit created on the change branch (Step 3d) with subject `chore(archive): archive {change-name}`, authored solely by the user's git account
 - [ ] PR has NOT been opened before this archive commit is staged (single-PR flow)
+- [ ] Feature Branch Chain flow ONLY: the archive commit is created on the
+  **tracker branch**, and the **tracker PR has NOT been merged to `main` before
+  the archive commit is staged on the tracker branch**; the integrated judge
+  passed on the tracker before archive ran.
 
 **IF mode is `engram`:** Confirm all artifact observation IDs are recorded in the archive report and the tasks observation has no unchecked implementation tasks unless the orchestrator explicitly approved archive-time stale-checkbox reconciliation backed by apply-progress/verify-report proof.
 
