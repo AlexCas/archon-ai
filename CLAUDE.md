@@ -142,7 +142,7 @@ Rules:
 - One file per session, kept at the repo ROOT while the session is active.
 - Update it at the START and END of each phase (explore → propose → spec → design → tasks → apply → verify → judge → archive), recording: active change name, current phase + status, preflight choices, completed phases with timestamps, key artifacts/paths, open questions, and the next recommended step.
 - If the agent is closed unexpectedly, `SESSION_STATUS.md` stays at the root. On the next session, READ it FIRST to restore context before doing anything else.
-- During `archive`, MOVE `SESSION_STATUS.md` into the archived change folder as part of the staged archive commit, before the PR is opened (single-PR flow) or before the tracker PR merges to `main` (Feature Branch Chain flow), then remove it from the root.
+- During `archive`, MOVE `SESSION_STATUS.md` into the archived change folder as part of the staged archive commit, before the PR is opened (single-PR flow) or on the tracker branch before the tracker PR merges to `main` (Feature Branch Chain flow), then remove it from the root.
 - Follow the `session-status-contract` shared module for the exact format.
 
 ## Commit Attribution (HARD RULE)
