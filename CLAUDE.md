@@ -32,8 +32,11 @@ In the single-PR flow the archive commit is staged BEFORE the PR is opened, so a
 In the Feature Branch Chain flow the archive commit is staged on the tracker branch
 after the integrated judge passes and before the tracker merges to `main` (Full
 rule: `openspec/specs/harness-workflow/spec.md` "Terminal Phase Ordering (Feature
-Branch Chain)" and the `chained-pr` skill). Stacked-to-Main archive ownership is
-deferred to slice 2b.
+Branch Chain)" and the `chained-pr` skill). When archive-before-PR is in effect,
+pure Stacked-to-Main is unsupported: the orchestrator converges to Feature Branch
+Chain at `sdd-tasks` strategy selection (full rule:
+`openspec/specs/harness-workflow/spec.md` "Stacked-to-Main Archive Convergence" and
+the `chained-pr` skill).
 
 ## SDD Session Preflight (HARD GATE)
 
