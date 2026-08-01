@@ -278,10 +278,87 @@ PR MUST NOT be merged until the archive commit is present on the tracker branch.
 - AND `archon map --check` passes before `SESSION_STATUS.md` is moved
 - AND tracker PR merge to `main` is not invoked until all four sub-operations and the archive commit are done
 
-#### Scenario: Stacked-to-Main archive ownership is out of scope (deferred to slice 2b)
+### Requirement: Stacked-to-Main Archive Convergence
 
-- GIVEN a change using the Stacked-to-Main strategy (individual child PRs each target `main`)
-- WHEN the terminal phase sequence is evaluated
-- THEN the Feature Branch Chain archive rule from this requirement DOES NOT apply
-- AND the harness-workflow treats Stacked-to-Main archive ownership as undefined / slice-2b pending
-- AND no blocking or enforcement of archive position is applied to Stacked-to-Main flows
+When **archive-before-PR is in effect** (artifact store is `openspec` or `hybrid`)
+AND the orchestrator is selecting a chain strategy during `sdd-tasks`, the
+orchestrator MUST NOT select pure Stacked-to-Main. It MUST select (or silently
+convert to) **Feature Branch Chain** instead. This decision is **up-front and
+decisive**: made at chain-strategy selection in `sdd-tasks`, before any child PR
+is opened.
+
+**Rationale:** Stacked-to-Main ships each slice independently to `main`. By the
+time an archive commit is needed there is no single un-merged owning ref; the
+archive-before-PR invariant ("archive commit inside the change's PR, not separate")
+cannot be satisfied. Feature Branch Chain supplies the required tracker branch.
+
+**Up-front convergence is mandatory:** A late Stacked-to-Main → FBC conversion
+(attempted after one or more slices have already merged to `main`) is NOT the
+sanctioned path. It would strand already-merged slices on `main` without an
+owning tracker ref, violating the archive-before-PR invariant retroactively. The
+orchestrator MUST converge at selection time.
+
+**Unsupported combination:** Pure independent-shipping Stacked-to-Main +
+archive-before-PR is explicitly **unsupported**. If the user has archive-before-PR
+in effect and requests Stacked-to-Main, the orchestrator MUST inform them that this
+combination is unsupported and MUST select Feature Branch Chain instead. No partial
+`main` merges are permitted before an owning tracker ref exists.
+
+**After convergence:** The change is now Feature Branch Chain. The "Terminal Phase
+Ordering (Feature Branch Chain)" requirement governs the archive commit — staged on
+the tracker branch, after the integrated judge passes, before the tracker PR merges
+to `main`. Zero additional archive mechanics are introduced by this requirement.
+
+**Scope boundary:** When archive-before-PR is NOT in effect (artifact store is
+`engram`, or archive is not applicable to the session), this requirement does NOT
+apply. Stacked-to-Main is unaffected; no forced convergence occurs.
+
+#### Scenario: Archive-before-PR active, Stacked-to-Main requested — orchestrator converges to FBC at sdd-tasks
+
+- GIVEN archive-before-PR is in effect (artifact store is `openspec` or `hybrid`)
+- AND the orchestrator is selecting a chain strategy during `sdd-tasks`
+- AND the user's preference or default would be Stacked-to-Main
+- WHEN `harness-workflow` evaluates the strategy selection
+- THEN the orchestrator selects Feature Branch Chain instead of Stacked-to-Main
+- AND the orchestrator notifies the user that Stacked-to-Main + archive-before-PR is unsupported and FBC is selected
+- AND a tracker/integration branch is created (or planned) before any child PR is opened
+- AND the archive step will be governed by the "Terminal Phase Ordering (Feature Branch Chain)" requirement
+
+#### Scenario: Pure Stacked-to-Main + archive-before-PR is unsupported — no partial main merges before owning ref
+
+- GIVEN archive-before-PR is in effect (artifact store is `openspec` or `hybrid`)
+- AND the orchestrator attempted to proceed with pure Stacked-to-Main (no tracker branch)
+- WHEN any child PR would merge to `main` without a tracker branch in place
+- THEN `harness-workflow` returns `blocked`
+- AND the response states that Stacked-to-Main + archive-before-PR is an unsupported combination
+- AND no child PR is merged to `main` until the strategy is corrected to Feature Branch Chain
+- AND `harness-workflow` directs the orchestrator to converge to FBC before opening child PRs
+
+#### Scenario: After convergence, FBC archive rule governs — no new mechanics
+
+- GIVEN the orchestrator has converged from Stacked-to-Main to Feature Branch Chain at sdd-tasks
+- AND the change is now proceeding as a Feature Branch Chain flow
+- AND the integrated judge has passed on the tracker branch
+- WHEN the terminal phase sequence runs
+- THEN the archive step follows the "Terminal Phase Ordering (Feature Branch Chain)" requirement verbatim
+- AND no additional archive mechanics are introduced by the Stacked-to-Main convergence
+- AND the archive commit is staged on the tracker branch before the tracker PR merges to `main`
+
+#### Scenario: Late Stacked-to-FBC conversion is out of scope — stranded slices hazard
+
+- GIVEN archive-before-PR is in effect
+- AND one or more slices have already merged to `main` under Stacked-to-Main
+- WHEN the orchestrator attempts a late conversion to Feature Branch Chain
+- THEN this conversion path is NOT the sanctioned approach
+- AND `harness-workflow` treats this state as an unresolved hazard (stranded slices on `main` without an owning tracker ref)
+- AND the orchestrator MUST NOT attempt archive under these conditions without explicit human resolution
+- AND this scenario exists to document the hazard, not to define a recovery procedure
+
+#### Scenario: Archive-before-PR not in effect — Stacked-to-Main is unaffected
+
+- GIVEN archive-before-PR is NOT in effect (artifact store is `engram`, or archive is not applicable)
+- AND the orchestrator selects Stacked-to-Main as the chain strategy during `sdd-tasks`
+- WHEN `harness-workflow` evaluates the strategy selection
+- THEN the orchestrator proceeds with Stacked-to-Main without forced convergence
+- AND no FBC tracker branch is required
+- AND this requirement does NOT apply
