@@ -1,184 +1,40 @@
-# harness-workflow Specification
+# Delta Spec: stacked-pr-archive → [[harness-workflow]]
 
-## Purpose
+<!-- Link convention: [[capability]] wikilinks for capability identity.
+     Source of truth after archive: openspec/specs/harness-workflow/spec.md -->
 
-The `harness-workflow` meta-skill enforces the SDD phase sequence (explore → propose → spec → design → tasks → apply → verify → judge → archive) by reading change state and blocking invalid transitions.
+Change: `stacked-pr-archive`
+Slice: 2b (Stacked-to-Main archive ownership — converge-to-FBC decision)
+Affects: [proposal.md](../../proposal.md)
 
-## Requirements
+---
 
-### Requirement: Phase State Machine
+<!-- Modeling choice: NEW REQUIREMENT, not appended scenarios.
 
-The meta-skill MUST enforce a linear phase progression with exactly one allowed next phase per state.
+     Rationale: The converge-to-FBC rule has a distinct invariant class —
+     it fires at sdd-tasks strategy selection time (upstream of archive), not at
+     archive/terminal-sequence time. Appending it to the "Terminal Phase Ordering
+     (Feature Branch Chain)" requirement would conflate two concerns: (1) how to
+     order archive within an FBC flow (FBC requirement), and (2) whether to enter
+     FBC at all when archive-before-PR is active (this requirement). A dedicated
+     requirement keeps the gate logic readable and makes the MODIFIED marker below
+     unambiguous: only the deferral scenario inside the FBC requirement is removed;
+     the FBC requirement body itself is untouched.
 
-#### Scenario: Valid transition is allowed
+     The deferral scenario in the FBC requirement (spec.md:281-287) is superseded
+     here via a MODIFIED block that drops it. The converge rule is ADDED as a new
+     requirement. Both markers are required: the MODIFIED removes the gap; the ADDED
+     states the decision. -->
 
-- GIVEN the current change state is `proposed`
-- WHEN the orchestrator requests `spec` phase
-- THEN `harness-workflow` returns `allowed` and records the new state as `specifying`
+---
 
-#### Scenario: Invalid transition is blocked
+## MODIFIED Requirements
 
-- GIVEN the current change state is `proposed`
-- WHEN the orchestrator requests `tasks` phase (skipping spec and design)
-- THEN `harness-workflow` returns `blocked`
-- AND the response includes the required next phase: `spec`
-
-#### Scenario: Phase in-progress is idempotent
-
-- GIVEN the current change state is `designing` (in progress)
-- WHEN the orchestrator requests `design` again
-- THEN `harness-workflow` returns `allowed` with status `resuming`
-
-### Requirement: State Persistence
-
-The meta-skill MUST read and write change state from `openspec/changes/{name}/state.yaml`.
-
-#### Scenario: State read on invocation
-
-- GIVEN `openspec/changes/my-feature/state.yaml` contains `phase: proposed, status: completed`
-- WHEN `harness-workflow` is invoked for `my-feature`
-- THEN it reads the current phase and status before enforcing any transition
-
-#### Scenario: State updated on transition
-
-- GIVEN transition from `proposed` to `spec` is allowed
-- WHEN the transition is approved
-- THEN `state.yaml` is updated to `phase: spec, status: in_progress`
-- AND a timestamp is recorded
-
-### Requirement: Workflow Reporting
-
-The meta-skill MUST report current phase and allowed transitions on request.
-
-#### Scenario: Report current state
-
-- GIVEN change `my-feature` is in `tasks` phase with status `completed`
-- WHEN the orchestrator requests state report
-- THEN `harness-workflow` returns `current: tasks, status: completed, next: apply`
-
-### Requirement: Phase Skipping Prevention
-
-The meta-skill MUST NOT allow skipping mandatory phases (propose, spec, design, tasks, apply, verify).
-
-#### Scenario: Attempt to skip from propose to apply
-
-- GIVEN the change state is `proposed`
-- WHEN the orchestrator requests `apply`
-- THEN `harness-workflow` returns `blocked`
-- AND reports all missing phases: `spec, design, tasks`
-
-### Requirement: Automatic map.md Regen on Phase Transition
-
-After every successful phase transition, the harness-workflow transition path MUST
-trigger `archon map` to regenerate `openspec/map.md`. This MUST happen after the
-`state.yaml` update so the new phase and status are reflected in the generated index.
-The regen MUST be transparent to the orchestrator: a regen failure SHOULD be reported
-as a warning but MUST NOT block the phase transition from being recorded.
-
-#### Scenario: map.md is regenerated after a successful phase transition
-
-```gherkin
-@happy
-Scenario: map.md is regenerated after a successful phase transition
-  Given a change my-feature transitioning from spec to design
-  When harness-workflow approves the transition and updates state.yaml
-  Then archon map is invoked to regenerate openspec/map.md
-  And map.md reflects my-feature with phase=design and status=in_progress
-```
-
-#### Scenario: Regen failure does not block the transition
-
-```gherkin
-@error
-Scenario: Regen failure does not block the transition
-  Given archon map exits non-zero during a phase transition regen
-  When harness-workflow detects the regen failure
-  Then the phase transition is still recorded in state.yaml
-  And a warning about the regen failure is surfaced to the orchestrator
-  And the transition is not rolled back
-```
-
-#### Scenario: Regen runs after state.yaml is written
-
-```gherkin
-@edge
-Scenario: Regen runs after state.yaml is written
-  Given a phase transition from tasks to apply
-  When harness-workflow processes the transition
-  Then state.yaml is updated before archon map is invoked
-  And the generated map.md shows the updated phase and status
-```
-
-### Requirement: Terminal Phase Ordering (Single-PR Flow)
-
-The harness-workflow MUST enforce archive-before-PR ordering in the single-PR flow:
-after `judge` passes, the archive step MUST run (and its commit MUST be staged on the
-change branch) BEFORE the PR is opened. This ensures the archive commit travels inside
-the change's own PR with no trailing archive-only commit.
-
-Judge gating is UNCHANGED: archive MUST NOT run until judge passes.
-
-The archive-internal operation order MUST be preserved:
-
-1. Spec merge (delta spec merged into `openspec/specs/{domain}/spec.md`)
-2. Folder move (`openspec/changes/{name}/` → `openspec/changes/archive/YYYY-MM-DD-{name}/`)
-3. `archon map --backfill` + `archon map --check`
-4. `SESSION_STATUS.md` move into the archived folder (within the same commit)
-
-All four steps MUST be staged into a single archive commit. PR-open is EXTERNAL to
-this sequence — the PR is opened only after the archive commit is on the branch.
-
-`SESSION_STATUS.md` MUST remain root-resident from session start through judge
-completion. It MUST be moved into the archived change folder only when the archive
-commit is being staged, satisfying the `[[session-status-contract]]` invariant
-("root-resident during work, moved at archive"). The move happening before PR-open
-(instead of after) does NOT violate this invariant.
-
-#### Scenario: Judge passes, archive runs, then PR is opened
-
-- GIVEN the change has reached `judge` phase with status `completed` (judge passed)
-- AND `SESSION_STATUS.md` exists at the repository root
-- WHEN the orchestrator begins the terminal sequence
-- THEN archive operations run (spec merge, folder move, archon map, SESSION_STATUS.md move)
-- AND all archive operations are staged into a single archive commit on the change branch
-- AND ONLY AFTER the archive commit is staged, the PR is opened
-- AND the archive commit is part of the change's PR (no separate archive-only commit after PR creation)
-
-#### Scenario: Archive is not attempted before judge passes
-
-- GIVEN the change is in `verify` phase with status `completed`
-- WHEN the orchestrator attempts to start archive
-- THEN `harness-workflow` returns `blocked`
-- AND the response indicates `judge` must complete before `archive` can run
-- AND no archive operations are performed
-
-#### Scenario: SESSION_STATUS.md stays root-resident through judge
-
-- GIVEN the change has passed `verify` and is entering `judge`
-- AND `SESSION_STATUS.md` exists at the repository root
-- WHEN judge runs and completes (pass or fail)
-- THEN `SESSION_STATUS.md` remains at the repository root
-- AND it is NOT moved until the archive commit is being staged
-
-#### Scenario: SESSION_STATUS.md moves in the archive commit (before PR-open)
-
-- GIVEN judge has passed and archive is running
-- WHEN the archive commit is being staged
-- THEN `SESSION_STATUS.md` is moved from the repository root into
-  `openspec/changes/archive/YYYY-MM-DD-{change-name}/SESSION_STATUS.md`
-- AND this move is part of the same archive commit as the spec merge and folder move
-- AND the PR is opened only AFTER this commit is staged
-- AND `SESSION_STATUS.md` is no longer present at the repository root after the commit
-
-#### Scenario: Archive-internal ordering is preserved
-
-- GIVEN judge has passed and archive is executing
-- WHEN the four archive sub-operations run
-- THEN spec merge completes before folder move begins
-- AND folder move completes before `archon map --backfill` is invoked
-- AND `archon map --check` runs after `--backfill` completes
-- AND `archon map --check` passes before `SESSION_STATUS.md` is moved
-- AND PR-open is not invoked until all four sub-operations and the archive commit are done
+<!-- MODIFIED: "Terminal Phase Ordering (Feature Branch Chain)"
+     The single ADDITIVE change is the removal of the deferred/out-of-scope
+     Stacked-to-Main scenario (formerly spec.md:281-287). All other requirement
+     text, clauses, and scenarios are preserved VERBATIM. Slice 2b replaces that
+     deferral with the ADDED requirement below. -->
 
 ### Requirement: Terminal Phase Ordering (Feature Branch Chain)
 
@@ -278,6 +134,20 @@ PR MUST NOT be merged until the archive commit is present on the tracker branch.
 - AND `archon map --check` passes before `SESSION_STATUS.md` is moved
 - AND tracker PR merge to `main` is not invoked until all four sub-operations and the archive commit are done
 
+<!-- The deferral scenario that previously appeared here (spec.md:281-287) is
+     REMOVED by this delta. It is superseded by the new requirement below.
+     No silent gap remains. -->
+
+---
+
+## ADDED Requirements
+
+<!-- ADDED: new requirement for Stacked-to-Main archive convergence.
+     Does NOT modify the FBC requirement body above (which stays verbatim).
+     Does NOT modify the single-PR requirement (which is unaffected entirely).
+     This requirement fires at strategy-selection time (sdd-tasks), upstream of
+     the terminal sequence governed by the two preceding requirements. -->
+
 ### Requirement: Stacked-to-Main Archive Convergence
 
 When **archive-before-PR is in effect** (artifact store is `openspec` or `hybrid`)
@@ -362,3 +232,45 @@ apply. Stacked-to-Main is unaffected; no forced convergence occurs.
 - THEN the orchestrator proceeds with Stacked-to-Main without forced convergence
 - AND no FBC tracker branch is required
 - AND this requirement does NOT apply
+
+---
+
+## Non-Goals (Slice 2b)
+
+- **No new archive mechanics** — the converge-to-FBC rule reuses the "Terminal Phase
+  Ordering (Feature Branch Chain)" requirement verbatim. Archive internals are unchanged.
+- **Pure Stacked-to-Main + archive-before-PR is unsupported** — this combination is
+  explicitly out of scope; the orchestrator converges to FBC rather than implementing a
+  separate Stacked-to-Main archive path.
+- **No `archon archive` CLI** — archive remains skill/LLM-driven. An optional
+  `archon archive` command is a future concern, not part of this slice.
+- **Single-PR behavior unchanged** — the "Terminal Phase Ordering (Single-PR Flow)"
+  requirement and its scenarios are VERBATIM and UNAFFECTED by this delta.
+- **FBC requirement unchanged** — the "Terminal Phase Ordering (Feature Branch Chain)"
+  requirement body and all its scenarios (except removal of the deferral scenario) are
+  VERBATIM and UNAFFECTED. The deferral scenario is replaced, not the requirement.
+
+---
+
+## Consistency Note
+
+The full Stacked-to-Main archive convergence rule lives in two places (source of truth +
+primary skill):
+
+1. `openspec/specs/harness-workflow/spec.md` — this spec (source of truth; updated
+   at archive via spec merge). Contains the new "Stacked-to-Main Archive Convergence"
+   requirement and the MODIFIED FBC requirement (deferral scenario removed).
+2. `skills/chained-pr/SKILL.md` — replaces the remaining deferral passage with the
+   converge-to-FBC rule and up-front selection narrative.
+
+Two additional locations carry a brief pointer line only (the full rule is NOT
+duplicated there):
+
+3. `CLAUDE.md` — Phase Order section or chain-strategy note gains a one-line reference
+   to the converge-to-FBC rule.
+4. `skills/harness-workflow/SKILL.md` — terminal-phase narrative gains a one-line
+   pointer to the "Stacked-to-Main Archive Convergence" requirement.
+
+The spec is the source of truth. `CLAUDE.md` and the SKILL files are downstream.
+The apply phase MUST update all four consistently: full rule in (1) and (2),
+pointer lines in (3) and (4). This mirrors the slice-2 copy fan-out decision.

@@ -53,8 +53,13 @@ main <- PR 1: foundation
 
 After a parent PR merges, rebase/retarget the next PR so GitHub shows only the current slice.
 
-Archive ownership for Stacked PRs to main is NOT yet defined (deferred to slice
-2b); there is no tracker branch to host the archive commit.
+Archive ownership for Stacked PRs to main: when archive-before-PR is in effect
+(`openspec`/`hybrid`), pure Stacked-to-Main is unsupported — there is no tracker
+branch to host the archive commit, so the orchestrator converges to Feature Branch
+Chain at `sdd-tasks` strategy selection and the FBC archive step (above) applies.
+When archive-before-PR is not in effect (`engram`), Stacked-to-Main is unaffected.
+Full rule: `[[harness-workflow]]` "Stacked-to-Main Archive Convergence" and the
+`chained-pr` skill.
 
 ## Chain Context Section
 

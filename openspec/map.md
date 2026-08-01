@@ -44,6 +44,8 @@ this preamble is authored prose and is preserved across every regeneration. See
 | [opencode-phase-subagents](changes/opencode-phase-subagents/proposal.md) | design | in_progress |
 
 ## Archive
+### 2026-08-01
+- [stacked-pr-archive](changes/archive/2026-08-01-stacked-pr-archive/proposal.md)
 ### 2026-07-31
 - [chained-pr-archive](changes/archive/2026-07-31-chained-pr-archive/proposal.md)
 ### 2026-07-30
@@ -85,7 +87,8 @@ this preamble is authored prose and is preserved across every regeneration. See
 
 ## Backlinks
 - [[archon-map]] ← obsidian-vault-specs
-- [[harness-workflow]] ← archive-before-pr, chained-pr-archive, obsidian-vault-specs
+- [[harness-judge]] ← chained-pr-archive
+- [[harness-workflow]] ← archive-before-pr, chained-pr-archive, obsidian-vault-specs, stacked-pr-archive
 - [[openspec-convention]] ← obsidian-vault-specs
 - [[sdd-archive]] ← obsidian-vault-specs
 - [[sdd-init]] ← obsidian-vault-specs

@@ -39,6 +39,10 @@ Use this skill when:
    passed on the tracker branch and the archive commit MUST already be staged on the
    **tracker branch** before the tracker PR is merged to `main`. Child PRs carry no
    archive commit.
+   (A change with archive-before-PR in effect that would otherwise be Stacked-to-Main
+   has already converged to Feature Branch Chain at `sdd-tasks`; there is no
+   Stacked-to-Main archive path — see `[[harness-workflow]]` "Stacked-to-Main Archive
+   Convergence".)
 6. Open PR using the template (in a Feature Branch Chain this covers opening each
    child PR and the tracker PR; the tracker PR is then MERGED — not re-opened — once
    5b's archive precondition is met)

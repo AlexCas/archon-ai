@@ -28,16 +28,25 @@ Load this skill when a planned PR may exceed **400 changed lines**, SDD forecast
   a child PR diff, never a separate archive-only PR. Archive-internal order and
   one-commit staging are unchanged from the single-PR flow (`[[harness-workflow]]`
   "Terminal Phase Ordering (Feature Branch Chain)").
-- **Stacked-to-Main archive ownership** is NOT yet defined — deferred to slice 2b.
-  Stacked-to-Main has no tracker branch; do not apply the Feature Branch Chain
-  archive rule to it and do not enforce archive position on Stacked-to-Main flows.
+- **Stacked-to-Main + archive-before-PR converges to Feature Branch Chain.** When
+  archive-before-PR is in effect (artifact store `openspec`/`hybrid`), pure
+  Stacked-to-Main is unsupported: it ships slices independently to `main`, leaving
+  no un-merged ref to own the archive commit. At `sdd-tasks` strategy selection the
+  orchestrator MUST select **Feature Branch Chain** instead and notify the user.
+  After convergence the change is FBC and the Feature Branch Chain archive rule
+  above governs — zero new archive mechanics. A late Stacked→FBC conversion (after
+  slices already merged to `main`) strands those slices and is NOT sanctioned; there
+  is no recovery procedure. When archive-before-PR is NOT in effect (`engram`),
+  Stacked-to-Main is unaffected and does not converge. Full rule:
+  `[[harness-workflow]]` "Stacked-to-Main Archive Convergence".
 
 ## Decision Gates
 
 | Condition | Action |
 |---|---|
 | PR ≤400 changed lines and focused | Keep single PR. |
-| PR >400, each slice can land independently | Use Stacked PRs to main. |
+| PR >400, each slice can land independently, archive-before-PR NOT in effect (`engram`) | Use Stacked PRs to main. |
+| PR >400, each slice independent, BUT archive-before-PR in effect (`openspec`/`hybrid`) | Converge to Feature Branch Chain (Stacked-to-Main unsupported here). |
 | PR >400, feature must integrate before main | Use Feature Branch Chain with tracker. |
 | Generated/vendor/migration diff cannot split cleanly | Ask maintainer for `size:exception`. |
 | SDD provides `delivery_strategy` | Follow it before apply/PR creation. |

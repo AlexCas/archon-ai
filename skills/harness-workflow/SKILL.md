@@ -28,8 +28,11 @@ passes is: archive commit staged (spec merge, folder move, `archon map`,
 archive commit is staged on the **tracker branch** after the integrated judge
 passes on the tracker and before the tracker PR merges to `main`. Full rule:
 `openspec/specs/harness-workflow/spec.md` "Terminal Phase Ordering (Feature Branch
-Chain)" and the `chained-pr` skill. Stacked-to-Main archive ownership is deferred
-to slice 2b.
+Chain)" and the `chained-pr` skill. When archive-before-PR is in effect,
+Stacked-to-Main is unsupported and converges to Feature Branch Chain at
+`sdd-tasks` strategy selection. Full rule:
+`openspec/specs/harness-workflow/spec.md` "Stacked-to-Main Archive Convergence" and
+the `chained-pr` skill.
 
 ## Activation Contract
 
