@@ -95,6 +95,13 @@ Then you MUST confirm the orchestrator/user provided a resolved delivery path:
 
 Also check for `Chain strategy` in the tasks artifact. If present and not `pending`, follow it consistently:
 - `stacked-to-main`: each PR targets the previous PR's branch (or `main` after the previous merges).
+  This value is only valid when archive-before-PR is NOT in effect (`engram`). If the
+  tasks artifact carries `Chain strategy: stacked-to-main` while archive-before-PR is
+  in effect (`openspec`/`hybrid`), the convergence gate in `sdd-tasks` was skipped:
+  STOP and return `blocked` with `Stacked-to-Main + archive-before-PR is unsupported;
+  converge to feature-branch-chain before opening any child PR` (see
+  `[[harness-workflow]]` "Stacked-to-Main Archive Convergence"). Do not merge any
+  child PR to `main`.
 - `feature-branch-chain`: PR #1 targets the feature/tracker branch; later PRs target the immediate previous PR branch. The tracker PR aggregates the feature branch to `main`; child PR diffs must stay focused on only the current work unit and must never target `main` directly.
   For `feature-branch-chain`, the archive commit is NOT part of any child slice; it is
   staged on the tracker branch after the integrated judge passes and before the
