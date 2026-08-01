@@ -101,7 +101,9 @@ Also check for `Chain strategy` in the tasks artifact. If present and not `pendi
   STOP and return `blocked` with `Stacked-to-Main + archive-before-PR is unsupported;
   converge to feature-branch-chain before opening any child PR` (see
   `[[harness-workflow]]` "Stacked-to-Main Archive Convergence"). Do not merge any
-  child PR to `main`.
+  child PR to `main`. If the artifact store mode was not injected, infer it from the
+  presence of `openspec/config.yaml` or `openspec/changes/{name}/` before evaluating
+  this check.
 - `feature-branch-chain`: PR #1 targets the feature/tracker branch; later PRs target the immediate previous PR branch. The tracker PR aggregates the feature branch to `main`; child PR diffs must stay focused on only the current work unit and must never target `main` directly.
   For `feature-branch-chain`, the archive commit is NOT part of any child slice; it is
   staged on the tracker branch after the integrated judge passes and before the

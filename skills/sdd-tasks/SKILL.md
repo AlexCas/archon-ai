@@ -158,26 +158,44 @@ If the estimate is **High** or likely above 400 lines:
    - **Stacked PRs to main** — each PR merges to main in order. Fast iteration, fix on the go. Best for speed-first teams and independent slices.
    - **Feature Branch Chain** — the feature/tracker branch accumulates the final integration; PR #1 targets the tracker branch, later PRs target the immediate previous PR branch so each child diff stays focused. Only the tracker merges to main. Best for rollback control and coordinated releases.
    - **size:exception** — keep it as a single PR with maintainer approval. Best for generated code, migrations, or vendor diffs.
-4a. **Archive-before-PR convergence gate (MANDATORY).** If archive-before-PR is in
-   effect for this session — i.e. the artifact store is `openspec` or `hybrid`
-   (from the SDD session preflight) — the orchestrator MUST NOT select pure
-   **Stacked PRs to main**. Stacked-to-Main ships each slice independently to
-   `main`, so no single un-merged ref can own the archive commit; the
-   archive-before-PR invariant cannot be satisfied. In that case the orchestrator
-   MUST select **Feature Branch Chain** (which supplies the tracker branch that
-   owns the archive commit) and MUST notify the user that
-   `Stacked-to-Main + archive-before-PR is unsupported, so Feature Branch Chain was
-   selected`. This decision is up-front and decisive: made here, before any child
-   PR is opened. A late Stacked→FBC conversion (after slices already merged to
-   `main`) is NOT sanctioned and has no recovery procedure — see the
-   `harness-workflow` spec requirement "Stacked-to-Main Archive Convergence." When
-   the artifact store is `engram` (archive-before-PR not in effect), Stacked-to-Main
-   is unaffected and remains a valid choice.
 5. Cache the user's choice and set `Decision needed before apply` from delivery strategy:
    - `ask-on-risk`: `Yes` — orchestrator asks before apply.
    - `auto-chain`: `No` — orchestrator proceeds with the first slice using the chosen chain strategy.
    - `single-pr`: `Yes` — orchestrator must require `size:exception` before apply.
    - `exception-ok`: `No` — maintainer has accepted `size:exception`.
+
+### Archive-before-PR Convergence Gate (MANDATORY)
+
+This gate is **UNCONDITIONAL**: it applies whenever a chain strategy is being
+**SELECTED or CACHED** — regardless of the 400-line budget estimate (Low,
+Medium, or High) and regardless of how chaining was triggered. This covers, at
+minimum: the High-budget path above, the session preflight PR strategy
+`force-chained`, and an `auto` delivery strategy that picks chaining under a
+Low/Medium estimate. No path is exempt.
+
+If the artifact store is `openspec` or `hybrid` (archive-before-PR in effect
+for this session, from the SDD session preflight), the chosen chain strategy
+MUST NOT be **Stacked PRs to main** (`stacked-to-main`). Stacked-to-Main ships
+each slice independently to `main`, so no single un-merged ref can own the
+archive commit; the archive-before-PR invariant cannot be satisfied. The
+orchestrator MUST select — or convert to — **Feature Branch Chain**
+(`feature-branch-chain`) instead (it supplies the tracker branch that owns the
+archive commit), and MUST notify the user that `Stacked-to-Main +
+archive-before-PR is unsupported, so Feature Branch Chain was selected`.
+
+This conversion MUST happen **BEFORE** the `Chain strategy` value is cached or
+written to the tasks artifact. No path — the High-budget block above, a
+`force-chained` preflight selection, or an `auto`-selected chain under a
+Low/Medium estimate — may cache `Chain strategy: stacked-to-main` while
+archive-before-PR is in effect.
+
+This decision is up-front and decisive: made here, before any child PR is
+opened. A late Stacked→FBC conversion (after slices already merged to `main`)
+is NOT sanctioned and has no recovery procedure — see the `harness-workflow`
+spec requirement "Stacked-to-Main Archive Convergence."
+
+When the artifact store is `engram` or `none` (archive-before-PR not in
+effect), Stacked-to-Main is unaffected and remains a valid choice.
 
 Do not bury this in prose. Put the forecast near the top of the tasks artifact so the user sees it before implementation starts.
 
@@ -193,9 +211,9 @@ Chain strategy: stacked-to-main|feature-branch-chain|size-exception|pending
 You may keep the table for readability, but the plain-text lines are the guard contract.
 
 When archive-before-PR is in effect (`openspec`/`hybrid`), `Chain strategy` MUST NOT
-be `stacked-to-main`; the convergence gate (step 4a) sets it to
+be `stacked-to-main`; the Archive-before-PR Convergence Gate above sets it to
 `feature-branch-chain` instead. `stacked-to-main` remains valid only when the
-artifact store is `engram`.
+artifact store is `engram` or `none`.
 
 For `feature-branch-chain`, suggested work units SHOULD name the intended base boundary: PR #1 base = feature/tracker branch; PR #2 base = PR #1 branch; PR #3 base = PR #2 branch. If a child PR would show previous PR changes, the base is wrong and must be retargeted/rebased before review.
 

@@ -310,7 +310,7 @@ the tracker branch, after the integrated judge passes, before the tracker PR mer
 to `main`. Zero additional archive mechanics are introduced by this requirement.
 
 **Scope boundary:** When archive-before-PR is NOT in effect (artifact store is
-`engram`, or archive is not applicable to the session), this requirement does NOT
+`engram` or `none`, or archive is not applicable to the session), this requirement does NOT
 apply. Stacked-to-Main is unaffected; no forced convergence occurs.
 
 #### Scenario: Archive-before-PR active, Stacked-to-Main requested — orchestrator converges to FBC at sdd-tasks
@@ -318,7 +318,7 @@ apply. Stacked-to-Main is unaffected; no forced convergence occurs.
 - GIVEN archive-before-PR is in effect (artifact store is `openspec` or `hybrid`)
 - AND the orchestrator is selecting a chain strategy during `sdd-tasks`
 - AND the user's preference or default would be Stacked-to-Main
-- WHEN `harness-workflow` evaluates the strategy selection
+- WHEN the orchestrator executes `sdd-tasks` strategy selection
 - THEN the orchestrator selects Feature Branch Chain instead of Stacked-to-Main
 - AND the orchestrator notifies the user that Stacked-to-Main + archive-before-PR is unsupported and FBC is selected
 - AND a tracker/integration branch is created (or planned) before any child PR is opened
@@ -329,7 +329,7 @@ apply. Stacked-to-Main is unaffected; no forced convergence occurs.
 - GIVEN archive-before-PR is in effect (artifact store is `openspec` or `hybrid`)
 - AND the orchestrator attempted to proceed with pure Stacked-to-Main (no tracker branch)
 - WHEN any child PR would merge to `main` without a tracker branch in place
-- THEN `harness-workflow` returns `blocked`
+- THEN the `sdd-apply` backstop returns `blocked`
 - AND the response states that Stacked-to-Main + archive-before-PR is an unsupported combination
 - AND no child PR is merged to `main` until the strategy is corrected to Feature Branch Chain
 - AND `harness-workflow` directs the orchestrator to converge to FBC before opening child PRs
@@ -356,7 +356,7 @@ apply. Stacked-to-Main is unaffected; no forced convergence occurs.
 
 #### Scenario: Archive-before-PR not in effect — Stacked-to-Main is unaffected
 
-- GIVEN archive-before-PR is NOT in effect (artifact store is `engram`, or archive is not applicable)
+- GIVEN archive-before-PR is NOT in effect (artifact store is `engram` or `none`, or archive is not applicable)
 - AND the orchestrator selects Stacked-to-Main as the chain strategy during `sdd-tasks`
 - WHEN `harness-workflow` evaluates the strategy selection
 - THEN the orchestrator proceeds with Stacked-to-Main without forced convergence
