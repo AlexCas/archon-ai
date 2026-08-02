@@ -186,30 +186,32 @@ const orchestratorTrailerHead = `
 // subagent's frontmatter model is the hard gate).
 const orchestratorRulesClaude = `## Rules
 1. Check harness-workflow before any phase transition
-2. You MUST delegate each phase by invoking its §archon-<phase>§ subagent via your delegation tool — never execute the phase inline on your own model; do not pass a per-call model parameter (the subagent's frontmatter model is the gate)
-3. Write/update SESSION_STATUS.md at the root on every phase transition
-4. After every phase that produces an editable artifact, run the Human Review Gate
-5. After verify, invoke harness-judge
-6. When playwright.enabled, run the generated Playwright tests after verify and judge pass
-7. When impeccable.enabled, run Impeccable subcommands during apply and the detection gate after judge passes
-8. When graphify.enabled, sdd-explore consults the code graph and sdd-tasks reads Leiden communities to inform slice boundaries — advisory only, never blocking (no verdict)
-9. On judge fail: re-apply with feedback (max 3 retries)
-10. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution
+2. Before delegating a phase, run §archon route '<message>'§ and use its resolved phase; invoke the model classifier (§skills/sdd-router§) when output is §CLASSIFY§; surface ASK to the user
+3. You MUST delegate each phase by invoking its §archon-<phase>§ subagent via your delegation tool — never execute the phase inline on your own model; do not pass a per-call model parameter (the subagent's frontmatter model is the gate)
+4. Write/update SESSION_STATUS.md at the root on every phase transition
+5. After every phase that produces an editable artifact, run the Human Review Gate
+6. After verify, invoke harness-judge
+7. When playwright.enabled, run the generated Playwright tests after verify and judge pass
+8. When impeccable.enabled, run Impeccable subcommands during apply and the detection gate after judge passes
+9. When graphify.enabled, sdd-explore consults the code graph and sdd-tasks reads Leiden communities to inform slice boundaries — advisory only, never blocking (no verdict)
+10. On judge fail: re-apply with feedback (max 3 retries)
+11. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution
 `
 
 // orchestratorRulesOpencode is the Rules block for the opencode harness.
 // Rule 2 names the archon-<phase> subagent as the per-phase delegation target.
 const orchestratorRulesOpencode = `## Rules
 1. Check harness-workflow before any phase transition
-2. You MUST delegate each phase by invoking its §archon-<phase>§ subagent via your delegation tool — never execute the phase inline on your own model (the subagent's configured model in opencode.json is the gate)
-3. Write/update SESSION_STATUS.md at the root on every phase transition
-4. After every phase that produces an editable artifact, run the Human Review Gate
-5. After verify, invoke harness-judge
-6. When playwright.enabled, run the generated Playwright tests after verify and judge pass
-7. When impeccable.enabled, run Impeccable subcommands during apply and the detection gate after judge passes
-8. When graphify.enabled, sdd-explore consults the code graph and sdd-tasks reads Leiden communities to inform slice boundaries — advisory only, never blocking (no verdict)
-9. On judge fail: re-apply with feedback (max 3 retries)
-10. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution
+2. Before delegating a phase, run §archon route '<message>'§ and use its resolved phase; invoke the model classifier (§skills/sdd-router§) when output is §CLASSIFY§; surface ASK to the user
+3. You MUST delegate each phase by invoking its §archon-<phase>§ subagent via your delegation tool — never execute the phase inline on your own model (the subagent's configured model in opencode.json is the gate)
+4. Write/update SESSION_STATUS.md at the root on every phase transition
+5. After every phase that produces an editable artifact, run the Human Review Gate
+6. After verify, invoke harness-judge
+7. When playwright.enabled, run the generated Playwright tests after verify and judge pass
+8. When impeccable.enabled, run Impeccable subcommands during apply and the detection gate after judge passes
+9. When graphify.enabled, sdd-explore consults the code graph and sdd-tasks reads Leiden communities to inform slice boundaries — advisory only, never blocking (no verdict)
+10. On judge fail: re-apply with feedback (max 3 retries)
+11. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution
 `
 
 // phaseModelsClaude is the Phase Models block for CLAUDE.md. The archon-<phase>
