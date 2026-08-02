@@ -42,7 +42,7 @@ this preamble is authored prose and is preserved across every regeneration. See
 |--------|-------|--------|
 | [ai-orchestration-harness](changes/ai-orchestration-harness/proposal.md) |  |  |
 | [issue-16-leader-personality](changes/issue-16-leader-personality/proposal.md) |  |  |
-| [local-model-router](changes/local-model-router/proposal.md) | apply | in_progress |
+| [local-model-router](changes/local-model-router/proposal.md) | verify | in_progress |
 | [opencode-phase-subagents](changes/opencode-phase-subagents/proposal.md) | design | in_progress |
 
 ## Archive
