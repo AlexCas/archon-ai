@@ -159,7 +159,7 @@ When committing on the user's behalf through the harness or any sub-agent:
 10. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution
 
 ## Configuration
-- Skills: 26 (embedded via archon init)
+- Skills: 27 (embedded via archon init)
 - Config: .archon/config.yaml
 - Agent: opencode
 - Harness Version: 0.6.0
