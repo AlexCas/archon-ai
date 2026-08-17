@@ -101,7 +101,7 @@ Feature: Graphify Integration (Slice A — advisory code-graph gate)
       | the graphify binary is not on PATH                  |
       | Python and uv and pipx are absent                   |
       | "graphify extract" exits with a non-zero code       |
-      | graph.json is absent and binary is unavailable      |
+      | graph.json is absent or unreadable (IO/permissions) |
       | graph.json contains invalid JSON                    |
       | graph.json has zero nodes and zero edges            |
       | output_dir is not writable                          |
