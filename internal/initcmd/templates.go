@@ -100,13 +100,13 @@ seven every SDD session.
 - Group G maps to §graphify.enabled§ in §.archon/config.yaml§. The §--graphify§
   flag at init time sets the same value. When enabled, sdd-explore consults the
   Graphify code graph for repo comprehension and sdd-tasks reads Leiden
-  communities to inform slice boundaries — informational only, never blocking.
+  communities to inform slice boundaries — advisory only, never blocking.
 
 **Hard gate rules:**
 - §openspec/config.yaml§, existing SDD artifacts, or previous §sdd-init§ results do NOT satisfy this preflight.
-- If the session has no preflight decision, ask the six per-group questions above and **STOP**. Do not run init, delegate phases, or apply tasks in the same turn.
+- If the session has no preflight decision, ask the seven per-group questions above and **STOP**. Do not run init, delegate phases, or apply tasks in the same turn.
 - Cache the choices for this session and echo them into later phase prompts.
-- If the user explicitly provided all six choices in the current conversation, summarize them as the session preflight block and continue.
+- If the user explicitly provided all seven choices in the current conversation, summarize them as the session preflight block and continue.
 
 ## Vague Request Guard (MANDATORY)
 
@@ -192,7 +192,7 @@ const orchestratorRulesClaude = `## Rules
 5. After verify, invoke harness-judge
 6. When playwright.enabled, run the generated Playwright tests after verify and judge pass
 7. When impeccable.enabled, run Impeccable subcommands during apply and the detection gate after judge passes
-8. When graphify.enabled, sdd-explore consults the code graph and sdd-tasks reads Leiden communities to inform slice boundaries — informational only, never blocking (no verdict)
+8. When graphify.enabled, sdd-explore consults the code graph and sdd-tasks reads Leiden communities to inform slice boundaries — advisory only, never blocking (no verdict)
 9. On judge fail: re-apply with feedback (max 3 retries)
 10. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution
 `

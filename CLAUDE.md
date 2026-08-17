@@ -99,9 +99,9 @@ seven every SDD session.
 
 **Hard gate rules:**
 - `openspec/config.yaml`, existing SDD artifacts, or previous `sdd-init` results do NOT satisfy this preflight.
-- If the session has no preflight decision, ask the six per-group questions above and **STOP**. Do not run init, delegate phases, or apply tasks in the same turn.
+- If the session has no preflight decision, ask the seven per-group questions above and **STOP**. Do not run init, delegate phases, or apply tasks in the same turn.
 - Cache the choices for this session and echo them into later phase prompts.
-- If the user explicitly provided all six choices in the current conversation, summarize them as the session preflight block and continue.
+- If the user explicitly provided all seven choices in the current conversation, summarize them as the session preflight block and continue.
 
 ## Vague Request Guard (MANDATORY)
 

@@ -587,8 +587,12 @@ func TestTemplates_ClaudePhaseModelsIsHardGate(t *testing.T) {
 		t.Error("CLAUDE.md Phase Models block does not name archon-<phase> subagents")
 	}
 
-	// Must not call model selection "advisory".
-	if strings.Contains(content, "advisory") {
+	// Must not call model selection "advisory". Scoped to the Phase Models
+	// section only (not a whole-document scan) — "advisory" may legitimately
+	// appear elsewhere in the document describing an unrelated, genuinely
+	// advisory gate (e.g. graphify). Do not widen this back to
+	// strings.Contains(content, "advisory") over the full render.
+	if strings.Contains(phaseModelsBlock(t, content), "advisory") {
 		t.Error("CLAUDE.md Phase Models block must not use the word \"advisory\"")
 	}
 
