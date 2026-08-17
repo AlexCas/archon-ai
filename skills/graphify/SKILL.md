@@ -82,7 +82,7 @@ the consuming phase continue with baseline grep/read. **Never** return
 | a | `graphify` binary not on PATH | `graphify unavailable: binary not on PATH; proceeding with baseline grep/read` (if `auto_install: true`, install first per §7) | baseline grep/read |
 | b | Python and uv and pipx all absent | `graphify unavailable: no Python/uv/pipx runtime; proceeding with baseline grep/read` | baseline grep/read |
 | c | `graphify extract` exits non-zero | `graphify extract failed (exit N); proceeding with baseline grep/read` | prior graph if any, else baseline |
-| d | `graph.json` absent and binary unavailable | `code graph unavailable and cannot extract; proceeding with baseline grep/read` | baseline grep/read |
+| d | `graph.json` absent or unreadable (IO error, permissions denied) | `code graph unavailable (missing or unreadable); proceeding with baseline grep/read` | baseline grep/read |
 | e | `graph.json` unparseable or schema-drifted | `code graph unreadable (parse/schema); proceeding with baseline grep/read` | baseline grep/read |
 | f | graph stale and binary unavailable for re-extraction | `graph may be stale and graphify unavailable; using existing graph / baseline grep/read` | existing graph or baseline |
 | g | `output_dir` unwritable | `cannot write to <output_dir>; skipping extraction, proceeding with baseline grep/read` | baseline grep/read |

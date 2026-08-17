@@ -165,9 +165,10 @@ If the estimate is **High** or likely above 400 lines:
    - `exception-ok`: `No` — maintainer has accepted `size:exception`.
 
 **Graphify community input (conditional):** When `graphify.enabled: true`,
-read Leiden community data from `graph.json`/`GRAPH_REPORT.md` in
-`.archon/graphify/` — **read-only file access, never shell any `graphify`
-command**, even if the binary is present and `graph.json` is absent;
+read Leiden community data from `graph.json`/`GRAPH_REPORT.md` in the
+configured `graphify.output_dir` (default `.archon/graphify/`) — **read-only
+file access, never shell any `graphify` command**, even if the binary is
+present and `graph.json` is absent;
 `sdd-explore` is the sole extraction site (see `skills/graphify/SKILL.md`).
 Community boundaries MAY inform the Suggested Work Units table below.
 Missing or unreadable community data falls back to the heuristic
