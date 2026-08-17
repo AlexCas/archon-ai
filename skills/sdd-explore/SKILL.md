@@ -116,6 +116,21 @@ automatic activation: state it explicitly so the orchestrator can surface it
 at the preflight gate, but do NOT set `impeccable.enabled` yourself and do NOT
 treat `not-web`/`unknown` projects as needing this recommendation.
 
+### Step 3d: Graphify Code-Graph Consumption (conditional)
+
+**Only if `.archon/config.yaml` → `graphify.enabled: true`:** load
+`skills/graphify/SKILL.md` and follow its Per-Phase Invocation Map for
+`sdd-explore`: if the code graph is fresh, read `graph.json`/`GRAPH_REPORT.md`
+and use `graphify query`/`graphify explain` for targeted questions; if absent,
+shell `graphify extract` (when the binary is present) then read; if stale,
+re-extract per the skill's staleness algorithm, then read. After a successful
+(re-)extraction, write/refresh the tracked excerpt at
+`openspec/changes/<change-name>/graph-report.excerpt.md`. Every failure mode
+falls back to baseline grep/read per the skill's degradation table — never
+fail this phase over Graphify. MUST NOT shell `/graphify` as a slash command
+and MUST NOT depend on the MCP surface. When `graphify.enabled: false`, skip
+this step entirely — no command runs, no directory is created.
+
 ### Step 4: Analyze Options
 
 If there are multiple approaches, compare them:
