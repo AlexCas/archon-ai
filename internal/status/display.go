@@ -64,6 +64,16 @@ func DisplayWithUpdate(w io.Writer, cfg *config.Config, n int) {
 	}
 	fmt.Fprintln(w)
 
+	fmt.Fprintln(w, "  Graphify (Code Graph)")
+	fmt.Fprintln(w, "  ---------------------")
+	fmt.Fprintf(w, "    Enabled:   %t\n", cfg.Graphify.Enabled)
+	if cfg.Graphify.Enabled {
+		fmt.Fprintf(w, "    Version:    %s\n", cfg.Graphify.Version)
+		fmt.Fprintf(w, "    Output Dir: %s\n", cfg.Graphify.OutputDir)
+		fmt.Fprintf(w, "    Semantic:   %t\n", cfg.Graphify.Semantic)
+	}
+	fmt.Fprintln(w)
+
 	fmt.Fprintln(w, "  Models")
 	fmt.Fprintln(w, "  ------")
 	if !cfg.Models.HasAny() {

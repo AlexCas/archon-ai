@@ -607,7 +607,7 @@ func TestBuildConfig_SecurityFlag(t *testing.T) {
 		{"security off, playwright on", false, true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := buildConfig("opencode", nil, nil, "", "", nil, tt.playwright, tt.security, false)
+			cfg := buildConfig("opencode", nil, nil, "", "", nil, tt.playwright, tt.security, false, false)
 			if cfg.Security.Enabled != tt.security {
 				t.Errorf("Security.Enabled = %v, want %v", cfg.Security.Enabled, tt.security)
 			}
@@ -630,12 +630,38 @@ func TestBuildConfig_ImpeccableFlag(t *testing.T) {
 		{"impeccable off", false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := buildConfig("opencode", nil, nil, "", "", nil, false, false, tt.impeccable)
+			cfg := buildConfig("opencode", nil, nil, "", "", nil, false, false, tt.impeccable, false)
 			if cfg.Impeccable.Enabled != tt.impeccable {
 				t.Errorf("Impeccable.Enabled = %v, want %v", cfg.Impeccable.Enabled, tt.impeccable)
 			}
 			if cfg.Impeccable.Severity != "" {
 				t.Errorf("Impeccable.Severity = %q, want empty (buildConfig must not set it; Load() normalizes)", cfg.Impeccable.Severity)
+			}
+		})
+	}
+}
+
+// TestBuildConfig_GraphifyFlag covers spec scenarios "archon init --graphify
+// writes enabled true" and "Default init leaves graphify disabled" (mirrors
+// TestBuildConfig_ImpeccableFlag).
+func TestBuildConfig_GraphifyFlag(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		graphify bool
+	}{
+		{"graphify:true", true},
+		{"graphify:false", false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := buildConfig("opencode", nil, nil, "", "", nil, false, false, false, tt.graphify)
+			if cfg.Graphify.Enabled != tt.graphify {
+				t.Errorf("Graphify.Enabled = %v, want %v", cfg.Graphify.Enabled, tt.graphify)
+			}
+			if cfg.Graphify.Version != config.DefaultGraphifyVersion {
+				t.Errorf("Graphify.Version = %q, want %q", cfg.Graphify.Version, config.DefaultGraphifyVersion)
+			}
+			if cfg.Graphify.OutputDir != config.DefaultGraphifyOutputDir {
+				t.Errorf("Graphify.OutputDir = %q, want %q", cfg.Graphify.OutputDir, config.DefaultGraphifyOutputDir)
 			}
 		})
 	}

@@ -185,6 +185,56 @@ func TestDisplay_Impeccable(t *testing.T) {
 	})
 }
 
+// TestDisplay_Graphify covers spec scenarios "Status shows Graphify section
+// when disabled" and "Status shows graphify details when enabled" (mirrors
+// TestDisplay_Impeccable).
+func TestDisplay_Graphify(t *testing.T) {
+	t.Run("disabled shows only Enabled: false", func(t *testing.T) {
+		cfg := &config.Config{
+			Version:         "1.0.0",
+			Agent:           "claude",
+			CreatedAt:       time.Date(2026, 6, 10, 0, 0, 0, 0, time.UTC),
+			MutationTesting: config.MutationTesting{Enabled: false},
+		}
+		var buf bytes.Buffer
+		Display(&buf, cfg)
+		got := buf.String()
+
+		if !strings.Contains(got, "Graphify (Code Graph)") {
+			t.Errorf("output missing Graphify block:\n%s", got)
+		}
+		if !strings.Contains(got, "Enabled:   false") {
+			t.Errorf("output missing disabled state:\n%s", got)
+		}
+		if strings.Contains(got, "v0.9.45") || strings.Contains(got, ".archon/graphify") {
+			t.Errorf("disabled block should not show version/output_dir:\n%s", got)
+		}
+	})
+
+	t.Run("enabled shows version and output_dir", func(t *testing.T) {
+		cfg := &config.Config{
+			Version:         "1.0.0",
+			Agent:           "claude",
+			CreatedAt:       time.Date(2026, 6, 10, 0, 0, 0, 0, time.UTC),
+			MutationTesting: config.MutationTesting{Enabled: false},
+			Graphify: config.Graphify{
+				Enabled:   true,
+				Version:   "v0.9.45",
+				OutputDir: ".archon/graphify",
+			},
+		}
+		var buf bytes.Buffer
+		Display(&buf, cfg)
+		got := buf.String()
+
+		for _, want := range []string{"Enabled:   true", "v0.9.45", ".archon/graphify"} {
+			if !strings.Contains(got, want) {
+				t.Errorf("output missing %q:\n%s", want, got)
+			}
+		}
+	})
+}
+
 func TestDisplayWithUpdate(t *testing.T) {
 	cfg := &config.Config{
 		Version:         "1.0.0",
