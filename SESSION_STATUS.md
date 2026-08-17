@@ -1,71 +1,80 @@
-# Session Status
+# SESSION STATUS — local-model-router
 
-- **Session started**: 2026-08-01
-- **Last updated**: 2026-08-01 (apply — start, Slice A)
 - **Active change**: local-model-router
-- **Current phase**: apply (in_progress) — Slice A: internal/route + archon route CLI + tests
-- **Next recommended**: apply Slice B, then verify
+- **Branch**: feat/lmr-slice-b (linearly contains A1 + A2 + B)
+- **Current phase**: judge — completed
+- **Last updated**: 2026-08-02T06:30:00Z
 
-## Preflight
+## Preflight Choices
+
 - Execution mode: interactive
 - Artifact store: openspec
-- Chained PR strategy: ask-always (single-pr unless estimate > budget)
+- PR strategy: Feature Branch Chain (ask-always)
 - Review budget: 400 lines
-- Playwright: no
-- Impeccable: no
-
-## Goal
-Formalize a HYBRID phase router that makes the SDD flow friendly for weak local
-models (e.g. ollama qwen3-orch:latest ~5B) which need explicit execution orders.
-Empirically validated in `prototype/sdd-router/` (17/18 on the local model).
-
-Architecture decided: deterministic CODE pre-router (control words + start verbs +
-literal `archon-<phase>`, resolved from state.yaml + PhaseOrder) → MODEL classifier
-(fuzzy "which phase family") → harness-workflow gate → archon-<phase> subagent.
+- Playwright: disabled
+- Impeccable: disabled
+- Mutation testing: disabled
 
 ## Phase History
-- [x] explore — completed 2026-08-01
-- [x] propose — completed 2026-08-01
-- [x] spec — completed 2026-08-01
-- [x] design — completed 2026-08-01
-- [x] tasks — completed 2026-08-01
-- [ ] apply — in_progress 2026-08-01 (Slice A)
-- [ ] verify
-- [ ] judge
-- [ ] archive
+
+| Phase | Status | Timestamp |
+|-------|--------|-----------|
+| explore | completed | 2026-08-01T18:41:00Z |
+| propose | completed | 2026-08-01T18:45:00Z |
+| spec | completed | 2026-08-01T22:15:00Z |
+| design | completed | 2026-08-01T22:45:00Z |
+| tasks | completed | 2026-08-01T23:30:00Z |
+| apply | completed | 2026-08-02T00:10:00Z |
+| verify | completed (PASS-with-warnings) | 2026-08-02T06:00:00Z |
+| judge | completed (APPROVED-pass-with-warnings) | 2026-08-02T06:30:00Z |
 
 ## Key Artifacts
-- openspec/changes/local-model-router/exploration.md — integration map
-- openspec/changes/local-model-router/proposal.md — approved proposal
-- openspec/changes/local-model-router/specs/local-model-router/spec.md — capability spec
-- openspec/changes/local-model-router/specs/local-model-router/local-model-router.feature — Gherkin feature file (18+ scenarios)
-- openspec/changes/local-model-router/design.md — technical design (package API, single-source verb table, 2-slice forecast)
-- openspec/changes/local-model-router/tasks.md — ordered task breakdown (8 phases, 28 tasks)
-- openspec/changes/local-model-router/state.yaml — phase state
-- prototype/sdd-router/ROUTER.md — deterministic rule spec (read-only reference)
-- prototype/sdd-router/fixtures.md — 18 test cases
-- prototype/sdd-router/FINDINGS.md — empirical results + architecture
 
-## Decisions Made in Spec
-- D1 (Handoff): --json primary (machine-readable), stderr human echo line.
-- D2 (Active-change): router discovers (flag > SESSION_STATUS.md > sole folder > none).
-- D3 (#15 dual-action): narrow code rule — judge-verb AND verify-verb + conjunction → ASK.
+- Proposal: `openspec/changes/local-model-router/proposal.md`
+- Spec: `openspec/changes/local-model-router/specs/local-model-router/spec.md`
+- Feature file: `openspec/changes/local-model-router/specs/local-model-router/local-model-router.feature`
+- Design: `openspec/changes/local-model-router/design.md`
+- Tasks: `openspec/changes/local-model-router/tasks.md`
+- Verify: `openspec/changes/local-model-router/verify.md`
+- Judge: `openspec/changes/local-model-router/judge.md`
+- State: `openspec/changes/local-model-router/state.yaml`
 
-## Chained-PR Strategy (Feature Branch Chain)
-Converged from Stacked-to-Main to Feature Branch Chain (archive-before-PR in effect).
+## Code Artifacts
 
-Branch chain:
-  main
-   └── feat/local-model-router        (tracker)
-        └── feat/lmr-slice-a          (PR A: internal/route/ + CLI + tests, ~330 lines)
-             └── feat/lmr-slice-b     (PR B: sdd-router SKILL.md + templates + golden + skill_count, ~180 lines)
+- `internal/route/resolve.go` — pure Resolve(Input) Result; Normalize
+- `internal/route/rules.go` — single-source verb/keyword data; D3 rule
+- `internal/route/discover.go` — active-change discovery + read-only state read
+- `internal/route/resolve_test.go` — 18 fixtures + keyword outline + normalize + implicit precedence
+- `internal/route/discover_test.go` — discovery precedence + readState tolerant behavior
+- `cmd/archon/main.go` — newRouteCmd wired into root
+- `skills/sdd-router/SKILL.md` — model classifier contract
+- `internal/initcmd/templates.go` — archon route rule 2 in both orchestratorRules blocks
 
-Test-split commit pre-planned: if slice A diff exceeds 400 lines at apply time,
-isolate fixture rows 9–18 into a follow-up commit before opening PR A.
+## Warnings Carried Forward
+
+- W1: Slice A code diff (~771 lines) exceeds 400-line budget; A1 (469) user-accepted as irreducible. Carry to PR.
+- W2: archive/completed + control word → rule:"next" but phase stays archive (semantic oddity, gate catches it).
+- W3: SKILL.md includes "tareas" in tasks keywords; rules.go intentionally excludes it. Undocumented safe divergence.
+- W4: Root CLAUDE.md/AGENTS.md lack the archon route Rule 2 (pre-existing drift). Follow-up: archon init --force after tracker merges.
 
 ## Open Questions
-- None. Confirm test-split at apply if slice A exceeds 400 lines at diff time.
 
-## Resume Hint
-Tasks complete. Human Review Gate required before sdd-apply. Next: show tasks.md to
-user, ask "¿Quieres ajustar algo en esta fase antes de continuar?"
+None — all spec requirements verified, all tasks complete.
+
+## Next Recommended Step — two-wave handoff (2 sub-PRs preserved)
+
+Branch topology (nothing pushed; push needs the AlexCas gh account):
+  master
+   └── feat/local-model-router   (tracker) 9361afa→3227a47 (planning + verify/judge record)
+   └── feat/lmr-slice-a1  e806f04 (resolver + fixture tests, 469)  → PR into tracker
+        └── feat/lmr-slice-a2  fa2197c (discover + archon route CLI, 303)  → PR into a1
+             └── feat/lmr-slice-b  ff7f888 (sdd-router SKILL.md + templates + skill_count, 191)  → PR into a2
+
+WAVE 1 (user, AlexCas account): push all 4 branches; open 3 stacked PRs
+  (A1→tracker, A2→a1, B→a2); note W1 in PR A1; review + merge each into the tracker
+  (retarget A2→tracker, B→tracker as the stack merges).
+WAVE 2 (after code is on the tracker): run `sdd-archive` on the tracker — spec merge into
+  openspec/specs/, move change folder to openspec/changes/archive/2026-08-02-local-model-router/,
+  move SESSION_STATUS.md into it, `archon map` regen — as ONE commit; then open tracker PR to `main`.
+WAVE 2 follow-up: after tracker merges, run `archon init --force` to sync root
+  CLAUDE.md/AGENTS.md with templates.go (addresses W4).
