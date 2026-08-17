@@ -1,0 +1,13 @@
+phase: tasks
+status: completed
+history:
+  - {phase: explore, status: in_progress, ts: "2026-08-17T00:00:00Z"}
+  - {phase: explore, status: completed, ts: "2026-08-17T00:00:00Z"}
+  - {phase: propose, status: in_progress, ts: "2026-08-17T00:00:00Z"}
+  - {phase: propose, status: completed, ts: "2026-08-17T00:00:00Z"}
+  - {phase: spec, status: in_progress, ts: "2026-08-17T00:00:00Z"}
+  - {phase: spec, status: completed, ts: "2026-08-17T00:00:00Z"}
+  - {phase: design, status: in_progress, ts: "2026-08-17T00:00:00Z"}
+  - {phase: design, status: completed, ts: "2026-08-17T00:00:00Z"}
+  - {phase: tasks, status: in_progress, ts: "2026-08-17T00:00:00Z"}
+  - {phase: tasks, status: completed, ts: "2026-08-17T00:00:00Z"}
