@@ -27,7 +27,7 @@ Required choices:
 
 ```text
 Antes de continuar con SDD, elija una opción por grupo.
-Responda con "usar recomendado" o con códigos como: A1, B1, C1, D1, E1, F1.
+Responda con "usar recomendado" o con códigos como: A1, B1, C1, D1, E1, F1, G1.
 
 A. Ritmo
    A1 Interactivo (recomendado): mostrar cada fase y esperar confirmación antes de continuar.
@@ -56,6 +56,10 @@ E. Pruebas web (Playwright)
 F. Impeccable (Diseño de interfaz)
    F1 No (recomendado): no correr verificaciones de diseño.
    F2 Sí: activar el gate de Impeccable tras verify/judge cuando esté habilitado.
+
+G. Graphify (Grafo de código)
+   G1 No (recomendado): no extraer ni consultar el grafo de código.
+   G2 Sí: extraer el grafo de código en sdd-explore y usar comunidades Leiden para sugerir límites de slices en sdd-tasks.
 ```
 
 **Project type & web testing (group E):**
@@ -69,11 +73,17 @@ F. Impeccable (Diseño de interfaz)
   enabled, the harness invokes Impeccable subcommands during apply and runs the
   detection gate after the judge phase.
 
+**Project type & code-graph gate (group G):**
+- Group G maps to `graphify.enabled` in `.archon/config.yaml`. The `--graphify`
+  flag at init time sets the same value. When enabled, sdd-explore consults the
+  Graphify code graph for repo comprehension and sdd-tasks reads Leiden
+  communities to inform slice boundaries — advisory only, never blocking.
+
 **Hard gate rules:**
 - `openspec/config.yaml`, existing SDD artifacts, or previous `sdd-init` results do NOT satisfy this preflight.
 - If the session has no preflight block, ask the prompt above and **STOP**. Do not run init, delegate phases, or apply tasks in the same turn.
 - Cache the choices for this session and include them in later phase prompts.
-- If the user explicitly provided all six choices in the current conversation, summarize them as the session preflight block and continue.
+- If the user explicitly provided all seven choices in the current conversation, summarize them as the session preflight block and continue.
 
 ## Vague Request Guard (MANDATORY)
 
@@ -144,11 +154,12 @@ When committing on the user's behalf through the harness or any sub-agent:
 5. After verify, invoke harness-judge
 6. When playwright.enabled, run the generated Playwright tests after verify and judge pass
 7. When impeccable.enabled, run Impeccable subcommands during apply and the detection gate after judge passes
-8. On judge fail: re-apply with feedback (max 3 retries)
-9. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution
+8. When graphify.enabled, sdd-explore consults the code graph and sdd-tasks reads Leiden communities to inform slice boundaries — advisory only, never blocking (no verdict)
+9. On judge fail: re-apply with feedback (max 3 retries)
+10. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution
 
 ## Configuration
-- Skills: 25 (embedded via archon init)
+- Skills: 26 (embedded via archon init)
 - Config: .archon/config.yaml
 - Agent: opencode
 - Harness Version: 0.6.0
