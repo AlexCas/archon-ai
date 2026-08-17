@@ -1,10 +1,118 @@
 # Session Status
 
 - **Session started**: 2026-08-17T16:53:00Z
-- **Last updated**: 2026-08-17T18:02:00Z
+- **Last updated**: 2026-08-17T19:15:00Z
 - **Active change**: graphify-integration
-- **Current phase**: apply (in_progress)
-- **Next recommended**: complete apply (T-01..T-18), then verify
+- **Current phase**: judge (completed, APPROVED — all warnings resolved)
+- **Next recommended**: archive as ONE commit (in progress), then the user pushes and opens
+  the PR with the AlexCas gh account
+
+## Judge warnings — RESOLVED, plus one third defect found while fixing them
+- `254dc1b fix(skills): use configured output_dir in sdd-tasks and align R-07 mode (d) to spec`
+  (2 files, +5/-4). W-01 and W-B both fixed. Apply re-checked all eight R-07 rows against
+  spec.md's (a)–(h): full 1:1 mapping, no gap, no overlap. It also confirmed
+  `sdd-explore/SKILL.md` and `chained-pr/SKILL.md` carry **zero** literal `.archon/graphify`
+  instances, and that the two remaining literals in `skills/graphify/SKILL.md` (lines 16,
+  128) are explicitly parenthesised as `(default ...)` — correct as-is.
+- `03a15fb fix(spec): align R-07 mode (d) example to the spec prose` (orchestrator). Apply
+  flagged that `graphify-integration.feature:104` still read "absent **and** binary is
+  unavailable", contradicting the binding prose in `spec.md:88` ("absent **or** unreadable")
+  and duplicating mode (f). That drift predates the skill fix — it was in the .feature from
+  the spec phase. Fixed so the spec merged into `openspec/specs/` carries ONE definition.
+  `spec.md` itself was not edited; the executable form was brought to it.
+
+**Eight commits on `9ed159c`. Final size: 20 files, 581 insertions / 55 deletions = 636
+changed lines** vs the ~430 estimate. Inside the 800 budget.
+
+## Judge Result — APPROVED
+Report: `openspec/changes/graphify-integration/judge.md`. Both judges voted APPROVE
+independently. 0 CRITICAL, 0 blockers, 0 confirmed issues. Judge re-ran the checks itself:
+`go build`/`go vet` exit 0, all 12 packages `ok`, `gofmt -l` clean on the 12 touched files.
+Judge assessed `skills/graphify/SKILL.md` as unambiguous enough to carry R-07..R-16 alone.
+It found `verify.md` accurate, not overstated.
+
+The two judges' warnings did NOT overlap, which strengthens both as independent catches.
+Orchestrator confirmed both against the files, and elected to FIX them rather than ship them
+as PR warnings — W-01 is a silent-wrong-path functional defect, not a doc nit:
+- **W-01** `skills/sdd-tasks/SKILL.md:169` hardcodes `.archon/graphify/` instead of the
+  configured `graphify.output_dir`. A non-default `output_dir` makes `sdd-tasks` read the
+  wrong path and fall back to heuristics silently. `skills/graphify/SKILL.md` correctly uses
+  `output_dir` in all 4 of its references.
+- **W-B** `skills/graphify/SKILL.md:85` mode (d) says "absent **and** binary unavailable";
+  `spec.md:88` R-07 mode (d) says "absent **or unreadable**". A `graph.json` failing on
+  permissions/IO matches none of the eight rows (mode (e) covers only parse/schema).
+- **Next recommended**: on judge pass → archive as ONE commit (spec merge, folder move,
+  `archon map`, SESSION_STATUS.md move) BEFORE opening the PR
+
+## Verify Result — PASS
+Report: `openspec/changes/graphify-integration/verify.md`. All R-01..R-18 PASS. No defects;
+one cosmetic suggestion (label alignment in `internal/status/display.go`, verbatim from
+design §1, no action). `go build`/`go vet` exit 0, all 12 packages `ok`, `gofmt -l` clean on
+all 12 touched Go files. T-19 and T-20 both executed and marked done in `tasks.md`.
+
+T-20 dry-run record: `which graphify` exit 1, `command -v graphify` exit 1,
+`graphify --version` exit 127, `.archon/graphify` absent — live env is R-07 mode (a).
+Mode (b) (Python/uv absent) is not reproducible here and was covered by doc review.
+Nothing was installed.
+
+Verify judged the `sdd-tasks` read-only guarantee **structurally obvious, not merely
+asserted** — it is encoded in three places (per-phase map row, dedicated §5, Rules bullet).
+
+## Warnings to carry into the PR body
+1. R-07..R-16 have **no automated coverage** — agent-executed skill prose, no Go exec
+   wrapper in this repo (same model as `npx impeccable`). Reviewers must read
+   `skills/graphify/SKILL.md` directly.
+2. The rule-count asymmetry is **intended**: `templates.go` 10 / root `CLAUDE.md` 11 / root
+   `AGENTS.md` 10. It exists because `templates.go` is behind the root docs on
+   archive-before-PR prose. Bringing it current is a scoped-out follow-up — say so in the PR
+   body so it does not read as an inconsistency.
+3. Size: 633 changed lines vs the ~430 estimate (inside the 800 budget).
+
+## Apply Result
+5 commits on top of `9ed159c`: `07dde1e` config · `2f589a3` cli · `71df300` templates ·
+`549955e` docs · `7b670bc` skills. T-01..T-18 all done; T-19/T-20 reserved for verify.
+`go build ./...`, `go test ./...`, `go vet ./...` all clean (orchestrator re-ran the diff
+stat independently).
+
+**Size: 569 insertions / 48 deletions = 617 changed lines** (581 excluding the `tasks.md`
+checkbox bookkeeping) against the approved ~430 estimate — a ~35% overage. Still under the
+800 budget, so no split is required, but it is a real miss worth disclosing in the PR.
+Drivers: `skills/graphify/SKILL.md` at 149 lines, and fuller-than-estimated test additions
+in `cmd/archon/config_test.go` (+72) and `internal/status/display_test.go` (+50).
+
+## Fix-up commit — BOTH defects RESOLVED and independently re-verified
+`797b8a9 fix(templates): correct preflight group count and scope the advisory guard to
+Phase Models` (3 files, +12/-8). Orchestrator confirmed: zero stale `\bsix\b` in
+`CLAUDE.md`/`AGENTS.md`/`templates.go`; `advisory only, never blocking` now appears in all
+three (2/2/3 occurrences); the guard at `templates_test.go` is scoped via the existing
+`phaseModelsBlock` helper with a comment warning against widening it back.
+
+Six commits total on `9ed159c`. Orchestrator re-ran `go build ./...` (rc=0) and
+`go test ./...` — all 12 packages pass. Final size: **19 files, 579 insertions / 54
+deletions = 633 changed lines** vs the ~430 estimate, inside the 800 budget.
+
+- [x] apply defect 1 (six/seven) — fixed in 797b8a9
+- [x] apply defect 2 (over-broad advisory guard) — fixed in 797b8a9
+
+## Orchestrator-found defects (both now fixed — kept for the audit trail)
+1. **`six` vs `seven` inconsistency.** Root `CLAUDE.md:102,104` and
+   `internal/initcmd/templates.go:107,109` still say "ask the six per-group questions" and
+   "all six choices", while the same files now say "Ask each group A–G" / "Ask all seven".
+   `AGENTS.md:86` is already correct. Four edits needed.
+2. **Over-broad pre-existing test guard.** `TestTemplates_ClaudePhaseModelsIsHardGate`
+   (`internal/initcmd/templates_test.go:591`) asserts `!strings.Contains(content,
+   "advisory")` over the WHOLE rendered CLAUDE.md, though its own comment and error message
+   scope the intent to the Phase Models block. Apply worked around it by rewording the
+   template to "informational only", which leaves generated output diverging from the
+   hand-edited root docs (which say "advisory only, never blocking").
+
+## Apply deviations (both judged sound by the orchestrator)
+- **`AGENTS.md` ends at 10 rules, not 11.** Verified: `AGENTS.md` never had the
+  archive-before-PR rule, so it had 9 rules, not 10. Renumbering it on its own terms was
+  correct per HARD CONSTRAINT 2. Its legacy rule-2 wording and fenced preflight format are
+  pre-existing drift, correctly left alone.
+- Commit 4 subject was amended from `docs(dogfood)` to `feat(docs)` before review.
+- `tasks.md` checkbox flips bundled into commit 5 (tracking metadata, not product code).
 
 Tasks gate PASSED (user-approved 2026-08-17). Approved planned scope: ~430 changed lines,
 the 5-commit sequence below, single PR. T-19/T-20 are handed to verify as documented
@@ -103,10 +211,10 @@ follow-ups interact.
 - [x] spec — completed (revision pass 2) 2026-08-17T17:30:00Z
 - [x] design — completed 2026-08-17T17:42:00Z
 - [x] tasks — completed 2026-08-17T17:58:00Z
-- [ ] apply — in_progress 2026-08-17T18:02:00Z
-- [ ] verify
-- [ ] judge
-- [ ] archive
+- [x] apply — completed 2026-08-17T18:30:00Z (incl. fix-up 797b8a9)
+- [x] verify — completed (PASS) 2026-08-17T18:42:00Z
+- [x] judge — completed (APPROVED) 2026-08-17T19:05:00Z
+- [ ] archive — in_progress 2026-08-17T19:18:00Z
 
 ## Artifacts
 - exploration: `openspec/changes/graphify-integration/exploration.md` (294 lines)
@@ -117,7 +225,8 @@ follow-ups interact.
   Orchestrator verified: all of R-01..R-18 present, R-18 citation fixed to `.gitignore`
   line 10, R-14's no-shell prohibition asserted in both spec.md:145 and the .feature:194.
 - design: `openspec/changes/graphify-integration/design.md` (340 lines)
-- tasks: `openspec/changes/graphify-integration/tasks.md` (158 lines, T-01..T-20)
+- tasks: `openspec/changes/graphify-integration/tasks.md` (158 lines, T-01..T-20, all done)
+- verify: `openspec/changes/graphify-integration/verify.md` — PASS
 
 ## Commit plan (single PR, ~430 changed lines)
 - C-1 `feat(config)` — config.go + config_test.go (~76)

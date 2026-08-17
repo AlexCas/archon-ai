@@ -11,6 +11,7 @@ this preamble is authored prose and is preserved across every regeneration. See
 - [[archon-map]] — The `archon-map` capability is a deterministic Go module (`internal/mapgen`) and `archon map` CLI subcommand that regenerates `openspec/map.md` (capabilities index + materialized backlink map), rewrites boundary-crossing relative links on archive, offers a `--check` guard, and supports a one-shot `--backfill` mode for existing archived changes.
 - [[claude-phase-subagents]]
 - [[cli-installer]] — The `archon` CLI bootstraps the SDD harness into any project by extracting 21 embedded gentle-ai skills and scaffolding per-project config, agent instructions, and rollback tracking.
+- [[graphify-integration]] — Opt-in, default-off, advisory *code graph* gate backed by [Graphify](https://github.com/Graphify-Labs/graphify) (Python, tree-sitter AST; edges tagged `EXTRACTED`/`INFERRED`). Adds graph-informed repo comprehension to `sdd-explore` and Leiden-community slice boundaries to `sdd-tasks`. **Never blocks any phase, never returns a verdict.**
 - [[harness-commits]] — Ensure commits created through the harness are attributed only to the user.
 - [[harness-init]] — Bootstrap the harness in a project regardless of pre-existing agent folders, protect hand-written orchestrator files, and configure web testing and models at init time.
 - [[harness-judge]]
@@ -44,6 +45,8 @@ this preamble is authored prose and is preserved across every regeneration. See
 | [opencode-phase-subagents](changes/opencode-phase-subagents/proposal.md) | design | in_progress |
 
 ## Archive
+### 2026-08-17
+- [graphify-integration](changes/archive/2026-08-17-graphify-integration/proposal.md)
 ### 2026-08-01
 - [stacked-pr-archive](changes/archive/2026-08-01-stacked-pr-archive/proposal.md)
 ### 2026-07-31
@@ -87,6 +90,7 @@ this preamble is authored prose and is preserved across every regeneration. See
 
 ## Backlinks
 - [[archon-map]] ← obsidian-vault-specs
+- [[graphify-integration]] ← graphify-integration
 - [[harness-judge]] ← chained-pr-archive
 - [[harness-workflow]] ← archive-before-pr, chained-pr-archive, obsidian-vault-specs, stacked-pr-archive
 - [[openspec-convention]] ← obsidian-vault-specs
