@@ -1,4 +1,4 @@
-phase: judge
+phase: archive
 status: completed
 history:
   - {phase: explore, status: in_progress, ts: "2026-08-01T00:00:00Z"}
@@ -17,3 +17,7 @@ history:
   - {phase: verify, status: completed, ts: "2026-08-02T06:00:00Z"}
   - {phase: judge, status: in_progress, ts: "2026-08-02T06:01:00Z"}
   - {phase: judge, status: completed, ts: "2026-08-02T06:30:00Z"}
+  - {phase: judge-integrated, status: in_progress, ts: "2026-08-21T00:00:00Z"}
+  - {phase: judge-integrated, status: completed, ts: "2026-08-21T00:30:00Z"}
+  - {phase: archive, status: in_progress, ts: "2026-08-21T00:30:00Z"}
+  - {phase: archive, status: completed, ts: "2026-08-22T00:00:00Z"}
