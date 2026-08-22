@@ -193,33 +193,35 @@ func TestTemplates_ContainSDDSessionPreflight(t *testing.T) {
 }
 
 func TestTemplates_FiveRules(t *testing.T) {
-	// Rules shared across both harnesses (rules 1, 3-10).
+	// Rules shared across both harnesses (rules 1, 2, 4-11). Rule 3 is
+	// per-harness (see rule3Want below).
 	sharedRules := []string{
 		"1. Check harness-workflow before any phase transition",
-		"3. Write/update SESSION_STATUS.md at the root on every phase transition",
-		"4. After every phase that produces an editable artifact, run the Human Review Gate",
-		"5. After verify, invoke harness-judge",
-		"6. When playwright.enabled, run the generated Playwright tests after verify and judge pass",
-		"7. When impeccable.enabled, run Impeccable subcommands during apply and the detection gate after judge passes",
-		"8. When graphify.enabled, sdd-explore consults the code graph",
-		"9. On judge fail: re-apply with feedback (max 3 retries)",
-		"10. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution",
+		"2. Before delegating a phase, run `archon route '<message>'` and use its resolved phase; invoke the model classifier (`skills/sdd-router`) when output is `CLASSIFY`; surface ASK to the user",
+		"4. Write/update SESSION_STATUS.md at the root on every phase transition",
+		"5. After every phase that produces an editable artifact, run the Human Review Gate",
+		"6. After verify, invoke harness-judge",
+		"7. When playwright.enabled, run the generated Playwright tests after verify and judge pass",
+		"8. When impeccable.enabled, run Impeccable subcommands during apply and the detection gate after judge passes",
+		"9. When graphify.enabled, sdd-explore consults the code graph",
+		"10. On judge fail: re-apply with feedback (max 3 retries)",
+		"11. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution",
 	}
 
 	tests := []struct {
 		name      string
 		render    func(TemplateData) (string, error)
-		rule2Want string
+		rule3Want string
 	}{
 		{
 			name:      "AGENTS.md",
 			render:    RenderAgentsMD,
-			rule2Want: "2. You MUST delegate each phase by invoking its `archon-<phase>` subagent via your delegation tool — never execute the phase inline on your own model",
+			rule3Want: "3. You MUST delegate each phase by invoking its `archon-<phase>` subagent via your delegation tool — never execute the phase inline on your own model",
 		},
 		{
 			name:      "CLAUDE.md",
 			render:    RenderClaudeMD,
-			rule2Want: "2. You MUST delegate each phase by invoking its `archon-<phase>` subagent via your delegation tool — never execute the phase inline on your own model; do not pass a per-call model parameter",
+			rule3Want: "3. You MUST delegate each phase by invoking its `archon-<phase>` subagent via your delegation tool — never execute the phase inline on your own model; do not pass a per-call model parameter",
 		},
 	}
 
@@ -242,14 +244,60 @@ func TestTemplates_FiveRules(t *testing.T) {
 				}
 			}
 
-			// Check the per-harness Rule 2 wording.
-			if !strings.Contains(content, tt.rule2Want) {
-				t.Errorf("%s missing rule 2 %q", tt.name, tt.rule2Want)
+			// Check the per-harness Rule 3 (delegate) wording.
+			if !strings.Contains(content, tt.rule3Want) {
+				t.Errorf("%s missing rule 3 %q", tt.name, tt.rule3Want)
 			}
 
-			// Ensure there is no rule 11 (exactly 10 rules).
-			if strings.Contains(content, "11. ") {
-				t.Errorf("%s should have exactly 10 rules, found rule 11", tt.name)
+			// Ensure there is no rule 12 (exactly 11 rules).
+			if strings.Contains(content, "12. ") {
+				t.Errorf("%s should have exactly 11 rules, found rule 12", tt.name)
+			}
+		})
+	}
+}
+
+// Slice B (local-model-router): the routing rule (archon route) must precede
+// the harness-workflow delegation rule in both rendered orchestrator docs.
+func TestTemplates_ArchonRouteInstructionPrecedesDelegateRule(t *testing.T) {
+	data := TemplateData{
+		Agent:          "opencode",
+		HarnessVersion: "1.0.0",
+		SkillCount:     10,
+	}
+
+	tests := []struct {
+		name   string
+		render func(TemplateData) (string, error)
+	}{
+		{"AGENTS.md", RenderAgentsMD},
+		{"CLAUDE.md", RenderClaudeMD},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			content, err := tt.render(data)
+			if err != nil {
+				t.Fatalf("render error = %v", err)
+			}
+
+			if !strings.Contains(content, "archon route") {
+				t.Fatalf("%s does not contain \"archon route\"", tt.name)
+			}
+
+			routeIdx := strings.Index(content, "archon route")
+			delegateIdx := strings.Index(content, "You MUST delegate each phase by invoking its `archon-<phase>` subagent")
+			if delegateIdx == -1 {
+				t.Fatalf("%s missing the harness-workflow delegation rule", tt.name)
+			}
+			if routeIdx >= delegateIdx {
+				t.Errorf("%s: routing rule (archon route) must precede the delegation rule; got routeIdx=%d delegateIdx=%d", tt.name, routeIdx, delegateIdx)
+			}
+
+			// The routing rule must also be downstream of the harness-workflow gate rule (rule 1).
+			gateIdx := strings.Index(content, "Check harness-workflow before any phase transition")
+			if gateIdx == -1 || gateIdx >= routeIdx {
+				t.Errorf("%s: routing rule must appear after the harness-workflow gate rule", tt.name)
 			}
 		})
 	}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -13,6 +14,7 @@ import (
 	"github.com/archon-ai/archon/internal/config"
 	"github.com/archon-ai/archon/internal/initcmd"
 	"github.com/archon-ai/archon/internal/mapgen"
+	"github.com/archon-ai/archon/internal/route"
 	"github.com/archon-ai/archon/internal/scaffold"
 	"github.com/archon-ai/archon/internal/status"
 	"github.com/archon-ai/archon/internal/tui"
@@ -49,6 +51,7 @@ func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 		newConfigCmd(stdout, stderr),
 		newTuiCmd(stdout, stderr),
 		newMapCmd(stdout, stderr),
+		newRouteCmd(stdout, stderr),
 	)
 
 	return root
@@ -480,6 +483,64 @@ func newMapCmd(stdout, stderr io.Writer) *cobra.Command {
 
 	cmd.Flags().BoolVar(&checkFlag, "check", false, "Check map.md and links for staleness without writing")
 	cmd.Flags().BoolVar(&backfillFlag, "backfill", false, "Rewrite boundary-crossing links in archived changes and regenerate map.md")
+
+	return cmd
+}
+
+// newRouteCmd resolves which SDD phase a natural-language message targets:
+// the deterministic code pre-router (internal/route). It NEVER executes a
+// phase, NEVER writes state, and NEVER invokes an LLM — it emits JSON on
+// stdout (the machine-readable contract) plus a human echo line on stderr.
+func newRouteCmd(stdout, stderr io.Writer) *cobra.Command {
+	var (
+		changeFlag string
+		phaseFlag  string
+		statusFlag string
+		jsonFlag   bool
+	)
+
+	cmd := &cobra.Command{
+		Use:   "route \"<message>\"",
+		Short: "Resolve which SDD phase a natural-language message targets",
+		Long:  "Deterministic code pre-router: applies explicit-agent, control, implicit, dual-action (D3), and keyword rules against MSG plus discovered/overridden state, emitting {phase,rule,path,active_change} JSON on stdout and a human echo line on stderr. Falls through to \"CLASSIFY\" when no code rule fires.",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			projectDir, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("get working directory: %w", err)
+			}
+
+			activeChange := route.ActiveChange(projectDir, changeFlag)
+
+			phase, status := route.ReadState(projectDir, activeChange)
+			if phaseFlag != "" {
+				phase = phaseFlag
+			}
+			if statusFlag != "" {
+				status = statusFlag
+			}
+
+			result := route.Resolve(route.Input{
+				Message:      args[0],
+				Phase:        phase,
+				Status:       status,
+				ActiveChange: activeChange,
+			})
+
+			out, err := json.Marshal(result)
+			if err != nil {
+				return fmt.Errorf("marshal route result: %w", err)
+			}
+			fmt.Fprintln(stdout, string(out))
+			fmt.Fprintf(stderr, "→ Router: archon-%s  (rule: %s, active-change: %s)\n", result.Phase, result.Rule, result.ActiveChange)
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&changeFlag, "change", "", "Override active-change discovery")
+	cmd.Flags().StringVar(&phaseFlag, "phase", "", "Override the discovered current phase (testability)")
+	cmd.Flags().StringVar(&statusFlag, "status", "", "Override the discovered current status (testability)")
+	cmd.Flags().BoolVar(&jsonFlag, "json", true, "Emit JSON to stdout (always on; flag is a no-op kept for CLI-contract compatibility)")
 
 	return cmd
 }
