@@ -398,7 +398,7 @@ func TestTemplates_AgentsAndClaudeSharedSections(t *testing.T) {
 
 	// Templates must differ in their Rule 2 wording (by design).
 	if agents == claude {
-		t.Error("agentsTemplate and claudeTemplate are identical — per-harness Rule 2 divergence is missing")
+		t.Error("agentsTemplate and claudeTemplate are identical — per-harness Rule 3 divergence is missing")
 	}
 }
 
