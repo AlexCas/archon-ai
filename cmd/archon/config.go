@@ -266,6 +266,33 @@ func setConfigValue(cfg *config.Config, key, value string) error {
 	case "impeccable.design_path":
 		cfg.Impeccable.DesignPath = value
 		return nil
+	case "graphify.enabled":
+		b, err := parseBool(key, value)
+		if err != nil {
+			return err
+		}
+		cfg.Graphify.Enabled = b
+		return nil
+	case "graphify.auto_install":
+		b, err := parseBool(key, value)
+		if err != nil {
+			return err
+		}
+		cfg.Graphify.AutoInstall = b
+		return nil
+	case "graphify.version":
+		cfg.Graphify.Version = value
+		return nil
+	case "graphify.output_dir":
+		cfg.Graphify.OutputDir = value
+		return nil
+	case "graphify.semantic":
+		b, err := parseBool(key, value)
+		if err != nil {
+			return err
+		}
+		cfg.Graphify.Semantic = b
+		return nil
 	default:
 		if strings.HasPrefix(key, "models.phases.") {
 			rest := strings.TrimPrefix(key, "models.phases.")
@@ -294,7 +321,7 @@ func setConfigValue(cfg *config.Config, key, value string) error {
 			cfg.Models.Phases[phase] = ref
 			return nil
 		}
-		return fmt.Errorf("unknown config key %q (supported: models.default, models.default.base_url, models.leader, models.leader.base_url, models.phases.<phase>, models.phases.<phase>.base_url, playwright.enabled, playwright.test_dir, playwright.base_url, mutation_testing.enabled, security.enabled, security.profile, impeccable.enabled, impeccable.auto_install, impeccable.severity, impeccable.product_path, impeccable.design_path)", key)
+		return fmt.Errorf("unknown config key %q (supported: models.default, models.default.base_url, models.leader, models.leader.base_url, models.phases.<phase>, models.phases.<phase>.base_url, playwright.enabled, playwright.test_dir, playwright.base_url, mutation_testing.enabled, security.enabled, security.profile, impeccable.enabled, impeccable.auto_install, impeccable.severity, impeccable.product_path, impeccable.design_path, graphify.enabled, graphify.auto_install, graphify.version, graphify.output_dir, graphify.semantic)", key)
 	}
 }
 
@@ -330,6 +357,16 @@ func getConfigValue(cfg *config.Config, key string) (string, error) {
 		return cfg.Impeccable.ProductPath, nil
 	case "impeccable.design_path":
 		return cfg.Impeccable.DesignPath, nil
+	case "graphify.enabled":
+		return strconv.FormatBool(cfg.Graphify.Enabled), nil
+	case "graphify.auto_install":
+		return strconv.FormatBool(cfg.Graphify.AutoInstall), nil
+	case "graphify.version":
+		return cfg.Graphify.Version, nil
+	case "graphify.output_dir":
+		return cfg.Graphify.OutputDir, nil
+	case "graphify.semantic":
+		return strconv.FormatBool(cfg.Graphify.Semantic), nil
 	default:
 		if strings.HasPrefix(key, "models.phases.") {
 			rest := strings.TrimPrefix(key, "models.phases.")
@@ -345,6 +382,6 @@ func getConfigValue(cfg *config.Config, key string) (string, error) {
 			}
 			return cfg.Models.Phases[phase].FullID(), nil
 		}
-		return "", fmt.Errorf("unknown config key %q (supported: models.default, models.default.base_url, models.leader, models.leader.base_url, models.phases.<phase>, models.phases.<phase>.base_url, playwright.enabled, playwright.test_dir, playwright.base_url, mutation_testing.enabled, security.enabled, security.profile, impeccable.enabled, impeccable.auto_install, impeccable.severity, impeccable.product_path, impeccable.design_path)", key)
+		return "", fmt.Errorf("unknown config key %q (supported: models.default, models.default.base_url, models.leader, models.leader.base_url, models.phases.<phase>, models.phases.<phase>.base_url, playwright.enabled, playwright.test_dir, playwright.base_url, mutation_testing.enabled, security.enabled, security.profile, impeccable.enabled, impeccable.auto_install, impeccable.severity, impeccable.product_path, impeccable.design_path, graphify.enabled, graphify.auto_install, graphify.version, graphify.output_dir, graphify.semantic)", key)
 	}
 }

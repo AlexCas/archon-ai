@@ -164,6 +164,16 @@ If the estimate is **High** or likely above 400 lines:
    - `single-pr`: `Yes` — orchestrator must require `size:exception` before apply.
    - `exception-ok`: `No` — maintainer has accepted `size:exception`.
 
+**Graphify community input (conditional):** When `graphify.enabled: true`,
+read Leiden community data from `graph.json`/`GRAPH_REPORT.md` in the
+configured `graphify.output_dir` (default `.archon/graphify/`) — **read-only
+file access, never shell any `graphify` command**, even if the binary is
+present and `graph.json` is absent;
+`sdd-explore` is the sole extraction site (see `skills/graphify/SKILL.md`).
+Community boundaries MAY inform the Suggested Work Units table below.
+Missing or unreadable community data falls back to the heuristic
+slice-boundary estimate above — no change to task behavior.
+
 ### Archive-before-PR Convergence Gate (MANDATORY)
 
 This gate is **UNCONDITIONAL**: it applies whenever a chain strategy is being
@@ -308,6 +318,11 @@ Return to the orchestrator:
   `sdd-apply` to run the relevant `/impeccable <verb>` slash commands (see
   `skills/impeccable/SKILL.md`). When `impeccable.enabled` is false, or the change
   has no frontend files, omit this task entirely.
+- **Graphify community input (conditional)**: If `graphify.enabled` is true, read
+  Leiden community data from `graph.json`/`GRAPH_REPORT.md` (read-only file
+  access — NEVER shell any `graphify` command) to inform Suggested Work Units.
+  Missing or unreadable community data falls back to heuristic slice
+  boundaries; no change to task behavior.
 - Each task should be completable in ONE session (if a task feels too big, split it)
 - Use hierarchical numbering: 1.1, 1.2, 2.1, 2.2, etc.
 - NEVER include vague tasks like "implement feature" or "add tests"

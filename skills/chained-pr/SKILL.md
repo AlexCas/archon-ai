@@ -53,7 +53,9 @@ Load this skill when a planned PR may exceed **400 changed lines**, SDD forecast
 
 ## Execution Steps
 
-1. Estimate changed lines and identify independent work units.
+1. Estimate changed lines and identify independent work units. When
+   `graphify.enabled` and Leiden community data is present in `graph.json`,
+   it MAY inform work-unit identification — advisory only, never required.
 2. Ask for a chain strategy when none is cached and the budget is exceeded.
 3. Create branches/PRs using the chosen strategy only.
 4. Add Chain Context to each PR without replacing the repo PR template.

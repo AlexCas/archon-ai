@@ -26,6 +26,7 @@ func TestFS_ContainsSkills(t *testing.T) {
 		"sdd-archive",
 		"judgment-day",
 		"branch-pr",
+		"graphify",
 	}
 
 	foundSkills := make(map[string]bool)

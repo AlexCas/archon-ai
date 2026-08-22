@@ -57,6 +57,27 @@ type Impeccable struct {
 	DesignPath  string `yaml:"design_path,omitempty"`
 }
 
+// Graphify controls the opt-in, advisory code-graph gate backed by the external
+// Python tool `graphify` (tree-sitter AST). Advisory only — never blocks a phase,
+// never returns a verdict, so there is no severity and no Load() validation.
+// Defaults to disabled (Enabled:false) when the block is absent.
+type Graphify struct {
+	Enabled     bool   `yaml:"enabled"`
+	AutoInstall bool   `yaml:"auto_install"`
+	Version     string `yaml:"version"`
+	OutputDir   string `yaml:"output_dir"`
+	Semantic    bool   `yaml:"semantic"`
+}
+
+// DefaultGraphifyVersion and DefaultGraphifyOutputDir are pre-seeded in Load()
+// before yaml.Unmarshal so an absent graphify block still yields these
+// defaults, mirroring the Judge.Enabled pre-seed. This is defaulting, not
+// validation — Graphify has no Load()-time validation.
+const (
+	DefaultGraphifyVersion   = "v0.9.45"
+	DefaultGraphifyOutputDir = ".archon/graphify"
+)
+
 // ValidImpeccableSeverities is the fixed set of allowed impeccable.severity values.
 var ValidImpeccableSeverities = []string{"block-deterministic", "block-all", "advisory"}
 
@@ -88,6 +109,7 @@ type Config struct {
 	Playwright      Playwright       `yaml:"playwright"`
 	Security        Security         `yaml:"security"`
 	Impeccable      Impeccable       `yaml:"impeccable"`
+	Graphify        Graphify         `yaml:"graphify"`
 	Models          ModelConfig      `yaml:"models,omitempty"`
 	SkillInventory  []SkillInventory `yaml:"skill_inventory"`
 	HomeDir         string           `yaml:"-"`
@@ -107,6 +129,12 @@ func (c *Config) Load(fsys fs.FS) error {
 	// Pre-seed the default so unmarshal only overrides it when the YAML sets it
 	// explicitly (e.g. `judge: {enabled: false}`).
 	c.Judge.Enabled = true
+
+	// Graphify's version/output_dir default when the block is absent or omits
+	// them; an explicit YAML value overrides these after Unmarshal. This is
+	// defaulting, not validation — there is no blocking verdict to validate.
+	c.Graphify.Version = DefaultGraphifyVersion
+	c.Graphify.OutputDir = DefaultGraphifyOutputDir
 
 	if err := yaml.Unmarshal(data, c); err != nil {
 		return fmt.Errorf("unmarshal config: %w", err)
@@ -145,6 +173,7 @@ func (c *Config) Clone() *Config {
 		Playwright:      c.Playwright,
 		Security:        c.Security,
 		Impeccable:      c.Impeccable, // value copy — no maps/slices inside
+		Graphify:        c.Graphify,   // value copy — no maps/slices inside
 		Models:          ModelConfig{Default: c.Models.Default, Leader: c.Models.Leader, Phases: make(map[string]ModelRef, len(c.Models.Phases))},
 		SkillInventory:  make([]SkillInventory, len(c.SkillInventory)),
 	}

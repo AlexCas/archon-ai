@@ -364,6 +364,78 @@ func TestConfigCmd_ImpeccableSetGet(t *testing.T) {
 	}
 }
 
+// TestConfigCmd_GraphifySetGet asserts set/get roundtrip for all five
+// graphify.* keys (mirror TestConfigCmd_ImpeccableSetGet).
+func TestConfigCmd_GraphifySetGet(t *testing.T) {
+	tmpDir := setupProjectWithConfig(t)
+	origDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	cases := []struct {
+		key   string
+		value string
+	}{
+		{"graphify.enabled", "true"},
+		{"graphify.auto_install", "true"},
+		{"graphify.version", "v0.9.45"},
+		{"graphify.output_dir", ".archon/graphify"},
+		{"graphify.semantic", "true"},
+	}
+
+	for _, c := range cases {
+		var setOut, setErr bytes.Buffer
+		setCmd := newRootCmd(&setOut, &setErr)
+		setCmd.SetArgs([]string{"config", "set", c.key, c.value})
+		if err := setCmd.Execute(); err != nil {
+			t.Fatalf("set %s Execute() error = %v, stderr = %s", c.key, err, setErr.String())
+		}
+
+		var getOut, getErr bytes.Buffer
+		getCmd := newRootCmd(&getOut, &getErr)
+		getCmd.SetArgs([]string{"config", "get", c.key})
+		if err := getCmd.Execute(); err != nil {
+			t.Fatalf("get %s Execute() error = %v, stderr = %s", c.key, err, getErr.String())
+		}
+
+		if got := strings.TrimSpace(getOut.String()); got != c.value {
+			t.Errorf("%s = %q, want %q", c.key, got, c.value)
+		}
+	}
+}
+
+// TestConfigCmd_UnknownKeyListsGraphifyKeys asserts that an unknown
+// graphify.* key produces an error whose message lists all five supported
+// graphify.* keys (mirror TestConfigCmd_UnknownKeyListsImpeccableKeys).
+func TestConfigCmd_UnknownKeyListsGraphifyKeys(t *testing.T) {
+	tmpDir := setupProjectWithConfig(t)
+	origDir, _ := os.Getwd()
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	var stdout, stderr bytes.Buffer
+	root := newRootCmd(&stdout, &stderr)
+	root.SetArgs([]string{"config", "set", "graphify.severity", "block"})
+
+	err := root.Execute()
+	if err == nil {
+		t.Fatal("expected error for graphify.severity, got none")
+	}
+
+	wantKeys := []string{
+		"graphify.enabled",
+		"graphify.auto_install",
+		"graphify.version",
+		"graphify.output_dir",
+		"graphify.semantic",
+	}
+	for _, k := range wantKeys {
+		if !strings.Contains(err.Error(), k) {
+			t.Errorf("error = %q, want contains %q", err.Error(), k)
+		}
+	}
+}
+
 // TestConfigCmd_ImpeccableSeverityInvalid asserts `config set
 // impeccable.severity invalid` exits non-zero and names the value plus the
 // three valid options.

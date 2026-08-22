@@ -55,10 +55,10 @@ Required choices:
 
 **Preflight questions (Spanish, arrow-key):**
 
-Ask each group A–F as its OWN separate arrow-key §AskUserQuestion§ — never a single
+Ask each group A–G as its OWN separate arrow-key §AskUserQuestion§ — never a single
 text block, never answer codes like "A1"/"B1", never a global "usar recomendado"
 shortcut. Pre-select the recommended option as the default in each question. Ask all
-six every SDD session.
+seven every SDD session.
 
 - **A. Ritmo** — "¿Qué ritmo quieres para las fases?"
   - Interactivo (recomendado): mostrar cada fase y esperar confirmación antes de continuar.
@@ -83,6 +83,9 @@ six every SDD session.
 - **F. Impeccable (Diseño de interfaz)** — "¿Activar Impeccable para calidad visual?"
   - No (recomendado): no correr verificaciones de diseño.
   - Sí: activar el gate de Impeccable tras verify/judge cuando esté habilitado.
+- **G. Graphify (Grafo de código)** — "¿Activar Graphify para análisis de grafo de código?"
+  - No (recomendado): no extraer ni consultar el grafo de código.
+  - Sí: extraer el grafo de código en sdd-explore y usar comunidades Leiden para sugerir límites de slices en sdd-tasks.
 
 **Project type & web testing (group E):**
 - Group E maps to §playwright.enabled§ in §.archon/config.yaml§. The §--playwright§ flag at init time or the Playwright tab in §archon tui§ set the same value. When enabled, the harness generates Playwright specs from Gherkin scenarios and runs them after the verify and judge phases.
@@ -93,11 +96,17 @@ six every SDD session.
   enabled, the harness invokes Impeccable subcommands during apply and runs the
   detection gate after the judge phase.
 
+**Project type & code-graph gate (group G):**
+- Group G maps to §graphify.enabled§ in §.archon/config.yaml§. The §--graphify§
+  flag at init time sets the same value. When enabled, sdd-explore consults the
+  Graphify code graph for repo comprehension and sdd-tasks reads Leiden
+  communities to inform slice boundaries — advisory only, never blocking.
+
 **Hard gate rules:**
 - §openspec/config.yaml§, existing SDD artifacts, or previous §sdd-init§ results do NOT satisfy this preflight.
-- If the session has no preflight decision, ask the six per-group questions above and **STOP**. Do not run init, delegate phases, or apply tasks in the same turn.
+- If the session has no preflight decision, ask the seven per-group questions above and **STOP**. Do not run init, delegate phases, or apply tasks in the same turn.
 - Cache the choices for this session and echo them into later phase prompts.
-- If the user explicitly provided all six choices in the current conversation, summarize them as the session preflight block and continue.
+- If the user explicitly provided all seven choices in the current conversation, summarize them as the session preflight block and continue.
 
 ## Vague Request Guard (MANDATORY)
 
@@ -183,8 +192,9 @@ const orchestratorRulesClaude = `## Rules
 5. After verify, invoke harness-judge
 6. When playwright.enabled, run the generated Playwright tests after verify and judge pass
 7. When impeccable.enabled, run Impeccable subcommands during apply and the detection gate after judge passes
-8. On judge fail: re-apply with feedback (max 3 retries)
-9. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution
+8. When graphify.enabled, sdd-explore consults the code graph and sdd-tasks reads Leiden communities to inform slice boundaries — advisory only, never blocking (no verdict)
+9. On judge fail: re-apply with feedback (max 3 retries)
+10. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution
 `
 
 // orchestratorRulesOpencode is the Rules block for the opencode harness.
@@ -197,8 +207,9 @@ const orchestratorRulesOpencode = `## Rules
 5. After verify, invoke harness-judge
 6. When playwright.enabled, run the generated Playwright tests after verify and judge pass
 7. When impeccable.enabled, run Impeccable subcommands during apply and the detection gate after judge passes
-8. On judge fail: re-apply with feedback (max 3 retries)
-9. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution
+8. When graphify.enabled, sdd-explore consults the code graph and sdd-tasks reads Leiden communities to inform slice boundaries — advisory only, never blocking (no verdict)
+9. On judge fail: re-apply with feedback (max 3 retries)
+10. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution
 `
 
 // phaseModelsClaude is the Phase Models block for CLAUDE.md. The archon-<phase>

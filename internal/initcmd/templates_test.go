@@ -148,6 +148,13 @@ func TestTemplates_ContainSDDSessionPreflight(t *testing.T) {
 				"E. Pruebas web (Playwright)",
 				"F. Impeccable (Diseño de interfaz)",
 				"Group F maps to `impeccable.enabled`",
+				"G. Graphify (Grafo de código)",
+				"¿Activar Graphify",
+				"Group G maps to",
+				"graphify.enabled",
+				"--graphify",
+				"seven",
+				"A–G",
 				"Interactivo (recomendado)",
 				"OpenSpec (recomendado)",
 				"Preguntarme (recomendado)",
@@ -186,7 +193,7 @@ func TestTemplates_ContainSDDSessionPreflight(t *testing.T) {
 }
 
 func TestTemplates_FiveRules(t *testing.T) {
-	// Rules shared across both harnesses (rules 1, 3-9).
+	// Rules shared across both harnesses (rules 1, 3-10).
 	sharedRules := []string{
 		"1. Check harness-workflow before any phase transition",
 		"3. Write/update SESSION_STATUS.md at the root on every phase transition",
@@ -194,8 +201,9 @@ func TestTemplates_FiveRules(t *testing.T) {
 		"5. After verify, invoke harness-judge",
 		"6. When playwright.enabled, run the generated Playwright tests after verify and judge pass",
 		"7. When impeccable.enabled, run Impeccable subcommands during apply and the detection gate after judge passes",
-		"8. On judge fail: re-apply with feedback (max 3 retries)",
-		"9. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution",
+		"8. When graphify.enabled, sdd-explore consults the code graph",
+		"9. On judge fail: re-apply with feedback (max 3 retries)",
+		"10. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution",
 	}
 
 	tests := []struct {
@@ -239,9 +247,9 @@ func TestTemplates_FiveRules(t *testing.T) {
 				t.Errorf("%s missing rule 2 %q", tt.name, tt.rule2Want)
 			}
 
-			// Ensure there is no rule 10 (exactly 9 rules).
-			if strings.Contains(content, "10. ") {
-				t.Errorf("%s should have exactly 9 rules, found rule 10", tt.name)
+			// Ensure there is no rule 11 (exactly 10 rules).
+			if strings.Contains(content, "11. ") {
+				t.Errorf("%s should have exactly 10 rules, found rule 11", tt.name)
 			}
 		})
 	}
@@ -579,8 +587,12 @@ func TestTemplates_ClaudePhaseModelsIsHardGate(t *testing.T) {
 		t.Error("CLAUDE.md Phase Models block does not name archon-<phase> subagents")
 	}
 
-	// Must not call model selection "advisory".
-	if strings.Contains(content, "advisory") {
+	// Must not call model selection "advisory". Scoped to the Phase Models
+	// section only (not a whole-document scan) — "advisory" may legitimately
+	// appear elsewhere in the document describing an unrelated, genuinely
+	// advisory gate (e.g. graphify). Do not widen this back to
+	// strings.Contains(content, "advisory") over the full render.
+	if strings.Contains(phaseModelsBlock(t, content), "advisory") {
 		t.Error("CLAUDE.md Phase Models block must not use the word \"advisory\"")
 	}
 
