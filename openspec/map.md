@@ -19,6 +19,7 @@ this preamble is authored prose and is preserved across every regeneration. See
 - [[harness-testing]] — Author use cases as formal Gherkin, detect web projects, and generate/execute Playwright E2E tests from those use cases when enabled.
 - [[harness-update]] — Provide a safe, version-aware `archon update` that refreshes installed skills from the embedded set without rewriting the orchestrator template or resetting user config.
 - [[harness-workflow]] — The `harness-workflow` meta-skill enforces the SDD phase sequence (explore → propose → spec → design → tasks → apply → verify → judge → archive) by reading change state and blocking invalid transitions.
+- [[local-model-router]] — Specify the behavior of the hybrid phase-dispatch router: a deterministic code pre-router (`archon route`) plus a model classifier (`skills/sdd-router/SKILL.md`) that together resolve which SDD phase to target from a natural-language user message. This spec is the contract the verify phase tests against.
 - [[model-effort-variants]] — Let users pick an effort/reasoning level for reasoning-capable models in the TUI Models picker, persist it on `config.ModelRef.Effort`, and write it to `opencode.json` as the per-agent `variant` field — without any opencode plugin, variants cache, or embedded-asset subsystem (availability is derived from the existing `opencode.Model.Reasoning` flag).
 - [[model-ref]] — Define a structured `provider + model` representation (`ModelRef`) that replaces flat model strings in `config.ModelConfig`, with a `FullID()` accessor and back-compatible YAML (un)marshalling so existing flat-string `config.yaml` files load and re-save byte-identical until the user re-picks a model.
 - [[opencode-model-cache]] — Define a structured reader for opencode's provider-keyed cache (`~/.cache/opencode/models.json`) that preserves the provider, degrades gracefully when the cache is absent, and serves as the primary catalog source in `ResolveModels` with the existing `opencode models` shell-out retained as a fallback (PR #45 preserved, not reverted).
@@ -42,10 +43,11 @@ this preamble is authored prose and is preserved across every regeneration. See
 |--------|-------|--------|
 | [ai-orchestration-harness](changes/ai-orchestration-harness/proposal.md) |  |  |
 | [issue-16-leader-personality](changes/issue-16-leader-personality/proposal.md) |  |  |
-| [local-model-router](changes/local-model-router/proposal.md) | verify | in_progress |
 | [opencode-phase-subagents](changes/opencode-phase-subagents/proposal.md) | design | in_progress |
 
 ## Archive
+### 2026-08-22
+- [local-model-router](changes/archive/2026-08-22-local-model-router/proposal.md)
 ### 2026-08-17
 - [graphify-integration](changes/archive/2026-08-17-graphify-integration/proposal.md)
 ### 2026-08-01
@@ -91,9 +93,10 @@ this preamble is authored prose and is preserved across every regeneration. See
 
 ## Backlinks
 - [[archon-map]] ← obsidian-vault-specs
-- [[graphify-integration]] ← graphify-integration
+- [[graphify-integration]] ← graphify-integration, local-model-router
 - [[harness-judge]] ← chained-pr-archive
 - [[harness-workflow]] ← archive-before-pr, chained-pr-archive, obsidian-vault-specs, stacked-pr-archive
+- [[local-model-router]] ← local-model-router
 - [[openspec-convention]] ← obsidian-vault-specs
 - [[sdd-archive]] ← obsidian-vault-specs
 - [[sdd-init]] ← obsidian-vault-specs
