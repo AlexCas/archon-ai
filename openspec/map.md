@@ -46,6 +46,8 @@ this preamble is authored prose and is preserved across every regeneration. See
 | [opencode-phase-subagents](changes/opencode-phase-subagents/proposal.md) | design | in_progress |
 
 ## Archive
+### 2026-08-26
+- [graphify-tui-tab](changes/archive/2026-08-26-graphify-tui-tab/proposal.md)
 ### 2026-08-22
 - [local-model-router](changes/archive/2026-08-22-local-model-router/proposal.md)
 ### 2026-08-17
@@ -93,7 +95,7 @@ this preamble is authored prose and is preserved across every regeneration. See
 
 ## Backlinks
 - [[archon-map]] ← obsidian-vault-specs
-- [[graphify-integration]] ← graphify-integration, local-model-router
+- [[graphify-integration]] ← graphify-integration, graphify-tui-tab, local-model-router
 - [[harness-judge]] ← chained-pr-archive
 - [[harness-workflow]] ← archive-before-pr, chained-pr-archive, obsidian-vault-specs, stacked-pr-archive
 - [[local-model-router]] ← local-model-router

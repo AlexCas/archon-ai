@@ -93,7 +93,7 @@ seven every SDD session.
 
 **Project type & code-graph gate (group G):**
 - Group G maps to `graphify.enabled` in `.archon/config.yaml`. The `--graphify`
-  flag at init time sets the same value. When enabled, sdd-explore consults the
+  flag at init time or the Graphify tab in `archon tui` set the same value. When enabled, sdd-explore consults the
   Graphify code graph for repo comprehension and sdd-tasks reads Leiden
   communities to inform slice boundaries — advisory only, never blocking.
 
