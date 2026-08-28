@@ -1,7 +1,5 @@
 # local-model-router Specification
 
-<!-- proposal: [proposal](../../proposal.md) | exploration: [exploration](../../exploration.md) -->
-
 ## Purpose
 
 Specify the behavior of the hybrid phase-dispatch router: a deterministic code

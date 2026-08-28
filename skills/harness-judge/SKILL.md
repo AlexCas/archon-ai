@@ -28,6 +28,17 @@ The FIRST action on activation is to read the judge flag (Step 0). If the judge 
 - Playwright E2E is OPT-IN and runs only for web projects. ALWAYS read `.archon/config.yaml` → `playwright.enabled` to decide whether to run it. Default: `false`. Skip entirely when disabled. These tests run AFTER verify and after `judgment-day` passes.
 - The Impeccable detection gate is OPT-IN. ALWAYS read `.archon/config.yaml` → `impeccable.enabled` to decide whether to run it. Default: `false`. Skip entirely when disabled — no invocation, no "### Impeccable Gate" section, no result-table column. When enabled, it runs `npx impeccable detect --json .` AFTER `judgment-day` passes, parses the JSON payload for pass/fail (never relying on exit code alone), and applies `impeccable.severity` to decide whether deterministic violations or LLM-critique findings block the gate.
 - Security gate is OPT-IN. Read `.archon/config.yaml` → `security.enabled`. Default: `false`. When `security.enabled` is true, treat any unresolved `@security` CRITICAL coverage gap (reported by `sdd-verify`) as a failing gate — do NOT advance to archive. When `security.enabled` is false, skip this check entirely and count it as `pass`.
+- Graphify edge evidence is OPT-IN and ADVISORY. When `graphify.enabled: true`,
+  judges MAY cite `EXTRACTED`-confidence edges from the post-apply `graph.json`
+  (via file read or `graphify query`/`graphify explain` — NEVER `graphify update`)
+  to enrich the description of findings they reached independently. `INFERRED`-
+  confidence edges MAY be cited too, but ONLY when `graphify.semantic: true`, and
+  every such citation MUST carry the `(INFERRED, semantic)` label. Edge evidence
+  is NEVER a new Step 4 result column, NEVER a Decision Gate condition, and NEVER a
+  re-apply trigger on its own. Edge evidence MUST NOT be the sole reason a finding
+  is raised (R-21(d)) — it only enriches a finding the judge already confirmed
+  independently. When `graphify.enabled: false`, judges access no graph data and
+  emit no edge citations.
 - Maximum 3 retry cycles. The 4th failure returns `blocked` with `max_retries_exceeded: true`.
 - NEVER skip the re-verify step between re-apply and re-judge.
 - Accumulate all issues across retry cycles in the feedback block.
@@ -87,6 +98,12 @@ Delegate the dual adversarial review to the `archon-judge` subagent (whose
 frontmatter `model:` is the binding hard gate):
 - Target: the current change (all files modified by the change)
 - Criteria: spec compliance, design coherence, code quality
+- When `graphify.enabled: true`, tell the judges they MAY cite EXTRACTED edges
+  from `<output_dir>/graph.json` (`(source, target, relation)`, confidence
+  `EXTRACTED`) as supporting evidence for findings they independently confirm,
+  e.g. `func X no longer called by Y — edge Y→[calls]→X removed (EXTRACTED, code
+  graph)`. INFERRED edges may be cited only when `semantic: true`, labeled
+  `(INFERRED, semantic)`. This is enrichment, never the sole basis for a finding.
 
 The archon-judge subagent invokes `judgment-day` internally and reports its verdict.
 Capture the verdict from the subagent's output:
@@ -176,6 +193,8 @@ requires judgment-day to pass AND every enabled gate to pass.
 | pass | pass (or skipped) | fail | any | `fail` → enter re-apply loop |
 | pass | pass (or skipped) | pass (or skipped) | fail or blocked | `fail` → enter re-apply loop |
 | fail | any | any | any | `fail` → enter re-apply loop |
+
+Edge evidence never adds a column here — the table stays exactly: judgment-day, mutation gate, playwright gate, impeccable gate.
 
 ### Step 5: On Pass
 

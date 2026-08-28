@@ -54,6 +54,22 @@
 |----------|-----------|-------|
 | {Decision} | ✅ Yes | |
 
+### Code Graph Diff (advisory)
+_Present only when `graphify.enabled: true`; NOTE severity; never changes the verdict._
+
+| Category | Count |
+|----------|-------|
+| Added nodes | {n} |
+| Removed nodes | {n} |
+| Added edges | {n} |
+| Removed edges | {n} |
+
+Samples (up to 5 per non-empty category):
+- Added node — `<node_id>`
+- Removed edge — `<source> →[<relation>]→ <target> (EXTRACTED)`
+
+When all four counts are zero: `No structural changes detected in the code graph.`
+
 ### Issues Found
 **CRITICAL**: {list or None}
 **WARNING**: {list or None}
