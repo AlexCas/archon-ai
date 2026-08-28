@@ -48,6 +48,16 @@ The orchestrator should provide structured status from `skills/_shared/sdd-statu
   are reported as a recommendation, never a blocker. Do NOT run `npx impeccable
   detect` here; that gate belongs to `harness-judge` (Step 3c). When
   `impeccable.enabled` is false, skip this check entirely.
+- **Code graph diff (conditional, advisory only)**: If `graphify.enabled` is true,
+  after the compliance matrix and before the verdict, load `skills/graphify/SKILL.md`,
+  capture the baseline (R-19), shell `graphify update <path>`, set-diff the two
+  snapshots, and emit a `### Code Graph Diff (advisory)` section. This is a NOTE,
+  never CRITICAL, and NEVER alters the PASS / PASS WITH WARNINGS / FAIL verdict.
+  Re-snapshot and re-extract fresh on each re-apply retry. Every failure mode
+  degrades to exactly one advisory line per `skills/graphify/SKILL.md` §6 rows c, i–j.
+  When the baseline source is absent, BOTH re-extraction and diff rendering are
+  skipped (R-19) — do not run `graphify update` first and decide afterward.
+  When `graphify.enabled` is false, skip this check entirely.
 - **Security coverage check (conditional)**: If `security.enabled` is true, confirm
   that every `@security`-tagged scenario in the `.feature` files maps to a covering
   test or scanner execution. Report any gap — a `@security` scenario with no
@@ -86,6 +96,41 @@ The orchestrator should provide structured status from `skills/_shared/sdd-statu
 6. If design exists, check design decisions against changed code. If design is missing, skip design coherence and record why.
 7. Run test, build/type-check, and coverage commands when available. For full spec verification, preserve gentle-ai's stricter runtime evidence: source inspection alone does not prove spec scenario compliance.
 8. Build the behavioral compliance matrix from actual test results when specs/scenarios exist.
+8b. If `graphify.enabled`, run the code graph diff (R-19/R-20): copy
+    `<output_dir>/graph.json` to `<output_dir>/graph.baseline.json`
+    (`output_dir` from `.archon/graphify.output_dir`, default `.archon/graphify`);
+    if the source is absent, emit the §6 row-i advisory and skip. Else shell
+    `graphify update <path>`, parse both snapshots, compute the set-diff, and add
+    the `### Code Graph Diff (advisory)` section. Never changes the verdict.
+
+    On every re-apply retry (this run included), the baseline snapshot and the
+    diff MUST be redone fresh — never reuse a snapshot or diff section carried
+    over from a prior attempt.
+
+    The set-diff procedure (for reference during apply):
+    ```
+    output_dir = config.graphify.output_dir or ".archon/graphify"
+    if not exists(output_dir/graph.json):      emit §6 row-i note; skip diff section
+    cp output_dir/graph.json output_dir/graph.baseline.json   # R-19
+    run: graphify update <project-root>        # overwrites output_dir/graph.json
+      on non-zero exit:                        emit §6 row-c note; skip diff section
+    baseline = parse(output_dir/graph.baseline.json)
+    after    = parse(output_dir/graph.json)
+      on parse/schema error of either:         emit §6 row-j note; skip diff section
+    baseNodes  = { n.id for n in baseline.nodes }
+    afterNodes = { n.id for n in after.nodes }
+    baseEdges  = { (e.source, e.target, e.relation) for e in baseline.links }
+    afterEdges = { (e.source, e.target, e.relation) for e in after.links }
+    addedNodes   = afterNodes - baseNodes
+    removedNodes = baseNodes  - afterNodes
+    addedEdges   = afterEdges - baseEdges
+    removedEdges = baseEdges  - afterEdges
+    render diff section (report-format template; up to 5 samples per non-empty
+      category — see references/report-format.md)
+    ```
+
+    Edge identity key is `(source, target, relation)`; `confidence` and
+    `source_location` are not part of the key (line drift never churns the diff).
 9. Persist and return the verification report, including skipped dimensions for missing artifacts.
 
 ## Output Contract

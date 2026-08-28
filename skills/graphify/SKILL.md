@@ -10,7 +10,7 @@ metadata:
 
 ## 1. Activation Contract
 
-Load this skill from `sdd-explore` or `sdd-tasks` only when `.archon/config.yaml`
+Load this skill from `sdd-explore`, `sdd-tasks`, `sdd-verify`, or `harness-judge` only when `.archon/config.yaml`
 → `graphify.enabled: true`. When the flag is absent or `false`, no phase reads
 this file, no `graphify` command is shelled, `output_dir` (default
 `.archon/graphify`) is never created, and no phase output changes. Fully
@@ -40,11 +40,13 @@ Surfaces") — do not repeat it here.
 
 | Phase | Action | Mechanism |
 |-------|--------|-----------|
-| `sdd-explore` | Fresh → read `graph.json`/`GRAPH_REPORT.md`, shell `graphify query`/`graphify explain` for targeted questions. Absent → shell `graphify extract` (if binary present) then read. Stale → re-extract per §4, then read. | file read + shell CLI |
+| `sdd-explore` | Fresh → read `graph.json`/`GRAPH_REPORT.md`, shell `graphify query`/`graphify explain` for targeted questions. Absent → shell `graphify update` (if binary present) then read. Stale → re-extract per §4, then read. | file read + shell CLI |
 | `sdd-tasks` | Read Leiden community data from `graph.json`/`GRAPH_REPORT.md` **only** | **file read — never shell** |
+| `sdd-verify` | Snapshot baseline (copy `graph.json` → `graph.baseline.json`); shell `graphify update <path>` for the post-apply graph; compute set-diff; emit advisory NOTE per R-20. Failure modes fall back per §6 rows i–j. | file copy + shell CLI |
+| `harness-judge` | Read `graph.json` or call `graphify query`/`graphify explain` to look up edge evidence for findings per R-21. | file read + shell CLI (query/explain only — **never extract**) |
 
-`sdd-explore` is the **sole extraction site**. No other phase shells any
-`graphify` command.
+`sdd-explore` and `sdd-verify` are the two extraction sites (see §5). No other
+phase shells any `graphify` extraction command.
 
 ## 4. Staleness Algorithm
 
@@ -53,7 +55,7 @@ Surfaces") — do not repeat it here.
 - **Stale iff `mtime(graph.json) < HEAD_time`. Fresh iff `mtime(graph.json) ≥ HEAD_time`.**
 - Fresh → reuse the existing graph; do NOT re-extract.
 - Stale + binary present → `sdd-explore` automatically re-runs `graphify
-  extract`, refreshes `graph-report.excerpt.md` (§ tracked excerpt), and emits
+  update`, refreshes `graph-report.excerpt.md` (§ tracked excerpt), and emits
   exactly: `graph may be stale — re-extracting`.
 - Stale + binary absent → failure mode (f) in §6.
 - There is no config knob for staleness policy — this algorithm is unconditional.
@@ -62,8 +64,14 @@ Surfaces") — do not repeat it here.
 
 `sdd-tasks` MUST NOT shell `graphify extract` or any other `graphify` command
 — **even when the binary is present on PATH and `graph.json` is absent.**
-`sdd-explore` is the sole extraction site in Slice A; `sdd-tasks` only ever
-opens `graph.json`/`GRAPH_REPORT.md` for a read. This is structural, not a
+
+> **Slice B amendment**: `sdd-explore` and `sdd-verify` are the two extraction
+> sites. No other phase shells `graphify update` or any extraction command.
+> `sdd-tasks` and `harness-judge` are read-only surfaces — file read or
+> `graphify query`/`graphify explain` only; they MUST NOT shell any
+> extraction command.
+
+`sdd-tasks` only ever opens `graph.json`/`GRAPH_REPORT.md` for a read. This is structural, not a
 policy choice re-derived per run: the Per-Phase Invocation Map in §3 already
 marks the `sdd-tasks` row "file read — never shell," and this subsection
 restates it so the constraint cannot be missed by a partial read of this
@@ -81,12 +89,14 @@ the consuming phase continue with baseline grep/read. **Never** return
 |---|---|---|---|
 | a | `graphify` binary not on PATH | `graphify unavailable: binary not on PATH; proceeding with baseline grep/read` (if `auto_install: true`, install first per §7) | baseline grep/read |
 | b | Python and uv and pipx all absent | `graphify unavailable: no Python/uv/pipx runtime; proceeding with baseline grep/read` | baseline grep/read |
-| c | `graphify extract` exits non-zero | `graphify extract failed (exit N); proceeding with baseline grep/read` | prior graph if any, else baseline |
+| c | `graphify update` exits non-zero | `graphify update failed (exit N); proceeding with baseline grep/read` | prior graph if any, else baseline |
 | d | `graph.json` absent or unreadable (IO error, permissions denied) | `code graph unavailable (missing or unreadable); proceeding with baseline grep/read` | baseline grep/read |
 | e | `graph.json` unparseable or schema-drifted | `code graph unreadable (parse/schema); proceeding with baseline grep/read` | baseline grep/read |
 | f | graph stale and binary unavailable for re-extraction | `graph may be stale and graphify unavailable; using existing graph / baseline grep/read` | existing graph or baseline |
 | g | `output_dir` unwritable | `cannot write to <output_dir>; skipping extraction, proceeding with baseline grep/read` | baseline grep/read |
 | h | empty graph (0 nodes, 0 edges) | `code graph is empty; proceeding with baseline grep/read` | baseline grep/read |
+| i | `graph.baseline.json` absent at verify diff time (baseline copy not captured or source `graph.json` was absent) | `code graph baseline absent; skipping graph diff` | skip diff section; verify continues |
+| j | Diff compute error (parse failure of `graph.baseline.json` or post-apply `graph.json`, or schema mismatch) | `code graph diff failed (parse/schema); skipping graph diff` | skip diff section; verify continues |
 
 ## 7. `auto_install` Semantics
 
