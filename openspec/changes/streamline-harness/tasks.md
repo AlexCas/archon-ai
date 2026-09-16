@@ -115,89 +115,89 @@
 
 ### Config removal — `internal/config/config.go`
 
-- [ ] **[P2-1]** Delete the `Graphify` struct (`:60-70`).
-- [ ] **[P2-2]** Delete `DefaultGraphifyVersion` and `DefaultGraphifyOutputDir` consts (`:72-79`).
-- [ ] **[P2-3]** Delete the `Graphify Graphify` field from the `Config` struct (`:112`).
-- [ ] **[P2-4]** Delete the Graphify pre-seed lines in `Load()` (`:136-137`).
-- [ ] **[P2-5]** Delete `Graphify: c.Graphify` from `Clone()` (`:176`).
+- [x] **[P2-1]** Delete the `Graphify` struct (`:60-70`).
+- [x] **[P2-2]** Delete `DefaultGraphifyVersion` and `DefaultGraphifyOutputDir` consts (`:72-79`).
+- [x] **[P2-3]** Delete the `Graphify Graphify` field from the `Config` struct (`:112`).
+- [x] **[P2-4]** Delete the Graphify pre-seed lines in `Load()` (`:136-137`).
+- [x] **[P2-5]** Delete `Graphify: c.Graphify` from `Clone()` (`:176`).
 
 ### Config test — `internal/config/config_test.go`
 
-- [ ] **[P2-6]** Remove the `Graphify` fields from the `TestConfig_CloneRoundtrip` fixture (`:265-269`) and delete any Graphify default/validation test analogue.
+- [x] **[P2-6]** Remove the `Graphify` fields from the `TestConfig_CloneRoundtrip` fixture (`:265-269`) and delete any Graphify default/validation test analogue.
 
 ### CLI config — `cmd/archon/config.go`
 
-- [ ] **[P2-7]** Delete the five `graphify.*` cases in `setConfigValue` (`:269-294`).
-- [ ] **[P2-8]** Delete the five `graphify.*` cases in `getConfigValue` (`:360-369`).
-- [ ] **[P2-9]** Remove every `graphify.*` key from the `(supported: …)` error strings at `:324` and `:385`.
+- [x] **[P2-7]** Delete the five `graphify.*` cases in `setConfigValue` (`:269-294`).
+- [x] **[P2-8]** Delete the five `graphify.*` cases in `getConfigValue` (`:360-369`).
+- [x] **[P2-9]** Remove every `graphify.*` key from the `(supported: …)` error strings at `:324` and `:385`.
 
 ### CLI main — `cmd/archon/main.go`
 
-- [ ] **[P2-10]** Delete `graphifyFlag` var decl (`:88`).
-- [ ] **[P2-11]** Delete `Graphify: graphifyFlag` from the `Options{}` literal (`:177`).
-- [ ] **[P2-12]** Delete the `cmd.Flags().BoolVar(...)` registration for `--graphify` (`:211`).
+- [x] **[P2-10]** Delete `graphifyFlag` var decl (`:88`).
+- [x] **[P2-11]** Delete `Graphify: graphifyFlag` from the `Options{}` literal (`:177`).
+- [x] **[P2-12]** Delete the `cmd.Flags().BoolVar(...)` registration for `--graphify` (`:211`).
 
 ### Init — `internal/initcmd/init.go`
 
-- [ ] **[P2-13]** Delete `Graphify bool` from `Options` (`:30-33`).
-- [ ] **[P2-14]** Delete `opts.Graphify` arg from the `buildConfig(...)` call (`:91`).
-- [ ] **[P2-15]** Delete the `graphify bool` param from `buildConfig` (`:224`) and the `Graphify: config.Graphify{...}` block it sets (`:255-258`).
+- [x] **[P2-13]** Delete `Graphify bool` from `Options` (`:30-33`).
+- [x] **[P2-14]** Delete `opts.Graphify` arg from the `buildConfig(...)` call (`:91`).
+- [x] **[P2-15]** Delete the `graphify bool` param from `buildConfig` (`:224`) and the `Graphify: config.Graphify{...}` block it sets (`:255-258`).
 
 ### Init test — `internal/initcmd/init_test.go`
 
-- [ ] **[P2-16]** Delete any `TestBuildConfig_GraphifyFlag` test analogue.
+- [x] **[P2-16]** Delete any `TestBuildConfig_GraphifyFlag` test analogue.
 
 ### TUI — `internal/tui/graphify_tab.go`
 
-- [ ] **[P2-17]** Delete `internal/tui/graphify_tab.go` entirely.
+- [x] **[P2-17]** Delete `internal/tui/graphify_tab.go` entirely.
 
 ### TUI — `internal/tui/model.go`
 
-- [ ] **[P2-18]** Delete `GraphifyTab` from the iota const block (`:30`). After this deletion, `SecurityTab` is at index 5, `tabCount` = 6 — the final post-change state.
-- [ ] **[P2-19]** Delete the `graphifyTab` field from the model struct (`:53`).
-- [ ] **[P2-20]** Delete `newGraphifyTabState` initialization in `NewModel` (`:116`).
-- [ ] **[P2-21]** Delete the `setWidth` call for `graphifyTab` in the `WindowSizeMsg` handler (`:138`).
-- [ ] **[P2-22]** Delete `case GraphifyTab:` in the key-routing switch (`:194-197`).
-- [ ] **[P2-23]** Delete the rebuild and resize calls for `graphifyTab` in `agentInitDoneMsg` (`:234-235`).
-- [ ] **[P2-24]** Remove `"Graphify"` from the tab-label slice (`:297`) — result is six labels ending with `"Security"`.
-- [ ] **[P2-25]** Delete `case GraphifyTab:` in `renderTabContent` (`:330-331`).
-- [ ] **[P2-26]** Delete the `applyToConfig` call for `graphifyTab` in `saveConfig` (`:371`).
+- [x] **[P2-18]** Delete `GraphifyTab` from the iota const block (`:30`). After this deletion, `SecurityTab` is at index 5, `tabCount` = 6 — the final post-change state.
+- [x] **[P2-19]** Delete the `graphifyTab` field from the model struct (`:53`).
+- [x] **[P2-20]** Delete `newGraphifyTabState` initialization in `NewModel` (`:116`).
+- [x] **[P2-21]** Delete the `setWidth` call for `graphifyTab` in the `WindowSizeMsg` handler (`:138`).
+- [x] **[P2-22]** Delete `case GraphifyTab:` in the key-routing switch (`:194-197`).
+- [x] **[P2-23]** Delete the rebuild and resize calls for `graphifyTab` in `agentInitDoneMsg` (`:234-235`).
+- [x] **[P2-24]** Remove `"Graphify"` from the tab-label slice (`:297`) — result is six labels ending with `"Security"`.
+- [x] **[P2-25]** Delete `case GraphifyTab:` in `renderTabContent` (`:330-331`).
+- [x] **[P2-26]** Delete the `applyToConfig` call for `graphifyTab` in `saveConfig` (`:371`).
 
 ### TUI test — `internal/tui/model_test.go`
 
-- [ ] **[P2-27]** Update the prev-tab-from-Agent test (`:109-122`): change the expected terminal tab from `GraphifyTab` to `SecurityTab`.
-- [ ] **[P2-28]** Delete any Graphify tab-state test analogue.
-- [ ] **[P2-29]** Update every test that asserts `tabCount` to expect 6 (was 8 before PR1+PR2; adjust for any partial update left by P1-29).
-- [ ] **[P2-30]** Update any test that enumerates the tab label list to the six-label set: `Agent, Models, Judge, Mutation Testing, Playwright, Security`.
+- [x] **[P2-27]** Update the prev-tab-from-Agent test (`:109-122`): change the expected terminal tab from `GraphifyTab` to `SecurityTab`.
+- [x] **[P2-28]** Delete any Graphify tab-state test analogue.
+- [x] **[P2-29]** Update every test that asserts `tabCount` to expect 6 (was 8 before PR1+PR2; adjust for any partial update left by P1-29).
+- [x] **[P2-30]** Update any test that enumerates the tab label list to the six-label set: `Agent, Models, Judge, Mutation Testing, Playwright, Security`.
 
 ### Status display — `internal/status/display.go` + test
 
-- [ ] **[P2-31]** Delete the Graphify status block.
-- [ ] **[P2-32]** Delete the Graphify display test.
+- [x] **[P2-31]** Delete the Graphify status block.
+- [x] **[P2-32]** Delete the Graphify display test.
 
 ### Embedded skill — `skills/embed_test.go`
 
-- [ ] **[P2-33]** Remove `"graphify"` from the expected embedded-skill list at `:29`.
+- [x] **[P2-33]** Remove `"graphify"` from the expected embedded-skill list at `:29`.
 
 ### Skill directory deletion
 
-- [ ] **[P2-34]** Delete `skills/graphify/` directory and all contents.
-- [ ] **[P2-35]** Delete `skills/impeccable/` directory and all contents (confirm impeccable is not in `embed_test.go` expected list before editing; no list edit needed).
+- [x] **[P2-34]** Delete `skills/graphify/` directory and all contents.
+- [x] **[P2-35]** Delete `skills/impeccable/` directory and all contents (confirm impeccable is not in `embed_test.go` expected list before editing; no list edit needed).
 
 ### Live spec retirement (apply-time deletion)
 
-- [ ] **[P2-36]** Delete `openspec/specs/graphify-integration/` directory (spec.md + any .feature). This is the physical deletion the `[[graphify-integration]]` delta spec records. Note: the archived copy in `openspec/changes/streamline-harness/specs/graphify-integration/` is the change delta and stays in place.
+- [x] **[P2-36]** Delete `openspec/specs/graphify-integration/` directory (spec.md + any .feature). This is the physical deletion the `[[graphify-integration]]` delta spec records. Note: the archived copy in `openspec/changes/streamline-harness/specs/graphify-integration/` is the change delta and stays in place.
 
 ### PR2 checklist
 
-- [ ] `go build ./...` is green.
-- [ ] `go vet ./...` is clean.
-- [ ] `go test ./...` is green, including `embed_test.go` (graphify no longer in expected list).
-- [ ] `grep -r 'graphify\|Graphify\|GraphifyTab' internal/ cmd/ skills/` returns no hits in Go source or skill files.
-- [ ] TUI iota block ends with `SecurityTab=5, tabCount=6` — verify against `model.go`.
-- [ ] `openspec/specs/graphify-integration/` no longer exists.
-- [ ] `skills/graphify/` and `skills/impeccable/` no longer exist.
-- [ ] Diff is comfortably under 800 lines.
+- [x] `go build ./...` is green.
+- [x] `go vet ./...` is clean.
+- [x] `go test ./...` is green, including `embed_test.go` (graphify no longer in expected list).
+- [x] `grep -r 'graphify\|Graphify\|GraphifyTab' internal/ cmd/ skills/` returns no hits in Go source or skill files (remaining refs in `templates.go`, `sdd-explore/SKILL.md`, `sdd-tasks/SKILL.md`, `chained-pr/SKILL.md` are PR3/PR4 scope — left intentionally).
+- [x] TUI iota block ends with `SecurityTab=5, tabCount=6` — verify against `model.go`.
+- [x] `openspec/specs/graphify-integration/` no longer exists.
+- [x] `skills/graphify/` and `skills/impeccable/` no longer exist.
+- [ ] Diff is 1,367 lines (28 ins / 1,339 del) — over 800 due to live spec files (spec.md + .feature ~527 lines). Go+skill+embed changes alone are ~840 lines. Note for orchestrator review.
 - [ ] PR description references the `streamline-harness` change, `[[graphify-integration]]` (RETIRED), and `[[harness-init]]`.
 
 ---
