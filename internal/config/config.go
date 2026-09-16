@@ -43,20 +43,6 @@ type Security struct {
 	Profile string `yaml:"profile,omitempty"` // "cli" | "web"
 }
 
-// Impeccable controls the opt-in design-language quality gate backed by the
-// external npm tool `npx impeccable`. When enabled, the harness references the
-// target project's Impeccable design docs during design, runs Impeccable design
-// verbs during apply, and executes the `npx impeccable detect` gate after the
-// judge phase. Severity governs which finding categories block the judge gate.
-// Defaults to disabled (Enabled:false) when the block is absent.
-type Impeccable struct {
-	Enabled     bool   `yaml:"enabled"`
-	AutoInstall bool   `yaml:"auto_install"`
-	Severity    string `yaml:"severity,omitempty"`
-	ProductPath string `yaml:"product_path,omitempty"`
-	DesignPath  string `yaml:"design_path,omitempty"`
-}
-
 // Graphify controls the opt-in, advisory code-graph gate backed by the external
 // Python tool `graphify` (tree-sitter AST). Advisory only — never blocks a phase,
 // never returns a verdict, so there is no severity and no Load() validation.
@@ -78,21 +64,6 @@ const (
 	DefaultGraphifyOutputDir = ".archon/graphify"
 )
 
-// ValidImpeccableSeverities is the fixed set of allowed impeccable.severity values.
-var ValidImpeccableSeverities = []string{"block-deterministic", "block-all", "advisory"}
-
-// ValidateImpeccableSeverity rejects any impeccable.severity value outside the
-// fixed set. Exported so both config.Load() and the CLI `config set` path share
-// a single source of truth for the three valid values.
-func ValidateImpeccableSeverity(s string) error {
-	switch s {
-	case "block-deterministic", "block-all", "advisory":
-		return nil
-	default:
-		return fmt.Errorf("invalid impeccable.severity %q (valid: block-deterministic, block-all, advisory)", s)
-	}
-}
-
 type SkillInventory struct {
 	Name    string `yaml:"name"`
 	Version string `yaml:"version"`
@@ -108,7 +79,6 @@ type Config struct {
 	Judge           Judge            `yaml:"judge"`
 	Playwright      Playwright       `yaml:"playwright"`
 	Security        Security         `yaml:"security"`
-	Impeccable      Impeccable       `yaml:"impeccable"`
 	Graphify        Graphify         `yaml:"graphify"`
 	Models          ModelConfig      `yaml:"models,omitempty"`
 	SkillInventory  []SkillInventory `yaml:"skill_inventory"`
@@ -140,16 +110,6 @@ func (c *Config) Load(fsys fs.FS) error {
 		return fmt.Errorf("unmarshal config: %w", err)
 	}
 
-	// Impeccable severity defaults to the safe "block-deterministic" mode; an
-	// absent or empty value is normalized here so downstream consumers never
-	// see "". Normalize BEFORE validate so an absent block is not rejected.
-	if c.Impeccable.Severity == "" {
-		c.Impeccable.Severity = "block-deterministic"
-	}
-	if err := ValidateImpeccableSeverity(c.Impeccable.Severity); err != nil {
-		return fmt.Errorf("config: %w", err)
-	}
-
 	return nil
 }
 
@@ -172,8 +132,7 @@ func (c *Config) Clone() *Config {
 		Judge:           c.Judge,
 		Playwright:      c.Playwright,
 		Security:        c.Security,
-		Impeccable:      c.Impeccable, // value copy — no maps/slices inside
-		Graphify:        c.Graphify,   // value copy — no maps/slices inside
+		Graphify:        c.Graphify, // value copy — no maps/slices inside
 		Models:          ModelConfig{Default: c.Models.Default, Leader: c.Models.Leader, Phases: make(map[string]ModelRef, len(c.Models.Phases))},
 		SkillInventory:  make([]SkillInventory, len(c.SkillInventory)),
 	}

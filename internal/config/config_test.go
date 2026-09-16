@@ -262,13 +262,6 @@ func TestConfig_CloneRoundtrip(t *testing.T) {
 			Enabled: true,
 			Profile: "web",
 		},
-		Impeccable: Impeccable{
-			Enabled:     true,
-			AutoInstall: true,
-			Severity:    "block-all",
-			ProductPath: "PRODUCT.md",
-			DesignPath:  "DESIGN.md",
-		},
 		Graphify: Graphify{
 			Enabled:     true,
 			AutoInstall: true,
@@ -453,51 +446,6 @@ func TestSecurity_DefaultOff(t *testing.T) {
 	if cfg.Security.Profile != "" {
 		t.Errorf("Security.Profile = %q; want empty when block is absent", cfg.Security.Profile)
 	}
-}
-
-// TestImpeccable_DefaultsAndValidation asserts (a) an absent impeccable block
-// defaults Severity to "block-deterministic" and leaves Enabled false, and (b)
-// an invalid severity value is rejected at Load() naming the value plus the
-// three valid options.
-func TestImpeccable_DefaultsAndValidation(t *testing.T) {
-	t.Run("absent block defaults", func(t *testing.T) {
-		fs := fstest.MapFS{
-			".archon/config.yaml": &fstest.MapFile{
-				Data: []byte("harness_version: \"1.0.0\"\nagent: claude\n"),
-			},
-		}
-		var cfg Config
-		if err := cfg.Load(fs); err != nil {
-			t.Fatalf("Load() error = %v", err)
-		}
-		if cfg.Impeccable.Enabled {
-			t.Error("Impeccable.Enabled = true; want false when block is absent")
-		}
-		if cfg.Impeccable.Severity != "block-deterministic" {
-			t.Errorf("Impeccable.Severity = %q; want %q", cfg.Impeccable.Severity, "block-deterministic")
-		}
-	})
-
-	t.Run("invalid severity rejected", func(t *testing.T) {
-		fs := fstest.MapFS{
-			".archon/config.yaml": &fstest.MapFile{
-				Data: []byte("harness_version: \"1.0.0\"\nagent: claude\nimpeccable:\n  severity: foobar\n"),
-			},
-		}
-		var cfg Config
-		err := cfg.Load(fs)
-		if err == nil {
-			t.Fatal("Load() error = nil, want error for invalid severity")
-		}
-		if !strings.Contains(err.Error(), "foobar") {
-			t.Errorf("error = %q, want contains %q", err.Error(), "foobar")
-		}
-		for _, v := range ValidImpeccableSeverities {
-			if !strings.Contains(err.Error(), v) {
-				t.Errorf("error = %q, want contains valid option %q", err.Error(), v)
-			}
-		}
-	})
 }
 
 // TestGraphify_DefaultsAbsentBlock asserts that loading a config with no

@@ -293,79 +293,8 @@ func TestConfigCmd_SecurityProfileInvalidValues(t *testing.T) {
 	}
 }
 
-// TestConfigCmd_UnknownKeyListsImpeccableKeys asserts the unknown-key error
-// contains all five impeccable.* keys (design §3.3).
-func TestConfigCmd_UnknownKeyListsImpeccableKeys(t *testing.T) {
-	tmpDir := setupProjectWithConfig(t)
-	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
-
-	var stdout, stderr bytes.Buffer
-	root := newRootCmd(&stdout, &stderr)
-	root.SetArgs([]string{"config", "get", "bogus.key"})
-
-	err := root.Execute()
-	if err == nil {
-		t.Fatal("expected error for unknown key, got none")
-	}
-
-	wantKeys := []string{
-		"impeccable.enabled",
-		"impeccable.auto_install",
-		"impeccable.severity",
-		"impeccable.product_path",
-		"impeccable.design_path",
-	}
-	for _, k := range wantKeys {
-		if !strings.Contains(err.Error(), k) {
-			t.Errorf("error = %q, want contains %q", err.Error(), k)
-		}
-	}
-}
-
-// TestConfigCmd_ImpeccableSetGet asserts set/get roundtrip for all five
-// impeccable.* keys, and that an invalid severity is rejected.
-func TestConfigCmd_ImpeccableSetGet(t *testing.T) {
-	tmpDir := setupProjectWithConfig(t)
-	origDir, _ := os.Getwd()
-	os.Chdir(tmpDir)
-	defer os.Chdir(origDir)
-
-	cases := []struct {
-		key   string
-		value string
-	}{
-		{"impeccable.enabled", "true"},
-		{"impeccable.auto_install", "true"},
-		{"impeccable.severity", "block-all"},
-		{"impeccable.product_path", "docs/PRODUCT.md"},
-		{"impeccable.design_path", "docs/DESIGN.md"},
-	}
-
-	for _, c := range cases {
-		var setOut, setErr bytes.Buffer
-		setCmd := newRootCmd(&setOut, &setErr)
-		setCmd.SetArgs([]string{"config", "set", c.key, c.value})
-		if err := setCmd.Execute(); err != nil {
-			t.Fatalf("set %s Execute() error = %v, stderr = %s", c.key, err, setErr.String())
-		}
-
-		var getOut, getErr bytes.Buffer
-		getCmd := newRootCmd(&getOut, &getErr)
-		getCmd.SetArgs([]string{"config", "get", c.key})
-		if err := getCmd.Execute(); err != nil {
-			t.Fatalf("get %s Execute() error = %v, stderr = %s", c.key, err, getErr.String())
-		}
-
-		if got := strings.TrimSpace(getOut.String()); got != c.value {
-			t.Errorf("%s = %q, want %q", c.key, got, c.value)
-		}
-	}
-}
-
 // TestConfigCmd_GraphifySetGet asserts set/get roundtrip for all five
-// graphify.* keys (mirror TestConfigCmd_ImpeccableSetGet).
+// graphify.* keys.
 func TestConfigCmd_GraphifySetGet(t *testing.T) {
 	tmpDir := setupProjectWithConfig(t)
 	origDir, _ := os.Getwd()
@@ -406,7 +335,7 @@ func TestConfigCmd_GraphifySetGet(t *testing.T) {
 
 // TestConfigCmd_UnknownKeyListsGraphifyKeys asserts that an unknown
 // graphify.* key produces an error whose message lists all five supported
-// graphify.* keys (mirror TestConfigCmd_UnknownKeyListsImpeccableKeys).
+// graphify.* keys.
 func TestConfigCmd_UnknownKeyListsGraphifyKeys(t *testing.T) {
 	tmpDir := setupProjectWithConfig(t)
 	origDir, _ := os.Getwd()
@@ -436,30 +365,42 @@ func TestConfigCmd_UnknownKeyListsGraphifyKeys(t *testing.T) {
 	}
 }
 
-// TestConfigCmd_ImpeccableSeverityInvalid asserts `config set
-// impeccable.severity invalid` exits non-zero and names the value plus the
-// three valid options.
-func TestConfigCmd_ImpeccableSeverityInvalid(t *testing.T) {
+// TestConfigCmd_ImpeccableKeyIsUnknown asserts that impeccable.* keys are
+// treated as unknown-key errors after Impeccable removal (harness-init spec:
+// "archon config set/get impeccable.<field> MUST return an unknown-key error").
+func TestConfigCmd_ImpeccableKeyIsUnknown(t *testing.T) {
 	tmpDir := setupProjectWithConfig(t)
 	origDir, _ := os.Getwd()
 	os.Chdir(tmpDir)
 	defer os.Chdir(origDir)
 
-	var stdout, stderr bytes.Buffer
-	root := newRootCmd(&stdout, &stderr)
-	root.SetArgs([]string{"config", "set", "impeccable.severity", "invalid"})
-
-	err := root.Execute()
-	if err == nil {
-		t.Fatal("expected error for invalid impeccable.severity, got none")
-	}
-	if !strings.Contains(err.Error(), "invalid") {
-		t.Errorf("error = %q, want contains %q", err.Error(), "invalid")
-	}
-	for _, v := range []string{"block-deterministic", "block-all", "advisory"} {
-		if !strings.Contains(err.Error(), v) {
-			t.Errorf("error = %q, want contains valid option %q", err.Error(), v)
-		}
+	for _, key := range []string{
+		"impeccable.enabled",
+		"impeccable.auto_install",
+		"impeccable.severity",
+		"impeccable.product_path",
+		"impeccable.design_path",
+	} {
+		t.Run(key, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			root := newRootCmd(&stdout, &stderr)
+			root.SetArgs([]string{"config", "set", key, "true"})
+			err := root.Execute()
+			if err == nil {
+				t.Fatalf("expected unknown-key error for %q, got none", key)
+			}
+			if !strings.Contains(err.Error(), "unknown config key") {
+				t.Errorf("error = %q, want contains %q", err.Error(), "unknown config key")
+			}
+			// The supported-keys hint must not list any impeccable.* key.
+			// Extract the "(supported: ...)" portion for the check.
+			if idx := strings.Index(err.Error(), "(supported:"); idx != -1 {
+				supported := err.Error()[idx:]
+				if strings.Contains(supported, "impeccable.") {
+					t.Errorf("supported-keys hint should not list impeccable.* keys: %q", supported)
+				}
+			}
+		})
 	}
 }
 

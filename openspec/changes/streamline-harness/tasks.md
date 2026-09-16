@@ -37,72 +37,72 @@
 
 ### Config removal — `internal/config/config.go`
 
-- [ ] **[P1-1]** Delete the `Impeccable` struct (`:46-58`).
-- [ ] **[P1-2]** Delete `ValidImpeccableSeverities` var and the `ValidateImpeccableSeverity` func (`:81-94`).
-- [ ] **[P1-3]** Delete the `Impeccable Impeccable` field from the `Config` struct (`:111`).
-- [ ] **[P1-4]** Delete the Impeccable severity normalize + validate block in `Load()` (`:143-151`, 9 lines).
-- [ ] **[P1-5]** Delete `Impeccable: c.Impeccable` from `Clone()` (`:175`).
+- [x] **[P1-1]** Delete the `Impeccable` struct (`:46-58`).
+- [x] **[P1-2]** Delete `ValidImpeccableSeverities` var and the `ValidateImpeccableSeverity` func (`:81-94`).
+- [x] **[P1-3]** Delete the `Impeccable Impeccable` field from the `Config` struct (`:111`).
+- [x] **[P1-4]** Delete the Impeccable severity normalize + validate block in `Load()` (`:143-151`, 9 lines).
+- [x] **[P1-5]** Delete `Impeccable: c.Impeccable` from `Clone()` (`:175`).
 
 ### Config test — `internal/config/config_test.go`
 
-- [ ] **[P1-6]** Remove the `Impeccable` fields from the `TestConfig_CloneRoundtrip` fixture (`:265-269`) so the roundtrip compiles.
-- [ ] **[P1-7]** Delete `TestImpeccable_DefaultsAndValidation` (`:458-503`).
+- [x] **[P1-6]** Remove the `Impeccable` fields from the `TestConfig_CloneRoundtrip` fixture (`:265-269`) so the roundtrip compiles.
+- [x] **[P1-7]** Delete `TestImpeccable_DefaultsAndValidation` (`:458-503`).
 
 ### CLI config — `cmd/archon/config.go`
 
-- [ ] **[P1-8]** Delete the six `impeccable.*` cases in `setConfigValue` (`:243-267`).
-- [ ] **[P1-9]** Delete the five `impeccable.*` cases in `getConfigValue` (`:350-359`).
-- [ ] **[P1-10]** Remove every `impeccable.*` key from the `(supported: …)` error strings at `:324` and `:385`; verify that the trimmed supported list still includes `models.*`, `playwright.*`, `mutation_testing.enabled`, `security.enabled`, `security.profile`.
+- [x] **[P1-8]** Delete the six `impeccable.*` cases in `setConfigValue` (`:243-267`).
+- [x] **[P1-9]** Delete the five `impeccable.*` cases in `getConfigValue` (`:350-359`).
+- [x] **[P1-10]** Remove every `impeccable.*` key from the `(supported: …)` error strings at `:324` and `:385`; verify that the trimmed supported list still includes `models.*`, `playwright.*`, `mutation_testing.enabled`, `security.enabled`, `security.profile`.
 
 ### CLI main — `cmd/archon/main.go`
 
-- [ ] **[P1-11]** Delete `impeccableFlag` var decl (`:87`).
-- [ ] **[P1-12]** Delete `Impeccable: impeccableFlag` from the `Options{}` literal (`:176`).
-- [ ] **[P1-13]** Delete the `cmd.Flags().BoolVar(...)` registration for `--impeccable` (`:210`).
+- [x] **[P1-11]** Delete `impeccableFlag` var decl (`:87`).
+- [x] **[P1-12]** Delete `Impeccable: impeccableFlag` from the `Options{}` literal (`:176`).
+- [x] **[P1-13]** Delete the `cmd.Flags().BoolVar(...)` registration for `--impeccable` (`:210`).
 
 ### Init — `internal/initcmd/init.go`
 
-- [ ] **[P1-14]** Delete `Impeccable bool` from `Options` (`:30-33`).
-- [ ] **[P1-15]** Delete `opts.Impeccable` arg from the `buildConfig(...)` call (`:91`).
-- [ ] **[P1-16]** Delete the `impeccable bool` param from `buildConfig` (`:224`) and the `Impeccable: config.Impeccable{...}` block it sets (`:252-254`).
+- [x] **[P1-14]** Delete `Impeccable bool` from `Options` (`:30-33`).
+- [x] **[P1-15]** Delete `opts.Impeccable` arg from the `buildConfig(...)` call (`:91`).
+- [x] **[P1-16]** Delete the `impeccable bool` param from `buildConfig` (`:224`) and the `Impeccable: config.Impeccable{...}` block it sets (`:252-254`).
 
 ### Init test — `internal/initcmd/init_test.go`
 
-- [ ] **[P1-17]** Delete `TestBuildConfig_ImpeccableFlag` (`:621-639`).
+- [x] **[P1-17]** Delete `TestBuildConfig_ImpeccableFlag` (`:621-639`).
 
 ### TUI — `internal/tui/impeccable_tab.go`
 
-- [ ] **[P1-18]** Delete `internal/tui/impeccable_tab.go` entirely.
+- [x] **[P1-18]** Delete `internal/tui/impeccable_tab.go` entirely.
 
 ### TUI — `internal/tui/model.go`
 
-- [ ] **[P1-19]** Delete `ImpeccableTab` from the iota const block (`:29`). `SecurityTab` remains at index 5; `tabCount` stays 8 at this PR (Graphify removal is PR2).
-- [ ] **[P1-20]** Delete the `impeccableTab` field from the model struct (`:52`).
-- [ ] **[P1-21]** Delete `newImpeccableTabState` initialization in `NewModel` (`:115`).
-- [ ] **[P1-22]** Delete the `setWidth` call for `impeccableTab` in the `WindowSizeMsg` handler (`:137`).
-- [ ] **[P1-23]** Delete `case ImpeccableTab:` in the key-routing switch (`:188-193`).
-- [ ] **[P1-24]** Delete the rebuild and resize calls for `impeccableTab` in `agentInitDoneMsg` (`:225-226`).
-- [ ] **[P1-25]** Remove `"Impeccable"` from the tab-label slice (`:297`).
-- [ ] **[P1-26]** Delete `case ImpeccableTab:` in `renderTabContent` (`:328-329`).
-- [ ] **[P1-27]** Delete the `applyToConfig` call for `impeccableTab` in `saveConfig` (`:370`).
+- [x] **[P1-19]** Delete `ImpeccableTab` from the iota const block (`:29`). `SecurityTab` remains at index 5; `GraphifyTab` shifts from 7→6, `tabCount` drops 8→7. See TODO(PR2) comment in model.go.
+- [x] **[P1-20]** Delete the `impeccableTab` field from the model struct (`:52`).
+- [x] **[P1-21]** Delete `newImpeccableTabState` initialization in `NewModel` (`:115`).
+- [x] **[P1-22]** Delete the `setWidth` call for `impeccableTab` in the `WindowSizeMsg` handler (`:137`).
+- [x] **[P1-23]** Delete `case ImpeccableTab:` in the key-routing switch (`:188-193`).
+- [x] **[P1-24]** Delete the rebuild and resize calls for `impeccableTab` in `agentInitDoneMsg` (`:225-226`).
+- [x] **[P1-25]** Remove `"Impeccable"` from the tab-label slice (`:297`).
+- [x] **[P1-26]** Delete `case ImpeccableTab:` in `renderTabContent` (`:328-329`).
+- [x] **[P1-27]** Delete the `applyToConfig` call for `impeccableTab` in `saveConfig` (`:370`).
 
 ### TUI test — `internal/tui/model_test.go`
 
-- [ ] **[P1-28]** Delete `TestImpeccableTabState_ApplyToConfig*` (`:381-440`).
-- [ ] **[P1-29]** Update any test asserting `tabCount` value (was 8; after both PR1 + PR2 it will be 6 — leave a TODO comment here if only PR1 is applied; the iota shift for `ImpeccableTab` removal at `:29` also requires fixing any hard-coded tab indices that followed it in tests).
+- [x] **[P1-28]** Delete `TestImpeccableTabState_ApplyToConfig*` (`:381-440`).
+- [x] **[P1-29]** Update any test asserting `tabCount` value (was 8; after both PR1 + PR2 it will be 6 — leave a TODO comment here if only PR1 is applied; the iota shift for `ImpeccableTab` removal at `:29` also requires fixing any hard-coded tab indices that followed it in tests).
 
 ### Status display — `internal/status/display.go` + test
 
-- [ ] **[P1-30]** Delete the "Impeccable (Design Language)" status block (`:53-65`).
-- [ ] **[P1-31]** Delete `TestDisplay_Impeccable` (`:137-186`).
+- [x] **[P1-30]** Delete the "Impeccable (Design Language)" status block (`:53-65`).
+- [x] **[P1-31]** Delete `TestDisplay_Impeccable` (`:137-186`).
 
 ### PR1 checklist
 
-- [ ] `go build ./...` is green.
-- [ ] `go vet ./...` is clean.
-- [ ] `go test ./...` is green (no reference to removed symbols).
-- [ ] `grep -r 'impeccable\|Impeccable\|ImpeccableTab' internal/ cmd/` returns no hits in Go source (only test-assertion strings that document the expected error message are acceptable).
-- [ ] Diff is comfortably under 800 lines.
+- [x] `go build ./...` is green.
+- [x] `go vet ./...` is clean.
+- [x] `go test ./...` is green (no reference to removed symbols).
+- [x] `grep -r 'impeccable\|Impeccable\|ImpeccableTab' internal/ cmd/` returns no hits in Go source (only test-assertion strings that document the expected error message are acceptable).
+- [x] Diff is comfortably under 800 lines (638 lines changed: 53 inserted, 585 deleted).
 - [ ] PR description references the `streamline-harness` change and `[[harness-init]]`.
 
 ---

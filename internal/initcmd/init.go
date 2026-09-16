@@ -27,8 +27,6 @@ type Options struct {
 	Playwright bool
 	// Security enables the security-baseline gate across the SDD phases.
 	Security bool
-	// Impeccable enables the Impeccable design-language quality gate.
-	Impeccable bool
 	// Graphify enables the advisory code-graph gate.
 	Graphify bool
 	// OverwriteTemplate, when true, replaces an existing orchestrator file
@@ -88,7 +86,7 @@ func Run(opts Options) (*Result, error) {
 	projectSkillsDir := res.ProjectSkillsDir
 	extracted := res.Extracted
 
-	cfg := buildConfig(agentName, extracted, res.Inventory, opts.ModelDefault, opts.ModelLeader, opts.ModelPhases, opts.Playwright, opts.Security, opts.Impeccable, opts.Graphify)
+	cfg := buildConfig(agentName, extracted, res.Inventory, opts.ModelDefault, opts.ModelLeader, opts.ModelPhases, opts.Playwright, opts.Security, opts.Graphify)
 	cfg.HomeDir = opts.ProjectDir
 	if err := cfg.Save(); err != nil {
 		return nil, fmt.Errorf("save config: %w", err)
@@ -221,7 +219,7 @@ func createSymlinks(globalDir, projectDir string, skills []string) error {
 	return nil
 }
 
-func buildConfig(agentName string, extracted []string, inventory []config.SkillInventory, modelDefault string, modelLeader string, modelPhases map[string]string, playwright bool, security bool, impeccable bool, graphify bool) *config.Config {
+func buildConfig(agentName string, extracted []string, inventory []config.SkillInventory, modelDefault string, modelLeader string, modelPhases map[string]string, playwright bool, security bool, graphify bool) *config.Config {
 	var phases map[string]config.ModelRef
 	for k, v := range modelPhases {
 		if v != "" {
@@ -248,9 +246,6 @@ func buildConfig(agentName string, extracted []string, inventory []config.SkillI
 		},
 		Security: config.Security{
 			Enabled: security,
-		},
-		Impeccable: config.Impeccable{
-			Enabled: impeccable,
 		},
 		Graphify: config.Graphify{
 			Enabled:   graphify,

@@ -607,7 +607,7 @@ func TestBuildConfig_SecurityFlag(t *testing.T) {
 		{"security off, playwright on", false, true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := buildConfig("opencode", nil, nil, "", "", nil, tt.playwright, tt.security, false, false)
+			cfg := buildConfig("opencode", nil, nil, "", "", nil, tt.playwright, tt.security, false)
 			if cfg.Security.Enabled != tt.security {
 				t.Errorf("Security.Enabled = %v, want %v", cfg.Security.Enabled, tt.security)
 			}
@@ -618,32 +618,8 @@ func TestBuildConfig_SecurityFlag(t *testing.T) {
 	}
 }
 
-// TestBuildConfig_ImpeccableFlag covers spec scenarios "Init with --impeccable
-// flag enables the gate", "Init without --impeccable leaves gate disabled",
-// and "buildConfig receives the flag value".
-func TestBuildConfig_ImpeccableFlag(t *testing.T) {
-	for _, tt := range []struct {
-		name       string
-		impeccable bool
-	}{
-		{"impeccable on", true},
-		{"impeccable off", false},
-	} {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := buildConfig("opencode", nil, nil, "", "", nil, false, false, tt.impeccable, false)
-			if cfg.Impeccable.Enabled != tt.impeccable {
-				t.Errorf("Impeccable.Enabled = %v, want %v", cfg.Impeccable.Enabled, tt.impeccable)
-			}
-			if cfg.Impeccable.Severity != "" {
-				t.Errorf("Impeccable.Severity = %q, want empty (buildConfig must not set it; Load() normalizes)", cfg.Impeccable.Severity)
-			}
-		})
-	}
-}
-
 // TestBuildConfig_GraphifyFlag covers spec scenarios "archon init --graphify
-// writes enabled true" and "Default init leaves graphify disabled" (mirrors
-// TestBuildConfig_ImpeccableFlag).
+// writes enabled true" and "Default init leaves graphify disabled".
 func TestBuildConfig_GraphifyFlag(t *testing.T) {
 	for _, tt := range []struct {
 		name     string
@@ -653,7 +629,7 @@ func TestBuildConfig_GraphifyFlag(t *testing.T) {
 		{"graphify:false", false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := buildConfig("opencode", nil, nil, "", "", nil, false, false, false, tt.graphify)
+			cfg := buildConfig("opencode", nil, nil, "", "", nil, false, false, tt.graphify)
 			if cfg.Graphify.Enabled != tt.graphify {
 				t.Errorf("Graphify.Enabled = %v, want %v", cfg.Graphify.Enabled, tt.graphify)
 			}
