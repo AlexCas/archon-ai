@@ -11,14 +11,14 @@ this preamble is authored prose and is preserved across every regeneration. See
 - [[archon-map]] — The `archon-map` capability is a deterministic Go module (`internal/mapgen`) and `archon map` CLI subcommand that regenerates `openspec/map.md` (capabilities index + materialized backlink map), rewrites boundary-crossing relative links on archive, offers a `--check` guard, and supports a one-shot `--backfill` mode for existing archived changes.
 - [[claude-phase-subagents]]
 - [[cli-installer]] — The `archon` CLI bootstraps the SDD harness into any project by extracting 21 embedded gentle-ai skills and scaffolding per-project config, agent instructions, and rollback tracking.
-- [[graphify-integration]] — Opt-in, default-off, advisory *code graph* gate backed by [Graphify](https://github.com/Graphify-Labs/graphify) (Python, tree-sitter AST; edges tagged `EXTRACTED`/`INFERRED`). Adds graph-informed repo comprehension to `sdd-explore` and Leiden-community slice boundaries to `sdd-tasks`. **Never blocks any phase, never returns a verdict.**
+- [[harness-bugfix-track]] — Defines an abbreviated SDD track for bug fixes. A change may declare `track: bugfix` in its `state.yaml`, selecting a 5-phase sequence (explore → spec → apply → verify → archive) with no judge phase and a minimal three-section scoped spec, instead of the full 9-phase track. The `track` field is back-compatible: absent means `full`.
 - [[harness-commits]] — Ensure commits created through the harness are attributed only to the user.
-- [[harness-init]] — Bootstrap the harness in a project regardless of pre-existing agent folders, protect hand-written orchestrator files, and configure web testing and models at init time.
+- [[harness-init]]
 - [[harness-judge]]
 - [[harness-session-status]] — Provide a single per-session resume point so an SDD session can continue without losing context after the agent is closed.
 - [[harness-testing]] — Author use cases as formal Gherkin, detect web projects, and generate/execute Playwright E2E tests from those use cases when enabled.
 - [[harness-update]] — Provide a safe, version-aware `archon update` that refreshes installed skills from the embedded set without rewriting the orchestrator template or resetting user config.
-- [[harness-workflow]] — The `harness-workflow` meta-skill enforces the SDD phase sequence (explore → propose → spec → design → tasks → apply → verify → judge → archive) by reading change state and blocking invalid transitions.
+- [[harness-workflow]]
 - [[local-model-router]] — Specify the behavior of the hybrid phase-dispatch router: a deterministic code pre-router (`archon route`) plus a model classifier (`skills/sdd-router/SKILL.md`) that together resolve which SDD phase to target from a natural-language user message. This spec is the contract the verify phase tests against.
 - [[model-effort-variants]] — Let users pick an effort/reasoning level for reasoning-capable models in the TUI Models picker, persist it on `config.ModelRef.Effort`, and write it to `opencode.json` as the per-agent `variant` field — without any opencode plugin, variants cache, or embedded-asset subsystem (availability is derived from the existing `opencode.Model.Reasoning` flag).
 - [[model-ref]] — Define a structured `provider + model` representation (`ModelRef`) that replaces flat model strings in `config.ModelConfig`, with a `FullID()` accessor and back-compatible YAML (un)marshalling so existing flat-string `config.yaml` files load and re-save byte-identical until the user re-picks a model.
@@ -44,6 +44,7 @@ this preamble is authored prose and is preserved across every regeneration. See
 | [ai-orchestration-harness](changes/ai-orchestration-harness/proposal.md) |  |  |
 | [issue-16-leader-personality](changes/issue-16-leader-personality/proposal.md) |  |  |
 | [opencode-phase-subagents](changes/opencode-phase-subagents/proposal.md) | design | in_progress |
+| [streamline-harness](changes/streamline-harness/proposal.md) | design | completed |
 
 ## Archive
 ### 2026-08-26
@@ -95,13 +96,14 @@ this preamble is authored prose and is preserved across every regeneration. See
 
 ## Backlinks
 - [[archon-map]] ← obsidian-vault-specs
-- [[graphify-integration]] ← graphify-integration, graphify-tui-tab, local-model-router
-- [[harness-judge]] ← chained-pr-archive
-- [[harness-workflow]] ← archive-before-pr, chained-pr-archive, obsidian-vault-specs, stacked-pr-archive
+- [[harness-bugfix-track]] ← streamline-harness
+- [[harness-init]] ← streamline-harness
+- [[harness-judge]] ← chained-pr-archive, streamline-harness
+- [[harness-workflow]] ← archive-before-pr, chained-pr-archive, obsidian-vault-specs, stacked-pr-archive, streamline-harness
 - [[local-model-router]] ← local-model-router
 - [[openspec-convention]] ← obsidian-vault-specs
 - [[sdd-archive]] ← obsidian-vault-specs
 - [[sdd-init]] ← obsidian-vault-specs
-- [[sdd-phase-skills]] ← obsidian-vault-specs
+- [[sdd-phase-skills]] ← obsidian-vault-specs, streamline-harness
 - [[spec-vault]] ← obsidian-vault-specs
 <!-- MAP:END -->

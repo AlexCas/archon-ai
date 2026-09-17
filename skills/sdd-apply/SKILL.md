@@ -38,7 +38,6 @@ You are a sub-agent responsible for IMPLEMENTATION. You receive specific tasks f
 From the orchestrator:
 - Change name
 - The specific task(s) to implement (e.g., "Phase 1, tasks 1.1-1.3")
-- Artifact store mode (`engram | openspec | hybrid | none`)
 - Structured status from `skills/_shared/sdd-status-contract.md`: `schemaName`, `planningHome`, `changeRoot`, `artifactPaths`, `contextFiles`, `applyState`, task progress, dependency states, and `actionContext`
 - Delivery strategy and resolved workload decision (`ask-on-risk | auto-chain | single-pr | exception-ok`, plus PR slice or `size:exception` when applicable)
 
@@ -46,10 +45,7 @@ From the orchestrator:
 
 > Follow **Section B** (retrieval) and **Section C** (persistence) from `skills/_shared/sdd-phase-common.md`.
 
-- **engram**: Read `sdd/{change-name}/proposal`, `sdd/{change-name}/spec`, `sdd/{change-name}/design`, `sdd/{change-name}/tasks` (all required — keep tasks ID for updates). Mark tasks complete via `mem_update(id: {tasks-observation-id}, content: "...")`. Save progress as `sdd/{change-name}/apply-progress`.
-- **openspec**: Read and follow `skills/_shared/openspec-convention.md`. Update `tasks.md` with `[x]` marks.
-- **hybrid**: Follow BOTH conventions — persist progress to Engram (`mem_update` for tasks) AND update `tasks.md` with `[x]` marks on filesystem.
-- **none**: Return progress only. Do not update project artifacts.
+Read and follow `skills/_shared/openspec-convention.md`. Update `tasks.md` with `[x]` marks.
 
 ## Status and Workspace Guard
 
@@ -95,15 +91,14 @@ Then you MUST confirm the orchestrator/user provided a resolved delivery path:
 
 Also check for `Chain strategy` in the tasks artifact. If present and not `pending`, follow it consistently:
 - `stacked-to-main`: each PR targets the previous PR's branch (or `main` after the previous merges).
-  This value is only valid when archive-before-PR is NOT in effect (`engram`). If the
+  This value is only valid when archive-before-PR is NOT in effect. If the
   tasks artifact carries `Chain strategy: stacked-to-main` while archive-before-PR is
-  in effect (`openspec`/`hybrid`), the convergence gate in `sdd-tasks` was skipped:
+  in effect, the convergence gate in `sdd-tasks` was skipped:
   STOP and return `blocked` with `Stacked-to-Main + archive-before-PR is unsupported;
   converge to feature-branch-chain before opening any child PR` (see
   `[[harness-workflow]]` "Stacked-to-Main Archive Convergence"). Do not merge any
-  child PR to `main`. If the artifact store mode was not injected, infer it from the
-  presence of `openspec/config.yaml` or `openspec/changes/{name}/` before evaluating
-  this check.
+  child PR to `main`. Infer archive-before-PR from the presence of `openspec/config.yaml`
+  or `openspec/changes/{name}/`.
 - `feature-branch-chain`: PR #1 targets the feature/tracker branch; later PRs target the immediate previous PR branch. The tracker PR aggregates the feature branch to `main`; child PR diffs must stay focused on only the current work unit and must never target `main` directly.
   For `feature-branch-chain`, the archive commit is NOT part of any child slice; it is
   staged on the tracker branch after the integrated judge passes and before the
@@ -113,13 +108,11 @@ If neither delivery decision nor chain strategy is present, STOP before writing 
 
 #### Step 2b: Read Previous Apply-Progress (if exists)
 
-Before starting work, check for existing apply-progress:
-
-1. `mem_search(query: "sdd/{change-name}/apply-progress", project: "{project}")`
-2. If found: `mem_get_observation(id)` → read the full content
-3. Parse which tasks are already marked complete
-4. Skip those tasks — start from the first incomplete task
-5. When saving your apply-progress in Step 6, MERGE: include all previously completed tasks PLUS your newly completed tasks in a single combined artifact
+Before starting work, check for existing apply-progress at
+`openspec/changes/{change-name}/apply-progress.md`. If found, parse which tasks are
+already marked complete, skip them, and start from the first incomplete task. When
+saving your apply-progress in Step 6, MERGE: include all previously completed tasks
+PLUS your newly completed tasks in a single combined artifact.
 
 **CRITICAL**: If the orchestrator told you previous progress exists, you MUST read it. If you overwrite without reading, completed work from prior batches is permanently lost.
 
@@ -129,7 +122,6 @@ Read the cached testing capabilities to determine implementation mode:
 
 ```
 Read testing capabilities from:
-├── engram: mem_search("sdd/{project}/testing-capabilities") → mem_get_observation(id)
 ├── openspec: openspec/config.yaml → strict_tdd + testing section
 └── Fallback: check project files directly (package.json, go.mod, etc.)
 
@@ -190,23 +182,6 @@ produced by `sdd-spec`:
 Treat the generated specs as part of this work unit's diff (commit them with the
 behavior they cover). If `playwright.enabled: false`, skip this step entirely.
 
-### Step 4c: Run Impeccable Design Verbs (conditional, frontend changes only)
-
-**Only if `.archon/config.yaml` → `impeccable.enabled: true`** AND this batch's
-tasks touch frontend-affecting files (UI components, styles, templates,
-client-side routes). Load `skills/impeccable/SKILL.md` for the full contract.
-
-- Run the relevant `/impeccable <verb>` (e.g. `craft`, `polish`, `harden`,
-  `animate`) as **agent slash commands inside this session** — this is
-  AGENT-BEHAVIORAL, NOT an `npx` shell-out. Do not attempt to shell out to
-  `/impeccable`; only `install`/`update`/`detect` are real `npx` commands.
-- Apply the verbs to the frontend files you just changed or created in this
-  batch.
-- Note which verbs were run (or that none applied) in the return summary.
-
-If `impeccable.enabled: false`, or the batch has no frontend-affecting files,
-skip this step entirely.
-
 ### Step 5: Mark Tasks Complete
 
 Update `tasks.md` — change `- [ ]` to `- [x]` for completed tasks:
@@ -225,9 +200,8 @@ Update `tasks.md` — change `- [ ]` to `- [x]` for completed tasks:
 
 Follow **Section C** from `skills/_shared/sdd-phase-common.md`.
 - artifact: `apply-progress`
-- topic_key: `sdd/{change-name}/apply-progress`
-- type: `architecture`
-- Also update the tasks artifact with `[x]` marks via `mem_update` (engram) or file edit (openspec/hybrid).
+- Write to `openspec/changes/{change-name}/apply-progress.md`
+- Also update `tasks.md` with `[x]` marks.
 
 #### Merge Protocol
 
@@ -298,7 +272,7 @@ judge, before the tracker merges), never to a child apply batch.
 - ALWAYS match existing code patterns and conventions in the project
 - ALWAYS consume or produce structured status before implementation; do not infer readiness from conversation alone
 - STOP on `applyState: blocked` and do not edit; STOP on unsafe `actionContext` or edit roots
-- In `openspec` mode, mark tasks complete in `tasks.md` AS you go, not at the end
+- Mark tasks complete in `tasks.md` AS you go, not at the end
 - Before returning, re-read the persisted tasks artifact and ensure completed tasks are visibly marked `[x]`; internal todos are not completion evidence
 - If you discover the design is wrong or incomplete, NOTE IT in your return summary — don't silently deviate
 - If a task is blocked by something unexpected, STOP and report back
@@ -312,7 +286,6 @@ judge, before the tracker merges), never to a child apply batch.
   diff.
 - NEVER implement tasks that weren't assigned to you
 - When `playwright.enabled` and the project is web, GENERATE Playwright specs from the Gherkin `.feature` files (Step 4b); never execute them here
-- When `impeccable.enabled`, run Impeccable design verbs on frontend-affecting changes during apply (Step 4c)
 - **Commit attribution**: if you create commits, they are authored SOLELY by the user's git account. NEVER add `Co-Authored-By` trailers, "Generated with" lines, or any agent/tool attribution to commit messages or PR bodies.
 - Skill loading is handled in Step 1 — follow any loaded skills strictly when writing code
 - Apply any `rules.apply` from `openspec/config.yaml`

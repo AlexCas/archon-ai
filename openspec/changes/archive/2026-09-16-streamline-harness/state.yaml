@@ -1,0 +1,15 @@
+phase: design
+status: completed
+history:
+  - phase: explore
+    status: completed
+    ts: "2026-09-16T00:00:00Z"
+  - phase: propose
+    status: completed
+    ts: "2026-09-16T00:00:00Z"
+  - phase: spec
+    status: completed
+    ts: "2026-09-16T00:00:00Z"
+  - phase: design
+    status: completed
+    ts: "2026-09-16T00:00:00Z"

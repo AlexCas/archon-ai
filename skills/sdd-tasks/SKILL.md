@@ -37,17 +37,13 @@ You are a sub-agent responsible for creating the TASK BREAKDOWN. You take the pr
 
 From the orchestrator:
 - Change name
-- Artifact store mode (`engram | openspec | hybrid | none`)
 - Delivery strategy (`ask-on-risk | auto-chain | single-pr | exception-ok`)
 
 ## Execution and Persistence Contract
 
 > Follow **Section B** (retrieval) and **Section C** (persistence) from `skills/_shared/sdd-phase-common.md`.
 
-- **engram**: Read `sdd/{change-name}/proposal` (required), `sdd/{change-name}/spec` (required), `sdd/{change-name}/design` (required). Save as `sdd/{change-name}/tasks`.
-- **openspec**: Read and follow `skills/_shared/openspec-convention.md`.
-- **hybrid**: Follow BOTH conventions — persist to Engram AND write `tasks.md` to filesystem. Retrieve dependencies from Engram (primary) with filesystem fallback.
-- **none**: Return result only. Never create or modify project files.
+Read and follow `skills/_shared/openspec-convention.md`.
 
 ## What to Do
 
@@ -63,7 +59,7 @@ From the design document, identify:
 
 ### Step 3: Write tasks.md
 
-**IF mode is `openspec` or `hybrid`:** Create the task file:
+Create the task file:
 
 ```
 openspec/changes/{change-name}/
@@ -72,8 +68,6 @@ openspec/changes/{change-name}/
 ├── design.md
 └── tasks.md               ← You create this
 ```
-
-**IF mode is `engram` or `none`:** Do NOT create any `openspec/` directories or files. Compose the tasks content in memory — you will persist it in Step 4.
 
 #### Task File Format
 
@@ -155,7 +149,7 @@ If the estimate is **High** or likely above 400 lines:
 2. Split tasks into **work units** that can become chained or stacked PRs.
 3. Each suggested PR must have a clear start, clear finish, verification, and autonomous scope.
 4. **Ask the user which chain strategy to use** (this is a team decision):
-   - **Stacked PRs to main** — each PR merges to main in order. Fast iteration, fix on the go. Best for speed-first teams and independent slices. (Not available under archive-before-PR / `openspec`/`hybrid` mode — the Convergence Gate below redirects it to Feature Branch Chain.)
+   - **Stacked PRs to main** — each PR merges to main in order. Fast iteration, fix on the go. Best for speed-first teams and independent slices. (Not available when archive-before-PR is in effect — the Convergence Gate below redirects it to Feature Branch Chain.)
    - **Feature Branch Chain** — the feature/tracker branch accumulates the final integration; PR #1 targets the tracker branch, later PRs target the immediate previous PR branch so each child diff stays focused. Only the tracker merges to main. Best for rollback control and coordinated releases.
    - **size:exception** — keep it as a single PR with maintainer approval. Best for generated code, migrations, or vendor diffs.
 5. Cache the user's choice and set `Decision needed before apply` from delivery strategy:
@@ -163,16 +157,6 @@ If the estimate is **High** or likely above 400 lines:
    - `auto-chain`: `No` — orchestrator proceeds with the first slice using the chosen chain strategy.
    - `single-pr`: `Yes` — orchestrator must require `size:exception` before apply.
    - `exception-ok`: `No` — maintainer has accepted `size:exception`.
-
-**Graphify community input (conditional):** When `graphify.enabled: true`,
-read Leiden community data from `graph.json`/`GRAPH_REPORT.md` in the
-configured `graphify.output_dir` (default `.archon/graphify/`) — **read-only
-file access, never shell any `graphify` command**, even if the binary is
-present and `graph.json` is absent;
-`sdd-explore` is the sole extraction site (see `skills/graphify/SKILL.md`).
-Community boundaries MAY inform the Suggested Work Units table below.
-Missing or unreadable community data falls back to the heuristic
-slice-boundary estimate above — no change to task behavior.
 
 ### Archive-before-PR Convergence Gate (MANDATORY)
 
@@ -183,9 +167,9 @@ minimum: the High-budget path above, the session preflight PR strategy
 `force-chained`, and an `auto` delivery strategy that picks chaining under a
 Low/Medium estimate. No path is exempt.
 
-If the artifact store is `openspec` or `hybrid` (archive-before-PR in effect
-for this session, from the SDD session preflight), the chosen chain strategy
-MUST NOT be **Stacked PRs to main** (`stacked-to-main`). Stacked-to-Main ships
+When archive-before-PR is in effect for this session (from the SDD session
+preflight), the chosen chain strategy MUST NOT be **Stacked PRs to main**
+(`stacked-to-main`). Stacked-to-Main ships
 each slice independently to `main`, so no single un-merged ref can own the
 archive commit; the archive-before-PR invariant cannot be satisfied. The
 orchestrator MUST select — or convert to — **Feature Branch Chain**
@@ -204,8 +188,7 @@ opened. A late Stacked→FBC conversion (after slices already merged to `main`)
 is NOT sanctioned and has no recovery procedure — see the `harness-workflow`
 spec requirement "Stacked-to-Main Archive Convergence."
 
-When the artifact store is `engram` or `none` (archive-before-PR not in
-effect), Stacked-to-Main is unaffected and remains a valid choice.
+When archive-before-PR is not in effect, Stacked-to-Main remains a valid choice.
 
 Do not bury this in prose. Put the forecast near the top of the tasks artifact so the user sees it before implementation starts.
 
@@ -220,10 +203,9 @@ Chain strategy: stacked-to-main|feature-branch-chain|size-exception|pending
 
 You may keep the table for readability, but the plain-text lines are the guard contract.
 
-When archive-before-PR is in effect (`openspec`/`hybrid`), `Chain strategy` MUST NOT
-be `stacked-to-main`; the Archive-before-PR Convergence Gate above sets it to
-`feature-branch-chain` instead. `stacked-to-main` remains valid only when the
-artifact store is `engram` or `none`.
+When archive-before-PR is in effect, `Chain strategy` MUST NOT be `stacked-to-main`;
+the Archive-before-PR Convergence Gate above sets it to `feature-branch-chain` instead.
+`stacked-to-main` remains valid only when archive-before-PR is not in effect.
 
 For `feature-branch-chain`, suggested work units SHOULD name the intended base boundary: PR #1 base = feature/tracker branch; PR #2 base = PR #1 branch; PR #3 base = PR #2 branch. If a child PR would show previous PR changes, the base is wrong and must be retargeted/rebased before review.
 
@@ -250,9 +232,6 @@ Phase 4: Testing
   └─ security.enabled: a @security CI task — run SAST, secret detection, and
      dependency vulnerability scans; fail CI on any HIGH or CRITICAL finding;
      do NOT name a specific vendor tool in the task description
-  └─ impeccable.enabled AND the change touches frontend files: an "Impeccable
-     pass" task instructing sdd-apply to run the relevant `/impeccable <verb>`
-     slash commands on the changed frontend files
 
 Phase 5: Cleanup (if needed)
   └─ Documentation, remove dead code, polish
@@ -264,8 +243,6 @@ Phase 5: Cleanup (if needed)
 
 Follow **Section C** from `skills/_shared/sdd-phase-common.md`.
 - artifact: `tasks`
-- topic_key: `sdd/{change-name}/tasks`
-- type: `architecture`
 
 ### Step 5: Return Summary
 
@@ -275,7 +252,7 @@ Return to the orchestrator:
 ## Tasks Created
 
 **Change**: {change-name}
-**Location**: `openspec/changes/{change-name}/tasks.md` (openspec/hybrid) | Engram `sdd/{change-name}/tasks` (engram) | inline (none)
+**Location**: `openspec/changes/{change-name}/tasks.md`
 
 ### Breakdown
 | Phase | Tasks | Focus |
@@ -312,17 +289,6 @@ Return to the orchestrator:
   name a specific vendor tool (e.g., do not write "run gosec" or "run trivy" —
   write "run SAST scan" and "run dependency vulnerability scan"). When
   `security.enabled` is false, omit this task entirely — no change to task behavior.
-- **Impeccable pass task (conditional)**: If `impeccable.enabled` is true and the
-  change touches frontend files, emit one task in Phase 4 titled along the lines
-  of "Run Impeccable design verbs on {affected frontend files}" — this instructs
-  `sdd-apply` to run the relevant `/impeccable <verb>` slash commands (see
-  `skills/impeccable/SKILL.md`). When `impeccable.enabled` is false, or the change
-  has no frontend files, omit this task entirely.
-- **Graphify community input (conditional)**: If `graphify.enabled` is true, read
-  Leiden community data from `graph.json`/`GRAPH_REPORT.md` (read-only file
-  access — NEVER shell any `graphify` command) to inform Suggested Work Units.
-  Missing or unreadable community data falls back to heuristic slice
-  boundaries; no change to task behavior.
 - Each task should be completable in ONE session (if a task feels too big, split it)
 - Use hierarchical numbering: 1.1, 1.2, 2.1, 2.2, etc.
 - NEVER include vague tasks like "implement feature" or "add tests"
