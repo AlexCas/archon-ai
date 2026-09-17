@@ -37,16 +37,12 @@ You are a sub-agent responsible for TECHNICAL DESIGN. You take the proposal and 
 
 From the orchestrator:
 - Change name
-- Artifact store mode (`engram | openspec | hybrid | none`)
 
 ## Execution and Persistence Contract
 
 > Follow **Section B** (retrieval) and **Section C** (persistence) from `skills/_shared/sdd-phase-common.md`.
 
-- **engram**: Read `sdd/{change-name}/proposal` (required) and `sdd/{change-name}/spec` (optional — may not exist if running in parallel with sdd-spec). Save as `sdd/{change-name}/design`.
-- **openspec**: Read and follow `skills/_shared/openspec-convention.md`.
-- **hybrid**: Follow BOTH conventions — persist to Engram AND write `design.md` to filesystem. Retrieve dependencies from Engram (primary) with filesystem fallback.
-- **none**: Return result only. Never create or modify project files.
+Read and follow `skills/_shared/openspec-convention.md`.
 
 ## What to Do
 
@@ -61,36 +57,9 @@ Before designing, read the actual code that will be affected:
 - Dependencies and interfaces
 - Test infrastructure (if any)
 
-### Step 2b: Impeccable Design-Language Reference (conditional, read-only)
-
-**Only if `.archon/config.yaml` → `impeccable.enabled: true`.** Load
-`skills/impeccable/SKILL.md` for the full contract; the summary here is the
-minimal hook.
-
-Before drafting `design.md`, look for `PRODUCT.md` and `DESIGN.md` at the
-target-project root (or `impeccable.product_path`/`impeccable.design_path` if
-set):
-
-- If both/either exist: read them and fold their design-language constraints
-  (audience, brand lane, voice, anti-references, colors, type, components)
-  into `design.md` as input context.
-- If neither exists: proceed normally and add a note recommending the user
-  run `/impeccable init` in their AI coding tool (a slash command, not `npx
-  impeccable init`) to generate the design-language foundation docs.
-
-This hook MUST NOT run `npx impeccable detect`, MUST NOT run any `/impeccable`
-slash command, and MUST NOT generate or overwrite the SDD `design.md`
-artifact or any Impeccable output file. `PRODUCT.md`/`DESIGN.md` stay at the
-target-project root; `design.md` stays at
-`openspec/changes/{change-name}/design.md` — distinct paths, neither
-overwrites the other.
-
-When `impeccable.enabled: false`, skip this step entirely — no change to
-today's behavior.
-
 ### Step 3: Write design.md
 
-**IF mode is `openspec` or `hybrid`:** Create the design document:
+Create the design document:
 
 ```
 openspec/changes/{change-name}/
@@ -98,8 +67,6 @@ openspec/changes/{change-name}/
 ├── specs/
 └── design.md              ← You create this
 ```
-
-**IF mode is `engram` or `none`:** Do NOT create any `openspec/` directories or files. Compose the design content in memory — you will persist it in Step 4.
 
 #### Design Document Format
 
@@ -177,8 +144,6 @@ If not applicable, state "No migration required."}
 
 Follow **Section C** from `skills/_shared/sdd-phase-common.md`.
 - artifact: `design`
-- topic_key: `sdd/{change-name}/design`
-- type: `architecture`
 
 ### Step 5: Return Summary
 
@@ -188,7 +153,7 @@ Return to the orchestrator:
 ## Design Created
 
 **Change**: {change-name}
-**Location**: `openspec/changes/{change-name}/design.md` (openspec/hybrid) | Engram `sdd/{change-name}/design` (engram) | inline (none)
+**Location**: `openspec/changes/{change-name}/design.md`
 
 ### Summary
 - **Approach**: {one-line technical approach}

@@ -218,59 +218,59 @@
 
 #### `skills/_shared/persistence-contract.md` rewrite
 
-- [ ] **[P3a-1]** Delete the `artifact_store.mode` selection line (`:5`) and the "ASK the user which mode" handshake (`:7`) and the default-resolution line (`:9`).
-- [ ] **[P3a-2]** Collapse the mode table (`:20-40`) to a single "OpenSpec is the sole store" statement: artifacts are files under `openspec/changes/{change-name}/`, git-tracked, team-shareable.
-- [ ] **[P3a-3]** Delete the `engram`, `hybrid`, and `none` rows from the mode table, the "engram mode limitation" note (`:29-31`), and the hybrid section (`:44-52`).
-- [ ] **[P3a-4]** Replace the state-persistence row with the single OpenSpec form: write/read `openspec/changes/{change-name}/state.yaml`.
-- [ ] **[P3a-5]** Delete the `none`-mode "return only" path (`:69,:74`) and the "default to none" fallback.
-- [ ] **[P3a-6]** Change the trailing prompt templates (`:103,:123`) that echo `{engram|openspec|hybrid|none}` to `OpenSpec`.
+- [x] **[P3a-1]** Delete the `artifact_store.mode` selection line (`:5`) and the "ASK the user which mode" handshake (`:7`) and the default-resolution line (`:9`).
+- [x] **[P3a-2]** Collapse the mode table (`:20-40`) to a single "OpenSpec is the sole store" statement: artifacts are files under `openspec/changes/{change-name}/`, git-tracked, team-shareable.
+- [x] **[P3a-3]** Delete the `engram`, `hybrid`, and `none` rows from the mode table, the "engram mode limitation" note (`:29-31`), and the hybrid section (`:44-52`).
+- [x] **[P3a-4]** Replace the state-persistence row with the single OpenSpec form: write/read `openspec/changes/{change-name}/state.yaml`.
+- [x] **[P3a-5]** Delete the `none`-mode "return only" path (`:69,:74`) and the "default to none" fallback.
+- [x] **[P3a-6]** Change the trailing prompt templates (`:103,:123`) that echo `{engram|openspec|hybrid|none}` to `OpenSpec`.
 
 #### `skills/_shared/engram-convention.md` deletion
 
-- [ ] **[P3a-7]** Delete `skills/_shared/engram-convention.md` entirely.
-- [ ] **[P3a-8]** Search for inbound references to `engram-convention.md` in `persistence-contract.md`, all phase skills, and `chained-pr`; remove each link.
+- [x] **[P3a-7]** Delete `skills/_shared/engram-convention.md` entirely.
+- [x] **[P3a-8]** Search for inbound references to `engram-convention.md` in `persistence-contract.md`, all phase skills, and `chained-pr`; remove each link.
 
 #### Per-phase skill engram/none removal (all 8 phase skills + aux)
 
 Apply the three-step pattern per skill: (a) delete the "Artifact store mode (engram|openspec|hybrid|none)" input line, (b) delete every `IF mode is engram/hybrid/none` branch block keeping only the OpenSpec body inline, (c) drop the now-redundant `IF mode is openspec` guard.
 
-- [ ] **[P3a-9]** `sdd-explore/SKILL.md` — engram/none anchors at `:46-48`, `:53-56`.
-- [ ] **[P3a-10]** `sdd-propose/SKILL.md` — engram/none anchors at `:41,:47,:49,:83,:89,:184`.
-- [ ] **[P3a-11]** `sdd-spec/SKILL.md` — engram/none anchors at `:40,:46,:48,:76,:93,:275`.
-- [ ] **[P3a-12]** `sdd-design/SKILL.md` — engram/none anchors at `:40,:46,:48,:102,:191`.
-- [ ] **[P3a-13]** `sdd-apply/SKILL.md` — engram/none anchors at `:41,:49,:51,:98,:132,:230`.
-- [ ] **[P3a-14]** `sdd-verify/SKILL.md` — engram/none mode branches (locate and delete).
-- [ ] **[P3a-15]** `sdd-tasks/SKILL.md` — engram/none mode branches (locate and delete).
-- [ ] **[P3a-16]** `sdd-archive/SKILL.md` — engram/none anchors at `:40,:48,:50,:59,:107,:144,:172,:191,:217,:237,:258`.
-- [ ] **[P3a-17]** `sdd-init/SKILL.md` — engram anchors at `:38,:40,:42,:51,:53,:75-76` (drop the track-less engram handling).
-- [ ] **[P3a-18]** `sdd-onboard/SKILL.md` — `:37` (`engram|openspec|hybrid|none` → `OpenSpec`).
-- [ ] **[P3a-19]** `skills/chained-pr/SKILL.md` and `skills/chained-pr/references/chaining-details.md` — remove any engram references.
-- [ ] **[P3a-20]** `skills/_shared/session-status-contract.md` — remove any engram mode branches.
+- [x] **[P3a-9]** `sdd-explore/SKILL.md` — engram/none anchors at `:46-48`, `:53-56`.
+- [x] **[P3a-10]** `sdd-propose/SKILL.md` — engram/none anchors at `:41,:47,:49,:83,:89,:184`.
+- [x] **[P3a-11]** `sdd-spec/SKILL.md` — engram/none anchors at `:40,:46,:48,:76,:93,:275`.
+- [x] **[P3a-12]** `sdd-design/SKILL.md` — engram/none anchors at `:40,:46,:48,:102,:191`.
+- [x] **[P3a-13]** `sdd-apply/SKILL.md` — engram/none anchors at `:41,:49,:51,:98,:132,:230`.
+- [x] **[P3a-14]** `sdd-verify/SKILL.md` — engram/none mode branches (locate and delete).
+- [x] **[P3a-15]** `sdd-tasks/SKILL.md` — engram/none mode branches (locate and delete).
+- [x] **[P3a-16]** `sdd-archive/SKILL.md` — engram/none anchors at `:40,:48,:50,:59,:107,:144,:172,:191,:217,:237,:258`.
+- [x] **[P3a-17]** `sdd-init/SKILL.md` — engram anchors at `:38,:40,:42,:51,:53,:75-76` (drop the track-less engram handling).
+- [x] **[P3a-18]** `sdd-onboard/SKILL.md` — `:37` (`engram|openspec|hybrid|none` → `OpenSpec`).
+- [x] **[P3a-19]** `skills/chained-pr/SKILL.md` and `skills/chained-pr/references/chaining-details.md` — remove any engram references.
+- [x] **[P3a-20]** `skills/_shared/session-status-contract.md` — remove any engram mode branches.
 
 ---
 
 ### Sub-group 3b — Impeccable/Graphify Hook Removal from Skills (split point if needed)
 
-- [ ] **[P3b-1]** `sdd-explore/SKILL.md` — delete Step 3c Impeccable recommendation block (`:110-118`) and the Graphify code-graph consumption block.
-- [ ] **[P3b-2]** `sdd-spec/SKILL.md` — delete Impeccable annotation notes (`:112-115,:312-315`). Confirm that `@security` abuse-case hooks are untouched.
-- [ ] **[P3b-3]** `sdd-design/SKILL.md` — delete Step 2b Impeccable block (`:64-88`).
-- [ ] **[P3b-4]** `sdd-apply/SKILL.md` — delete Step 4c Impeccable/Graphify block (`:193-208`) and the corresponding Rules line (`:315`).
-- [ ] **[P3b-5]** `sdd-verify/SKILL.md` — delete Impeccable presence check (`:44-50`).
-- [ ] **[P3b-6]** `sdd-tasks/SKILL.md` — delete Impeccable pass task (`:253-254,:315-321`) and Graphify Leiden consumption block.
-- [ ] **[P3b-7]** `skills/harness-judge/SKILL.md` — delete the `impeccable.enabled` Hard Rule (`:23,:30ff`), the Step-1 impeccable config read (`:71-77,:82`), Step 3c entire Impeccable gate block (`:125-165`), the Step-4 result-table impeccable column (`:172-173`), the Output-Contract "### Impeccable Gate" section (`:270-278`), and the Impeccable Error-Handling rows (`:307-310`) and Rules bullet (`:321-323`).
+- [x] **[P3b-1]** `sdd-explore/SKILL.md` — delete Step 3c Impeccable recommendation block (`:110-118`) and the Graphify code-graph consumption block.
+- [x] **[P3b-2]** `sdd-spec/SKILL.md` — delete Impeccable annotation notes (`:112-115,:312-315`). Confirm that `@security` abuse-case hooks are untouched.
+- [x] **[P3b-3]** `sdd-design/SKILL.md` — delete Step 2b Impeccable block (`:64-88`).
+- [x] **[P3b-4]** `sdd-apply/SKILL.md` — delete Step 4c Impeccable/Graphify block (`:193-208`) and the corresponding Rules line (`:315`).
+- [x] **[P3b-5]** `sdd-verify/SKILL.md` — delete Impeccable presence check (`:44-50`).
+- [x] **[P3b-6]** `sdd-tasks/SKILL.md` — delete Impeccable pass task (`:253-254,:315-321`) and Graphify Leiden consumption block.
+- [x] **[P3b-7]** `skills/harness-judge/SKILL.md` — delete the `impeccable.enabled` Hard Rule (`:23,:30ff`), the Step-1 impeccable config read (`:71-77,:82`), Step 3c entire Impeccable gate block (`:125-165`), the Step-4 result-table impeccable column (`:172-173`), the Output-Contract "### Impeccable Gate" section (`:270-278`), and the Impeccable Error-Handling rows (`:307-310`) and Rules bullet (`:321-323`).
 
 ---
 
 ### PR3 checklist
 
-- [ ] `go build ./...` is green (skill edits are markdown; this verifies no accidental Go touch).
-- [ ] `go test ./...` is green.
-- [ ] `grep -r 'engram\|Engram\|hybrid\|none.*mode\|impeccable\|Impeccable\|graphify\|Graphify' skills/` returns no hits (excluding the retired graphify-integration delta spec under `openspec/changes/`).
-- [ ] `skills/_shared/engram-convention.md` does not exist.
-- [ ] `skills/_shared/persistence-contract.md` names OpenSpec as the sole mode.
-- [ ] `harness-judge/SKILL.md` contains no Impeccable gate, no `impeccable.enabled` reference.
-- [ ] Security `@security` hooks in `sdd-spec/SKILL.md` are present and unmodified — do a targeted diff to confirm.
-- [ ] Diff is under 800 lines if kept whole; if split, each of 3a and 3b is under 800 lines individually.
+- [x] `go build ./...` is green (skill edits are markdown; this verifies no accidental Go touch).
+- [x] `go test ./...` is green.
+- [x] `grep -rInE 'engram|Engram|hybrid|none.*mode|impeccable|Impeccable|graphify|Graphify|mem_search|mem_get|mem_save|mem_update|topic_key|observation' skills/` returns no hits (excluding the declarative "OpenSpec is the sole persistence mode…" line in `persistence-contract.md`).
+- [x] `skills/_shared/engram-convention.md` does not exist.
+- [x] `skills/_shared/persistence-contract.md` names OpenSpec as the sole mode.
+- [x] `harness-judge/SKILL.md` contains no Impeccable gate, no `impeccable.enabled` reference.
+- [x] Security `@security` hooks in `sdd-spec/SKILL.md` are present and unmodified — do a targeted diff to confirm.
+- [ ] Diff is 830 lines (3a+3b both done; 30 lines over the 800 soft budget — see note below).
 - [ ] PR description references the `streamline-harness` change and `[[sdd-phase-skills]]`.
 
 ---
