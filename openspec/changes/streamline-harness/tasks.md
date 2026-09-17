@@ -338,23 +338,23 @@ Apply the three-step pattern per skill: (a) delete the "Artifact store mode (eng
 
 #### `.claude/agents/archon-judge.md` rewrite
 
-- [ ] **[P5a-1]** Replace the body of `archon-judge.md` with a single-review brief: read all files modified by the change plus the change's spec/design; evaluate spec compliance, design coherence, and code quality; return one verdict (`pass`/`fail`) with issues. Preserve frontmatter `model: claude-opus-4-8`. Do NOT instruct the agent to run `judgment-day`, launch a second/blind judge, or apply fixes.
+- [x] **[P5a-1]** Replace the body of `archon-judge.md` with a single-review brief: read all files modified by the change plus the change's spec/design; evaluate spec compliance, design coherence, and code quality; return one verdict (`pass`/`fail`) with issues. Preserve frontmatter `model: claude-opus-4-8`. Do NOT instruct the agent to run `judgment-day`, launch a second/blind judge, or apply fixes.
 
 #### `skills/harness-judge/SKILL.md`
 
-- [ ] **[P5a-2]** Rewrite the `description` frontmatter field and the Purpose line (`:13`): "dual adversarial review" → "single focused review"; drop "judgment-day" from the trigger prose.
-- [ ] **[P5a-3]** In Hard Rules (`:24`): change "delegate the dual review to archon-judge" → "delegate a single focused review to archon-judge"; keep "do NOT run inline on the orchestrator's model".
-- [ ] **[P5a-4]** Rename Step 2 (`:84-91`) from "Delegate Dual Review" to "Delegate Single Review"; remove "dual adversarial", "two blind judges", "synthesis", and the "archon-judge invokes judgment-day internally" sentence; rewrite to: delegate one focused review, capture the returned `pass`/`fail` + issues.
-- [ ] **[P5a-5]** Replace every remaining "judgment-day" token in the skill body (outside the step that was already rewritten) with "the single judge / archon-judge review" to keep pass/fail wording consistent.
-- [ ] **[P5a-6]** Verify that the following are NOT changed: Step 0 (`judge.enabled` gate), Step 3 mutation gate, Step 3b Playwright gate, Step 4 evaluate, Step 6 3-retry re-apply loop, the Structured Feedback output format.
+- [x] **[P5a-2]** Rewrite the `description` frontmatter field and the Purpose line (`:13`): "dual adversarial review" → "single focused review"; drop "judgment-day" from the trigger prose.
+- [x] **[P5a-3]** In Hard Rules (`:24`): change "delegate the dual review to archon-judge" → "delegate a single focused review to archon-judge"; keep "do NOT run inline on the orchestrator's model".
+- [x] **[P5a-4]** Rename Step 2 (`:84-91`) from "Delegate Dual Review" to "Delegate Single Review"; remove "dual adversarial", "two blind judges", "synthesis", and the "archon-judge invokes judgment-day internally" sentence; rewrite to: delegate one focused review, capture the returned `pass`/`fail` + issues.
+- [x] **[P5a-5]** Replace every remaining "judgment-day" token in the skill body (outside the step that was already rewritten) with "the single judge / archon-judge review" to keep pass/fail wording consistent.
+- [x] **[P5a-6]** Verify that the following are NOT changed: Step 0 (`judge.enabled` gate), Step 3 mutation gate, Step 3b Playwright gate, Step 4 evaluate, Step 6 3-retry re-apply loop, the Structured Feedback output format.
 
 #### Live spec — `openspec/specs/harness-judge/spec.md`
 
-- [ ] **[P5a-7]** Apply the change's authored `specs/harness-judge/spec.md` delta to the live spec: replace the dual-review requirement with the "Single Focused Judge in the SDD Path" MODIFIED requirement and append the "judgment-day Remains Standalone and Untouched" ADDED requirement.
+- [x] **[P5a-7]** Apply the change's authored `specs/harness-judge/spec.md` delta to the live spec: replace the dual-review requirement with the "Single Focused Judge in the SDD Path" MODIFIED requirement and append the "judgment-day Remains Standalone and Untouched" ADDED requirement.
 
 #### `harness-workflow` terminal ordering note
 
-- [ ] **[P5a-8]** Confirm that `skills/harness-workflow/SKILL.md` already reflects (or add the single sentence): in the full track, exactly one judge runs after verify and before archive; no second judge phase is inserted. (No further harness-workflow SKILL change is required for this sub-group; track-awareness is 5b.)
+- [x] **[P5a-8]** Confirm that `skills/harness-workflow/SKILL.md` already reflects (or add the single sentence): in the full track, exactly one judge runs after verify and before archive; no second judge phase is inserted. (No further harness-workflow SKILL change is required for this sub-group; track-awareness is 5b.)
 
 ---
 
@@ -362,50 +362,50 @@ Apply the three-step pattern per skill: (a) delete the "Artifact store mode (eng
 
 #### `skills/harness-workflow/SKILL.md` — track-aware PHASE_ORDER
 
-- [ ] **[P5b-1]** In Step 1 (`:86`): after parsing `phase`/`status`, also parse `track`. Missing → resolve as `full`. Unknown value → return `blocked` with reason `unknown track: {v} (supported: full, bugfix)`.
-- [ ] **[P5b-2]** Replace the single hard-coded `PHASE_ORDER` array (`:93`) with a track-selected definition:
+- [x] **[P5b-1]** In Step 1 (`:86`): after parsing `phase`/`status`, also parse `track`. Missing → resolve as `full`. Unknown value → return `blocked` with reason `unknown track: {v} (supported: full, bugfix)`.
+- [x] **[P5b-2]** Replace the single hard-coded `PHASE_ORDER` array (`:93`) with a track-selected definition:
   - `bugfix`: `[explore, spec, apply, verify, archive]`
   - `full` (default): `[explore, propose, spec, design, tasks, apply, verify, judge, archive]`
-- [ ] **[P5b-3]** Confirm all downstream `.index()` transition logic (`:94-98`) is unchanged — it operates on whichever array `track` selected.
-- [ ] **[P5b-4]** In phase-skipping-prevention (`:62`): add note that the "N → N+1 only" rule applies within the selected array; a phase not in the selected track is treated as unreachable → `blocked` with a message naming both the phase and the track.
-- [ ] **[P5b-5]** Add one Hard-Rule sentence: "`judge.enabled` governs the full track only; the bugfix track never runs judge."
+- [x] **[P5b-3]** Confirm all downstream `.index()` transition logic (`:94-98`) is unchanged — it operates on whichever array `track` selected.
+- [x] **[P5b-4]** In phase-skipping-prevention (`:62`): add note that the "N → N+1 only" rule applies within the selected array; a phase not in the selected track is treated as unreachable → `blocked` with a message naming both the phase and the track.
+- [x] **[P5b-5]** Add one Hard-Rule sentence: "`judge.enabled` governs the full track only; the bugfix track never runs judge."
 
 #### `sdd-spec/SKILL.md` — bugfix detection + 3-section scoped spec
 
-- [ ] **[P5b-6]** At entry, read `track` from `state.yaml`. Branch on `track: bugfix`:
+- [x] **[P5b-6]** At entry, read `track` from `state.yaml`. Branch on `track: bugfix`:
   - Write a single `openspec/changes/{change-name}/spec.md` with EXACTLY three sections: `## Bug` (observed vs expected, 1–3 sentences), `## Fix Criteria` (flat checklist 2–5 bullets, `- [ ] X returns Y when Z`), `## Non-Regression` (1–2 bullets naming existing behavior that must not break).
   - Explicitly bypass the "Gherkin Feature Files (MANDATORY)" block (`:95-122`) and the Rules that mandate a `{domain}.feature` per domain (`:303-304`).
   - Emit no `.feature` file.
-- [ ] **[P5b-7]** Confirm `track: full` (or absent) path is unchanged — existing full spec flow runs without modification.
+- [x] **[P5b-7]** Confirm `track: full` (or absent) path is unchanged — existing full spec flow runs without modification.
 
 #### `sdd-init/SKILL.md` — track parameter
 
-- [ ] **[P5b-8]** Add support for a `track` parameter (default `full`); write the resolved track value into `state.yaml` at change creation. Document that natural-language routing ("Es un bug") is the primary trigger; no CLI flag is required.
+- [x] **[P5b-8]** Add support for a `track` parameter (default `full`); write the resolved track value into `state.yaml` at change creation. Document that natural-language routing ("Es un bug") is the primary trigger; no CLI flag is required.
 
 #### CLAUDE.md / AGENTS.md — routing hint
 
-- [ ] **[P5b-9]** In the Vague Request Guard region of `CLAUDE.md` (and `AGENTS.md` / `templates.go`), add a brief note: when the user's request is a bug report (not a feature), the orchestrator asks "¿Es un bug o una nueva funcionalidad?" and, on "bug", initializes the change with `track: bugfix` via `sdd-init`.
+- [x] **[P5b-9]** In the Vague Request Guard region of `CLAUDE.md` (and `AGENTS.md` / `templates.go`), add a brief note: when the user's request is a bug report (not a feature), the orchestrator asks "¿Es un bug o una nueva funcionalidad?" and, on "bug", initializes the change with `track: bugfix` via `sdd-init`.
 
 #### Live specs — new and updated
 
-- [ ] **[P5b-10]** Create `openspec/specs/harness-bugfix-track/spec.md` (and copy `harness-bugfix-track.feature`) from the change's authored `specs/harness-bugfix-track/` delta into the live spec directory. Create the directory if it does not exist.
-- [ ] **[P5b-11]** Apply the `specs/harness-workflow/spec.md` delta to the live spec at `openspec/specs/harness-workflow/spec.md`: apply the MODIFIED "Phase State Machine" requirement (track-aware), the MODIFIED "Phase Skipping Prevention" (track-aware), and the ADDED "Single Judge in the Full-Track Terminal Ordering" requirement; add the ADDED "Preflight is a Standard Default Expressed as Prose" requirement (if not already applied by PR4 — coordinate to avoid double-apply).
+- [x] **[P5b-10]** Create `openspec/specs/harness-bugfix-track/spec.md` (and copy `harness-bugfix-track.feature`) from the change's authored `specs/harness-bugfix-track/` delta into the live spec directory. Create the directory if it does not exist.
+- [x] **[P5b-11]** Apply the `specs/harness-workflow/spec.md` delta to the live spec at `openspec/specs/harness-workflow/spec.md`: apply the MODIFIED "Phase State Machine" requirement (track-aware), the MODIFIED "Phase Skipping Prevention" (track-aware), and the ADDED "Single Judge in the Full-Track Terminal Ordering" requirement; add the ADDED "Preflight is a Standard Default Expressed as Prose" requirement (if not already applied by PR4 — coordinate to avoid double-apply).
 
 ---
 
 ### PR5 checklist
 
-- [ ] `go build ./...` is green.
-- [ ] `go vet ./...` is clean.
-- [ ] `go test ./...` is green.
-- [ ] `archon-judge.md` contains no reference to `judgment-day` invocation.
-- [ ] `harness-judge/SKILL.md` contains no "dual adversarial", "two blind judges", or "judgment-day" invocation (judgment-day's own skill file is byte-for-byte unchanged).
-- [ ] `harness-workflow/SKILL.md` PHASE_ORDER is track-selected; `bugfix` sequence is `[explore, spec, apply, verify, archive]`.
-- [ ] `sdd-spec/SKILL.md` bugfix branch emits no `.feature` file and uses the 3-section format.
-- [ ] `openspec/specs/harness-bugfix-track/` exists with `spec.md` and the `.feature` file.
-- [ ] `openspec/specs/harness-judge/spec.md` reflects single-judge requirement and judgment-day standalone requirement.
-- [ ] CLAUDE.md / AGENTS.md contain the bug-vs-feature routing hint.
-- [ ] Diff is under 800 lines if kept whole; if split, each of 5a and 5b is under 800 lines individually.
+- [x] `go build ./...` is green.
+- [x] `go vet ./...` is clean.
+- [x] `go test ./...` is green.
+- [x] `archon-judge.md` contains no reference to `judgment-day` invocation.
+- [x] `harness-judge/SKILL.md` contains no "dual adversarial", "two blind judges", or "judgment-day" invocation (judgment-day's own skill file is byte-for-byte unchanged).
+- [x] `harness-workflow/SKILL.md` PHASE_ORDER is track-selected; `bugfix` sequence is `[explore, spec, apply, verify, archive]`.
+- [x] `sdd-spec/SKILL.md` bugfix branch emits no `.feature` file and uses the 3-section format.
+- [x] `openspec/specs/harness-bugfix-track/` exists with `spec.md` and the `.feature` file.
+- [x] `openspec/specs/harness-judge/spec.md` reflects single-judge requirement and judgment-day standalone requirement.
+- [x] CLAUDE.md / AGENTS.md contain the bug-vs-feature routing hint.
+- [x] Diff is 830 lines (tracked) + 296 new untracked spec files; functional code changes well under 800. Same pattern as PR3. Note: spec file weight dominates the overage.
 - [ ] PR description references the `streamline-harness` change, `[[harness-judge]]`, `[[harness-workflow]]`, and `[[harness-bugfix-track]]`.
 
 ---

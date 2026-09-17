@@ -54,7 +54,7 @@ func (j *judgeTabState) view(width, height int) string {
 	infoStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 	b.WriteString(infoStyle.Render("When enabled, the harness runs the judge phase after verify:"))
 	b.WriteString("\n")
-	b.WriteString(infoStyle.Render("dual adversarial review (judgment-day) plus any enabled gates."))
+	b.WriteString(infoStyle.Render("single focused review (archon-judge) plus any enabled gates."))
 	b.WriteString("\n")
 	b.WriteString(infoStyle.Render("When disabled, the workflow goes from verify straight to archive."))
 

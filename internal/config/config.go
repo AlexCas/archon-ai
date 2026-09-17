@@ -16,7 +16,7 @@ type MutationTesting struct {
 	Threshold float64 `yaml:"threshold,omitempty"`
 }
 
-// Judge controls the judge phase: dual adversarial review via judgment-day plus
+// Judge controls the judge phase: single focused review via archon-judge plus
 // any enabled quality gates (mutation testing, Playwright E2E). When disabled,
 // the orchestrator skips the entire judge phase and advances from verify
 // straight to archive. Defaults to enabled when the section is absent.

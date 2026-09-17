@@ -49,6 +49,43 @@ Read and follow `skills/_shared/openspec-convention.md`.
 ### Step 1: Load Skills
 Follow **Section A** from `skills/_shared/sdd-phase-common.md`.
 
+### Step 1b: Detect Track
+
+Read `openspec/changes/{change-name}/state.yaml` and parse the `track` field:
+- `track: bugfix` (or `track` is `"bugfix"`) → follow the **Bugfix Scoped Spec** path below. STOP — do NOT continue to Step 2.
+- `track: full` or `track` absent → continue to Step 2 (full spec flow, unchanged).
+
+#### Bugfix Scoped Spec Path (ONLY for `track: bugfix`)
+
+Write a single `openspec/changes/{change-name}/spec.md` with EXACTLY three sections and NO Gherkin content:
+
+```markdown
+## Bug
+
+{Observed vs expected behavior — 1–3 sentences describing what goes wrong and what should happen instead.}
+
+## Fix Criteria
+
+- [ ] {Verifiable condition 1 — "X returns Y when Z"}
+- [ ] {Verifiable condition 2}
+- [ ] {Verifiable condition 3 (2–5 bullets total)}
+
+## Non-Regression
+
+- {Existing behavior A must not break.}
+- {Existing behavior B must not break. (1–2 bullets)}
+```
+
+**Rules for the bugfix scoped spec:**
+- The three sections MUST be `## Bug`, `## Fix Criteria`, and `## Non-Regression` — no other requirement sections.
+- `## Fix Criteria` MUST contain between 2 and 5 checklist bullets (`- [ ] ...`), each stating a verifiable condition.
+- `## Non-Regression` MUST contain 1–2 bullets naming existing behavior that must not break.
+- **BYPASS** the "Gherkin Feature Files (MANDATORY)" block entirely — do NOT produce a `.feature` file.
+- **BYPASS** capability and requirement decomposition — no `## ADDED/MODIFIED/REMOVED Requirements` structure.
+- Persist the `spec.md` artifact following **Section C** from `skills/_shared/sdd-phase-common.md`.
+- Return a summary noting the scoped spec format and the omission of Gherkin.
+- After writing `spec.md`, STOP — return to the orchestrator. Do NOT proceed to Steps 2–6.
+
 ### Step 2: Identify Affected Domains
 
 Read the proposal's **Capabilities section** — this is your primary contract:

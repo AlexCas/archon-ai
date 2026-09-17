@@ -49,15 +49,28 @@ Run this phase when the orchestrator/user asks to initialize SDD in a project. Y
 | no marker/config but test runner exists | Default `strict_tdd: true`. |
 | no test runner | Set `strict_tdd: false` and explain unavailable. |
 
+## Track Parameter
+
+`sdd-init` accepts an optional `track` parameter (default `full`). When the user's request signals a bug fix ("Es un bug", "fix a bug", "bug report"), the orchestrator passes `track: bugfix`. Write the resolved track value into `state.yaml` at change creation:
+
+```yaml
+track: bugfix   # or omit for full (default)
+phase: explore
+status: in_progress
+```
+
+Supported values: `full` | `bugfix`. Reject any other value with an error naming both supported values. No CLI flag is required — natural-language routing is the primary trigger; the `track` parameter is passed by the orchestrator when it initializes the change.
+
 ## Execution Steps
 
 1. Inspect project files (`package.json`, `go.mod`, `pyproject.toml`, CI, lint/test config) and summarize stack/conventions.
 2. Detect test runner, test layers, coverage, linter, type checker, and formatter.
 3. Resolve Strict TDD from agent marker, `openspec/config.yaml`, detected runner fallback, or no-runner fallback.
-4. Initialize persistence for the resolved mode.
-5. Build `.atl/skill-registry.md` using the skill-registry scan rules.
-6. Persist testing capabilities and project context.
-7. Return the structured initialization envelope.
+4. Resolve `track` from the orchestrator-supplied parameter (default `full`). Write the resolved value into the new `state.yaml`.
+5. Initialize persistence for the resolved mode.
+6. Build `.atl/skill-registry.md` using the skill-registry scan rules.
+7. Persist testing capabilities and project context.
+8. Return the structured initialization envelope.
 
 ## Output Contract
 
