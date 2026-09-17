@@ -40,68 +40,28 @@ the `chained-pr` skill).
 
 ## SDD Session Preflight (HARD GATE)
 
-Before executing ANY SDD command or natural-language SDD request, ensure this session has an explicit preflight decision block.
+The preflight is a **fixed standard default applied silently** — no ceremony, no
+per-session questionnaire. The standard default is:
 
-Required choices:
-1. **Execution mode**: `interactive` or `auto`.
-2. **Artifact store**: `openspec`, `engram`, or `both`.
-3. **Chained PR strategy**: `ask-always`, `single-pr-default`, `force-chained`, or `auto-forecast`.
-4. **Review budget**: maximum changed lines before stopping for approval.
+- **Ritmo**: interactivo — show each phase and wait for confirmation before continuing.
+- **Artefactos**: OpenSpec — artifacts are always files under `openspec/changes/{change-name}/`, git-tracked, team-shareable. No other artifact store is supported.
+- **PRs**: ask-but-default-chained — default to a Feature Branch Chain; surface a single
+  scoped question if the estimate or the user's preference suggests otherwise.
+- **Revisión**: 800 lines — the review budget per PR slice.
 
-**Preflight questions (Spanish, arrow-key):**
+**Deviation rule:** the standard default is applied without asking. The orchestrator
+surfaces a single scoped one-line decision ONLY when a genuine deviation is detected:
+(a) the estimate exceeds the 800-line budget (suggest slicing or a budget bump),
+(b) the change is trivially small (suggest a single PR), or (c) the user explicitly
+asks to adjust. Absent a deviation, no preflight question is asked.
 
-Ask each group A–G as its OWN separate arrow-key `AskUserQuestion` — never a single
-text block, never answer codes like "A1"/"B1", never a global "usar recomendado"
-shortcut. Pre-select the recommended option as the default in each question. Ask all
-seven every SDD session.
-
-- **A. Ritmo** — "¿Qué ritmo quieres para las fases?"
-  - Interactivo (recomendado): mostrar cada fase y esperar confirmación antes de continuar.
-  - Automático: ejecutar las fases seguidas y frenar solo ante riesgo alto.
-- **B. Artefactos** — "¿Dónde guardamos los artefactos?"
-  - OpenSpec (recomendado): archivos en el repo, trazables en revisión.
-  - Engram: más rápido, sin archivos de especificación en el repo.
-  - Ambos: archivos OpenSpec más copia en Engram.
-- **C. PRs** — "¿Qué estrategia de PRs?"
-  - Preguntarme (recomendado): frenar y preguntar si la estimación supera el presupuesto.
-  - Un solo PR: intentar mantener el cambio en un PR.
-  - Encadenados: separar en PRs encadenados desde el inicio.
-  - Auto: decidir según la estimación de tamaño.
-- **D. Revisión** — "¿Presupuesto de líneas por revisión?"
-  - 400 líneas (recomendado): frenar si la estimación supera 400 líneas cambiadas.
-  - 800 líneas: más permisivo; útil para cambios medianos.
-  - Otro: al elegir esta opción, hacer UNA pregunta de texto libre pidiendo el número
-    de líneas y usar ese valor como presupuesto.
-- **E. Pruebas web (Playwright)** — "¿Generar y correr pruebas Playwright?"
-  - No (recomendado): no generar ni ejecutar pruebas Playwright.
-  - Sí: generar pruebas Playwright desde los escenarios Gherkin y ejecutarlas tras verify y jueces.
-- **F. Impeccable (Diseño de interfaz)** — "¿Activar Impeccable para calidad visual?"
-  - No (recomendado): no correr verificaciones de diseño.
-  - Sí: activar el gate de Impeccable tras verify/judge cuando esté habilitado.
-- **G. Graphify (Grafo de código)** — "¿Activar Graphify para análisis de grafo de código?"
-  - No (recomendado): no extraer ni consultar el grafo de código.
-  - Sí: extraer el grafo de código en sdd-explore y usar comunidades Leiden para sugerir límites de slices en sdd-tasks.
-
-**Project type & web testing (group E):**
-- Group E maps to `playwright.enabled` in `.archon/config.yaml`. The `--playwright` flag at init time or the Playwright tab in `archon tui` set the same value. When enabled, the harness generates Playwright specs from Gherkin scenarios and runs them after the verify and judge phases.
-
-**Project type & design-language gate (group F):**
-- Group F maps to `impeccable.enabled` in `.archon/config.yaml`. The `--impeccable`
-  flag at init time or the Impeccable tab in `archon tui` set the same value. When
-  enabled, the harness invokes Impeccable subcommands during apply and runs the
-  detection gate after the judge phase.
-
-**Project type & code-graph gate (group G):**
-- Group G maps to `graphify.enabled` in `.archon/config.yaml`. The `--graphify`
-  flag at init time or the Graphify tab in `archon tui` set the same value. When enabled, sdd-explore consults the
-  Graphify code graph for repo comprehension and sdd-tasks reads Leiden
-  communities to inform slice boundaries — advisory only, never blocking.
-
-**Hard gate rules:**
-- `openspec/config.yaml`, existing SDD artifacts, or previous `sdd-init` results do NOT satisfy this preflight.
-- If the session has no preflight decision, ask the seven per-group questions above and **STOP**. Do not run init, delegate phases, or apply tasks in the same turn.
-- Cache the choices for this session and echo them into later phase prompts.
-- If the user explicitly provided all seven choices in the current conversation, summarize them as the session preflight block and continue.
+**Playwright (web projects):**
+`playwright.enabled` in `.archon/config.yaml` controls Playwright web E2E generation.
+The `--playwright` flag at init time or the Playwright tab in `archon tui` set the
+same value. When enabled, the harness generates Playwright specs from Gherkin scenarios
+and runs them after the verify and judge phases. The orchestrator determines whether the
+project is web during `sdd-explore`; for a new or blank project where explore cannot
+determine the type, ask the user before enabling Playwright.
 
 ## Vague Request Guard (MANDATORY)
 
@@ -165,16 +125,15 @@ When committing on the user's behalf through the harness or any sub-agent:
 - Use conventional commit format for the subject; keep the body about the change, not the tool.
 ## Rules
 1. Check harness-workflow before any phase transition
-2. You MUST delegate each phase by invoking its `archon-<phase>` subagent via your delegation tool — never execute the phase inline on your own model; do not pass a per-call model parameter (the subagent's frontmatter model is the gate)
-3. Write/update SESSION_STATUS.md at the root on every phase transition
-4. After every phase that produces an editable artifact, run the Human Review Gate
-5. After verify, invoke harness-judge
-6. When playwright.enabled, run the generated Playwright tests after verify and judge pass
-7. When impeccable.enabled, run Impeccable subcommands during apply and the detection gate after judge passes
-8. When graphify.enabled, sdd-explore consults the code graph and sdd-tasks reads Leiden communities to inform slice boundaries — advisory only, never blocking (no verdict)
-9. On judge fail: re-apply with feedback (max 3 retries; in a Feature Branch Chain the integrated judge on the tracker uses the same cap)
-10. In the single-PR flow, run archive (spec merge, folder move, `archon map`, SESSION_STATUS.md move) as one commit AFTER judge passes and BEFORE opening the PR
-11. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution
+2. Before delegating a phase, run `archon route '<message>'` and use its resolved phase; invoke the model classifier (`skills/sdd-router`) when output is `CLASSIFY`; surface ASK to the user
+3. You MUST delegate each phase by invoking its `archon-<phase>` subagent via your delegation tool — never execute the phase inline on your own model; do not pass a per-call model parameter (the subagent's frontmatter model is the gate)
+4. Write/update SESSION_STATUS.md at the root on every phase transition
+5. After every phase that produces an editable artifact, run the Human Review Gate
+6. After verify, invoke harness-judge
+7. When playwright.enabled, run the generated Playwright tests after verify and judge pass
+8. On judge fail: re-apply with feedback (max 3 retries; in a Feature Branch Chain the integrated judge on the tracker uses the same cap)
+9. In the single-PR flow, run archive (spec merge, folder move, `archon map`, SESSION_STATUS.md move) as one commit AFTER judge passes and BEFORE opening the PR
+10. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution
 
 ## Configuration
 - Skills: 27 (embedded via archon init)

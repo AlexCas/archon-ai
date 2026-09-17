@@ -283,41 +283,41 @@ Apply the three-step pattern per skill: (a) delete the "Artifact store mode (eng
 
 ### Template — `internal/initcmd/templates.go`
 
-- [ ] **[P4-1]** Delete lines 56-88 of `orchestratorSections` (the A–G arrow-key question list). Replace with a concise "SDD Session Preflight" prose block stating the fixed default: Ritmo=interactivo · Artefactos=OpenSpec · PRs=ask-but-default-chained · Revisión=800, applied silently.
-- [ ] **[P4-2]** Keep lines 90-91 (group E — Playwright; reword to drop the "group E" framing).
-- [ ] **[P4-3]** Delete lines 93-97 (group F mapping, `impeccable.enabled`).
-- [ ] **[P4-4]** Delete lines 99-103 (group G mapping, `graphify.enabled`).
-- [ ] **[P4-5]** Replace lines 105-109 (hard-gate rules referencing "seven per-group questions" and "§openspec§, §engram§, or §both§") with the prose deviation contract: default applied without asking; surface a single scoped question only on (a) estimate > 800 lines, (b) trivially small change, or (c) explicit user request.
-- [ ] **[P4-6]** In `orchestratorRulesClaude` (`:187-199`) and `orchestratorRulesOpencode` (`:203-215`): delete Rule 8 (`impeccable.enabled`) and Rule 9 (`graphify.enabled`); keep Rule 7 (playwright.enabled); renumber trailing rules after the two deletions (former Rule 10 → Rule 8, former Rule 11 → Rule 9).
+- [x] **[P4-1]** Delete lines 56-88 of `orchestratorSections` (the A–G arrow-key question list). Replace with a concise "SDD Session Preflight" prose block stating the fixed default: Ritmo=interactivo · Artefactos=OpenSpec · PRs=ask-but-default-chained · Revisión=800, applied silently.
+- [x] **[P4-2]** Keep lines 90-91 (group E — Playwright; reword to drop the "group E" framing).
+- [x] **[P4-3]** Delete lines 93-97 (group F mapping, `impeccable.enabled`).
+- [x] **[P4-4]** Delete lines 99-103 (group G mapping, `graphify.enabled`).
+- [x] **[P4-5]** Replace lines 105-109 (hard-gate rules referencing "seven per-group questions" and "§openspec§, §engram§, or §both§") with the prose deviation contract: default applied without asking; surface a single scoped question only on (a) estimate > 800 lines, (b) trivially small change, or (c) explicit user request.
+- [x] **[P4-6]** In `orchestratorRulesClaude` (`:187-199`) and `orchestratorRulesOpencode` (`:203-215`): delete Rule 8 (`impeccable.enabled`) and Rule 9 (`graphify.enabled`); keep Rule 7 (playwright.enabled); renumber trailing rules after the two deletions (former Rule 10 → Rule 8, former Rule 11 → Rule 9).
 
 ### Template test — `internal/initcmd/templates_test.go`
 
-- [ ] **[P4-7]** Remove Group F/G assertions (`:149-151`) and the Group B engram/"Ambos" assertions.
-- [ ] **[P4-8]** Remove Rule 8 / Rule 9 assertions (`:205`).
-- [ ] **[P4-9]** Add assertion: rendered output contains the prose default text (e.g. "Ritmo=interactivo" or "SDD Session Preflight").
-- [ ] **[P4-10]** Add assertion: rendered output does NOT contain "Impeccable", "Graphify", "Engram", or "Ambos".
+- [x] **[P4-7]** Remove Group F/G assertions (`:149-151`) and the Group B engram/"Ambos" assertions.
+- [x] **[P4-8]** Remove Rule 8 / Rule 9 assertions (`:205`).
+- [x] **[P4-9]** Add assertion: rendered output contains the prose default text (e.g. "Ritmo=interactivo" or "SDD Session Preflight").
+- [x] **[P4-10]** Add assertion: rendered output does NOT contain "Impeccable", "Graphify", "Engram", or "Ambos".
 
 ### Rendered orchestrator files — `CLAUDE.md` and `AGENTS.md` (repo root)
 
-- [ ] **[P4-11]** Edit `CLAUDE.md` directly to mirror the template edits: replace the 7-group block with prose preflight, drop groups B-engram/F/G, drop rules 8–9.
-- [ ] **[P4-12]** Edit `AGENTS.md` with the same prose preflight changes.
-- [ ] **[P4-13]** Confirm that the committed CLAUDE.md and AGENTS.md match what `RenderClaudeMD`/`RenderAgentsMD` would produce from the updated template (run `archon update` or invoke the render functions in a test if available).
+- [x] **[P4-11]** Edit `CLAUDE.md` directly to mirror the template edits: replace the 7-group block with prose preflight, drop groups B-engram/F/G, drop rules 8–9.
+- [x] **[P4-12]** Edit `AGENTS.md` with the same prose preflight changes.
+- [x] **[P4-13]** Confirm that the committed CLAUDE.md and AGENTS.md match what `RenderClaudeMD`/`RenderAgentsMD` would produce from the updated template (run `archon update` or invoke the render functions in a test if available).
 
 ### README — `README.md`
 
-- [ ] **[P4-14]** Strip the `--impeccable` flag description (`:103`).
-- [ ] **[P4-15]** Strip the Impeccable and Graphify TUI-tab descriptions (`:162`).
-- [ ] **[P4-16]** Strip the `impeccable:` and `graphify:` config snippets (`:190-192,:260-262`).
+- [x] **[P4-14]** Strip the `--impeccable` flag description (`:103`).
+- [x] **[P4-15]** Strip the Impeccable and Graphify TUI-tab descriptions (`:162`).
+- [x] **[P4-16]** Strip the `impeccable:` and `graphify:` config snippets (`:190-192,:260-262`).
 
 ### PR4 checklist
 
-- [ ] `go build ./...` is green.
-- [ ] `go vet ./...` is clean.
-- [ ] `go test ./...` is green, including `templates_test.go` with the new prose assertions.
-- [ ] `grep -i 'impeccable\|graphify\|engram\|ambos' CLAUDE.md AGENTS.md README.md internal/initcmd/templates.go` returns no hits.
-- [ ] `CLAUDE.md` and `AGENTS.md` contain the prose "SDD Session Preflight" block and the silent-default + deviation rule.
-- [ ] Playwright group E is still present in the template output.
-- [ ] Diff is comfortably under 800 lines.
+- [x] `go build ./...` is green.
+- [x] `go vet ./...` is clean.
+- [x] `go test ./...` is green, including `templates_test.go` with the new prose assertions.
+- [x] `grep -i 'impeccable\|graphify\|engram\|ambos' CLAUDE.md AGENTS.md README.md internal/initcmd/templates.go` returns no hits.
+- [x] `CLAUDE.md` and `AGENTS.md` contain the prose "SDD Session Preflight" block and the silent-default + deviation rule.
+- [x] Playwright group E is still present in the template output.
+- [x] Diff is comfortably under 800 lines (377 lines: 112 ins / 265 del).
 - [ ] PR description references the `streamline-harness` change, `[[harness-workflow]]`, and `[[harness-init]]`.
 
 ---
