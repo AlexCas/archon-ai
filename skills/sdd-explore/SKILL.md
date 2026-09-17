@@ -37,24 +37,16 @@ You are a sub-agent responsible for EXPLORATION. You investigate the codebase, t
 
 The orchestrator will give you:
 - A topic or feature to explore
-- Artifact store mode (`engram | openspec | hybrid | none`)
 
 ## Execution and Persistence Contract
 
 > Follow **Section B** (retrieval) and **Section C** (persistence) from `skills/_shared/sdd-phase-common.md`.
 
-- **engram**: Optionally read `sdd-init/{project}` for project context. Save artifact as `sdd/{change-name}/explore` (or `sdd/explore/{topic-slug}` if standalone).
-- **openspec**: Read and follow `skills/_shared/openspec-convention.md`.
-- **hybrid**: Follow BOTH conventions — persist to Engram AND write to filesystem.
-- **none**: Return result only.
+Read and follow `skills/_shared/openspec-convention.md`.
 
 ### Retrieving Context
 
-> Follow **Section B** from `skills/_shared/sdd-phase-common.md` for retrieval.
-
-- **engram**: Search for `sdd-init/{project}` (project context) and optionally `sdd/` (existing artifacts).
-- **openspec**: Read `openspec/config.yaml` and `openspec/specs/`.
-- **none**: Use whatever context the orchestrator passed in the prompt.
+Read `openspec/config.yaml` and `openspec/specs/`.
 
 ## What to Do
 
@@ -106,31 +98,6 @@ Report one of: `web`, `not-web`, or `unknown`.
 This determination informs `playwright.enabled` in `.archon/config.yaml`. Never
 enable Playwright for a `not-web` project.
 
-### Step 3c: Impeccable Recommendation (web/frontend detection)
-
-When Step 3b's project-type determination is `web`, note in your output
-that the orchestrator SHOULD recommend enabling Impeccable (preflight group F)
-to the user — the opt-in design-language quality gate documented in
-`skills/impeccable/SKILL.md`. This is a **recommendation only**, never an
-automatic activation: state it explicitly so the orchestrator can surface it
-at the preflight gate, but do NOT set `impeccable.enabled` yourself and do NOT
-treat `not-web`/`unknown` projects as needing this recommendation.
-
-### Step 3d: Graphify Code-Graph Consumption (conditional)
-
-**Only if `.archon/config.yaml` → `graphify.enabled: true`:** load
-`skills/graphify/SKILL.md` and follow its Per-Phase Invocation Map for
-`sdd-explore`: if the code graph is fresh, read `graph.json`/`GRAPH_REPORT.md`
-and use `graphify query`/`graphify explain` for targeted questions; if absent,
-shell `graphify extract` (when the binary is present) then read; if stale,
-re-extract per the skill's staleness algorithm, then read. After a successful
-(re-)extraction, write/refresh the tracked excerpt at
-`openspec/changes/<change-name>/graph-report.excerpt.md`. Every failure mode
-falls back to baseline grep/read per the skill's degradation table — never
-fail this phase over Graphify. MUST NOT shell `/graphify` as a slash command
-and MUST NOT depend on the MCP surface. When `graphify.enabled: false`, skip
-this step entirely — no command runs, no directory is created.
-
 ### Step 4: Analyze Options
 
 If there are multiple approaches, compare them:
@@ -146,8 +113,6 @@ If there are multiple approaches, compare them:
 
 Follow **Section C** from `skills/_shared/sdd-phase-common.md`.
 - artifact: `explore`
-- topic_key: `sdd/{change-name}/explore` (or `sdd/explore/{topic-slug}` if standalone)
-- type: `architecture`
 
 ### Step 6: Return Structured Analysis
 
@@ -158,8 +123,7 @@ Return EXACTLY this format to the orchestrator (and write the same content to `e
 
 ### Project Type
 **Web testing**: {web | not-web | unknown}
-{If `unknown`: "NEW/blank project — orchestrator must ask preflight group E (Playwright) before proceeding."}
-{If `web`: "Recommend preflight group F (Impeccable design-language gate) to the user."}
+{If `unknown`: "NEW/blank project — orchestrator must ask about Playwright web testing before proceeding."}
 
 ### Current State
 {How the system works today relevant to this topic}

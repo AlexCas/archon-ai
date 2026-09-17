@@ -140,27 +140,14 @@ func TestTemplates_ContainSDDSessionPreflight(t *testing.T) {
 				"## Vague Request Guard (MANDATORY)",
 				"## Human Review Gate (MANDATORY)",
 				"¿Quieres ajustar algo en esta fase antes de continuar?",
-				"AskUserQuestion",
-				"A. Ritmo",
-				"B. Artefactos",
-				"C. PRs",
-				"D. Revisión",
-				"E. Pruebas web (Playwright)",
-				"F. Impeccable (Diseño de interfaz)",
-				"Group F maps to `impeccable.enabled`",
-				"G. Graphify (Grafo de código)",
-				"¿Activar Graphify",
-				"Group G maps to",
-				"graphify.enabled",
-				"--graphify",
-				"seven",
-				"A–G",
-				"Interactivo (recomendado)",
-				"OpenSpec (recomendado)",
-				"Preguntarme (recomendado)",
-				"400 líneas (recomendado)",
-				"No (recomendado)",
-				"pregunta de texto libre",
+				"Ritmo",
+				"interactivo",
+				"OpenSpec",
+				"ask-but-default-chained",
+				"800",
+				"standard default",
+				"deviation",
+				"playwright.enabled",
 			}
 
 			for _, req := range required {
@@ -169,13 +156,21 @@ func TestTemplates_ContainSDDSessionPreflight(t *testing.T) {
 				}
 			}
 
-			// Legacy fenced-prompt strings must be fully removed (@error scenario).
-			// These check for the old answer-code PATTERN ("A1 Interactivo",
-			// "B1 OpenSpec", the instruction to type "usar recomendado" as a
-			// literal reply) — not incidental mentions of the substrings, since
-			// the new prose intentionally quotes "A1"/"B1"/"usar recomendado"
-			// as examples of what NOT to answer.
-			legacy := []string{
+			// Removed content must not appear in the rendered output.
+			removed := []string{
+				"Impeccable",
+				"Graphify",
+				"Engram",
+				"Ambos",
+				"impeccable.enabled",
+				"graphify.enabled",
+				"AskUserQuestion",
+				"A–G",
+				"seven",
+				"group F",
+				"group G",
+				"Group F",
+				"Group G",
 				"Antes de continuar con SDD",
 				`Responda con "usar recomendado"`,
 				"```text",
@@ -183,9 +178,9 @@ func TestTemplates_ContainSDDSessionPreflight(t *testing.T) {
 				"B1 OpenSpec",
 			}
 
-			for _, old := range legacy {
+			for _, old := range removed {
 				if strings.Contains(content, old) {
-					t.Errorf("%s still contains legacy preflight string %q", tt.name, old)
+					t.Errorf("%s still contains removed preflight string %q", tt.name, old)
 				}
 			}
 		})
@@ -193,7 +188,7 @@ func TestTemplates_ContainSDDSessionPreflight(t *testing.T) {
 }
 
 func TestTemplates_FiveRules(t *testing.T) {
-	// Rules shared across both harnesses (rules 1, 2, 4-11). Rule 3 is
+	// Rules shared across both harnesses (rules 1, 2, 4-10). Rule 3 is
 	// per-harness (see rule3Want below).
 	sharedRules := []string{
 		"1. Check harness-workflow before any phase transition",
@@ -202,10 +197,9 @@ func TestTemplates_FiveRules(t *testing.T) {
 		"5. After every phase that produces an editable artifact, run the Human Review Gate",
 		"6. After verify, invoke harness-judge",
 		"7. When playwright.enabled, run the generated Playwright tests after verify and judge pass",
-		"8. When impeccable.enabled, run Impeccable subcommands during apply and the detection gate after judge passes",
-		"9. When graphify.enabled, sdd-explore consults the code graph",
-		"10. On judge fail: re-apply with feedback (max 3 retries)",
-		"11. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution",
+		"8. On judge fail: re-apply with feedback (max 3 retries; in a Feature Branch Chain the integrated judge on the tracker uses the same cap)",
+		"9. In the single-PR flow, run archive (spec merge, folder move, `archon map`, SESSION_STATUS.md move) as one commit AFTER judge passes and BEFORE opening the PR",
+		"10. Commits carry ONLY the user's authorship — no Co-Authored-By or tool attribution",
 	}
 
 	tests := []struct {
@@ -249,9 +243,9 @@ func TestTemplates_FiveRules(t *testing.T) {
 				t.Errorf("%s missing rule 3 %q", tt.name, tt.rule3Want)
 			}
 
-			// Ensure there is no rule 12 (exactly 11 rules).
-			if strings.Contains(content, "12. ") {
-				t.Errorf("%s should have exactly 11 rules, found rule 12", tt.name)
+			// Ensure there is no rule 11 (exactly 10 rules).
+			if strings.Contains(content, "11. ") {
+				t.Errorf("%s should have exactly 10 rules, found rule 11", tt.name)
 			}
 		})
 	}
@@ -317,10 +311,8 @@ func TestTemplates_BacktickRendering(t *testing.T) {
 
 	// Verify backtick placeholder was replaced with actual backticks
 	backtickChecks := []string{
-		"`interactive`",
-		"`auto`",
-		"`openspec`",
-		"`engram`",
+		"`openspec/changes/{change-name}/`",
+		"`playwright.enabled`",
 		"`sdd-explore`",
 		"`sdd-propose`",
 		"`internal/billing`",
@@ -637,8 +629,7 @@ func TestTemplates_ClaudePhaseModelsIsHardGate(t *testing.T) {
 
 	// Must not call model selection "advisory". Scoped to the Phase Models
 	// section only (not a whole-document scan) — "advisory" may legitimately
-	// appear elsewhere in the document describing an unrelated, genuinely
-	// advisory gate (e.g. graphify). Do not widen this back to
+	// appear elsewhere in the document. Do not widen this back to
 	// strings.Contains(content, "advisory") over the full render.
 	if strings.Contains(phaseModelsBlock(t, content), "advisory") {
 		t.Error("CLAUDE.md Phase Models block must not use the word \"advisory\"")

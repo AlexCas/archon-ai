@@ -29,33 +29,29 @@ Load this skill when a planned PR may exceed **400 changed lines**, SDD forecast
   one-commit staging are unchanged from the single-PR flow (`[[harness-workflow]]`
   "Terminal Phase Ordering (Feature Branch Chain)").
 - **Stacked-to-Main + archive-before-PR converges to Feature Branch Chain.** When
-  archive-before-PR is in effect (artifact store `openspec`/`hybrid`), pure
-  Stacked-to-Main is unsupported: it ships slices independently to `main`, leaving
-  no un-merged ref to own the archive commit. At `sdd-tasks` strategy selection the
-  orchestrator MUST select **Feature Branch Chain** instead and notify the user.
-  After convergence the change is FBC and the Feature Branch Chain archive rule
-  above governs — zero new archive mechanics. A late Stacked→FBC conversion (after
-  slices already merged to `main`) strands those slices and is NOT sanctioned; there
-  is no recovery procedure. When archive-before-PR is NOT in effect (`engram`),
-  Stacked-to-Main is unaffected and does not converge. Full rule:
-  `[[harness-workflow]]` "Stacked-to-Main Archive Convergence".
+  archive-before-PR is in effect, pure Stacked-to-Main is unsupported: it ships
+  slices independently to `main`, leaving no un-merged ref to own the archive
+  commit. At `sdd-tasks` strategy selection the orchestrator MUST select **Feature
+  Branch Chain** instead and notify the user. After convergence the change is FBC
+  and the Feature Branch Chain archive rule above governs — zero new archive
+  mechanics. A late Stacked→FBC conversion (after slices already merged to `main`)
+  strands those slices and is NOT sanctioned; there is no recovery procedure. Full
+  rule: `[[harness-workflow]]` "Stacked-to-Main Archive Convergence".
 
 ## Decision Gates
 
 | Condition | Action |
 |---|---|
 | PR ≤400 changed lines and focused | Keep single PR. |
-| PR >400, each slice can land independently, archive-before-PR NOT in effect (`engram`) | Use Stacked PRs to main. |
-| PR >400, each slice independent, BUT archive-before-PR in effect (`openspec`/`hybrid`) | Converge to Feature Branch Chain (Stacked-to-Main unsupported here). |
+| PR >400, each slice can land independently, archive-before-PR NOT in effect | Use Stacked PRs to main. |
+| PR >400, each slice independent, BUT archive-before-PR in effect | Converge to Feature Branch Chain (Stacked-to-Main unsupported here). |
 | PR >400, feature must integrate before main | Use Feature Branch Chain with tracker. |
 | Generated/vendor/migration diff cannot split cleanly | Ask maintainer for `size:exception`. |
 | SDD provides `delivery_strategy` | Follow it before apply/PR creation. |
 
 ## Execution Steps
 
-1. Estimate changed lines and identify independent work units. When
-   `graphify.enabled` and Leiden community data is present in `graph.json`,
-   it MAY inform work-unit identification — advisory only, never required.
+1. Estimate changed lines and identify independent work units.
 2. Ask for a chain strategy when none is cached and the budget is exceeded.
 3. Create branches/PRs using the chosen strategy only.
 4. Add Chain Context to each PR without replacing the repo PR template.
