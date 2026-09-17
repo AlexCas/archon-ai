@@ -37,21 +37,54 @@ You are a sub-agent responsible for writing SPECIFICATIONS. You take the proposa
 
 From the orchestrator:
 - Change name
-- Artifact store mode (`engram | openspec | hybrid | none`)
 
 ## Execution and Persistence Contract
 
 > Follow **Section B** (retrieval) and **Section C** (persistence) from `skills/_shared/sdd-phase-common.md`.
 
-- **engram**: Read `sdd/{change-name}/proposal` (required). If specs span multiple domains, concatenate into a single artifact with domain headers. Save as `sdd/{change-name}/spec`.
-- **openspec**: Read and follow `skills/_shared/openspec-convention.md`.
-- **hybrid**: Follow BOTH conventions — persist to Engram (single concatenated artifact) AND write domain files to filesystem.
-- **none**: Return result only. Never create or modify project files.
+Read and follow `skills/_shared/openspec-convention.md`.
 
 ## What to Do
 
 ### Step 1: Load Skills
 Follow **Section A** from `skills/_shared/sdd-phase-common.md`.
+
+### Step 1b: Detect Track
+
+Read `openspec/changes/{change-name}/state.yaml` and parse the `track` field:
+- `track: bugfix` (or `track` is `"bugfix"`) → follow the **Bugfix Scoped Spec** path below. STOP — do NOT continue to Step 2.
+- `track: full` or `track` absent → continue to Step 2 (full spec flow, unchanged).
+
+#### Bugfix Scoped Spec Path (ONLY for `track: bugfix`)
+
+Write a single `openspec/changes/{change-name}/spec.md` with EXACTLY three sections and NO Gherkin content:
+
+```markdown
+## Bug
+
+{Observed vs expected behavior — 1–3 sentences describing what goes wrong and what should happen instead.}
+
+## Fix Criteria
+
+- [ ] {Verifiable condition 1 — "X returns Y when Z"}
+- [ ] {Verifiable condition 2}
+- [ ] {Verifiable condition 3 (2–5 bullets total)}
+
+## Non-Regression
+
+- {Existing behavior A must not break.}
+- {Existing behavior B must not break. (1–2 bullets)}
+```
+
+**Rules for the bugfix scoped spec:**
+- The three sections MUST be `## Bug`, `## Fix Criteria`, and `## Non-Regression` — no other requirement sections.
+- `## Fix Criteria` MUST contain between 2 and 5 checklist bullets (`- [ ] ...`), each stating a verifiable condition.
+- `## Non-Regression` MUST contain 1–2 bullets naming existing behavior that must not break.
+- **BYPASS** the "Gherkin Feature Files (MANDATORY)" block entirely — do NOT produce a `.feature` file.
+- **BYPASS** capability and requirement decomposition — no `## ADDED/MODIFIED/REMOVED Requirements` structure.
+- Persist the `spec.md` artifact following **Section C** from `skills/_shared/sdd-phase-common.md`.
+- Return a summary noting the scoped spec format and the omission of Gherkin.
+- After writing `spec.md`, STOP — return to the orchestrator. Do NOT proceed to Steps 2–6.
 
 ### Step 2: Identify Affected Domains
 
@@ -71,15 +104,11 @@ If the proposal has no Capabilities section (older format), fall back to inferri
 
 ### Step 3: Read Existing Specs
 
-**IF mode is `openspec` or `hybrid`:** If `openspec/specs/{domain}/spec.md` exists, read it to understand CURRENT behavior. Your delta specs describe CHANGES to this behavior.
-
-**IF mode is `engram`:** Existing specs were already retrieved from Engram in the Persistence Contract. Skip filesystem reads.
-
-**IF mode is `none`:** Skip — no existing specs to read.
+If `openspec/specs/{domain}/spec.md` exists, read it to understand CURRENT behavior. Your delta specs describe CHANGES to this behavior.
 
 ### Step 4: Write Delta Specs
 
-**IF mode is `openspec` or `hybrid`:** Create specs inside the change folder:
+Create specs inside the change folder:
 
 ```
 openspec/changes/{change-name}/
@@ -89,8 +118,6 @@ openspec/changes/{change-name}/
         ├── spec.md          ← Delta spec (requirements + Gherkin scenarios)
         └── {domain}.feature ← Formal Gherkin feature file (executable use cases)
 ```
-
-**IF mode is `engram` or `none`:** Do NOT create any `openspec/` directories or files. Compose the spec content (including the Gherkin feature) in memory — you will persist it in Step 5.
 
 #### Gherkin Feature Files (MANDATORY)
 
@@ -109,13 +136,6 @@ Rules for `.feature` files:
 - Tag scenarios for traceability and selective execution, e.g. `@happy`, `@edge`,
   `@error`, `@web` for browser-facing flows that Playwright will exercise, and
   `@security` for abuse-case scenarios when `security.enabled` is true.
-- **Impeccable annotation (conditional, prose not tag)**: when `impeccable.enabled`
-  is true and a requirement concerns frontend design-language quality (visual
-  consistency, brand voice, component polish), add a short `@design` prose note
-  in the scenario or requirement text (e.g. "@design: covered by the Impeccable
-  gate") instead of a new Gherkin tag — this keeps the annotation lightweight and
-  avoids coupling a new hard tag to the `@web` selector Playwright already owns.
-  When `impeccable.enabled` is false, omit this note entirely.
 - Every requirement in `spec.md` MUST map to at least one scenario in the
   `.feature` file. Keep the scenario names identical in both files.
 
@@ -267,13 +287,8 @@ Scenario: {Name}
 
 Follow **Section C** from `skills/_shared/sdd-phase-common.md`.
 - artifact: `spec`
-- topic_key: `sdd/{change-name}/spec`
-- type: `architecture`
 
-The persisted `spec` artifact MUST include the Gherkin feature content. In
-`openspec`/`hybrid` mode also write the `{domain}.feature` files to disk (Step 4).
-In `engram`/`none` mode, embed each domain's feature block inside the artifact under
-a clearly labelled `## Feature ({domain})` section.
+Also write the `{domain}.feature` files to disk (Step 4).
 
 ### Step 6: Return Summary
 
@@ -308,11 +323,6 @@ Ready for design (sdd-design). If design already exists, ready for tasks (sdd-ta
   case MUST describe the malicious or prohibited action and use RFC 2119 `MUST NOT`
   for the prohibition. Example: `Then the system MUST NOT process the command`.
   When `security.enabled` is false, do not emit `@security` tags — no change to
-  spec behavior.
-- **Impeccable design note (conditional)**: If `impeccable.enabled` is true, flag
-  frontend design-language requirements with a lightweight `@design` prose note
-  (not a new hard Gherkin tag) so they can be selected by the Impeccable gate. See
-  `skills/impeccable/SKILL.md`. When `impeccable.enabled` is false, no change to
   spec behavior.
 - ALWAYS use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY) for requirement strength
 - Read the proposal's **Capabilities section** first — it tells you exactly which spec files to create

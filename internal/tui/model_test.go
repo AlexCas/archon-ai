@@ -106,8 +106,7 @@ func TestModel_Update_TabNavigation(t *testing.T) {
 
 // TestModel_Update_ShiftTabWrapsFromAgent verifies that a single Shift+Tab
 // from a freshly-constructed model (default AgentTab) wraps around to the
-// last tab, GraphifyTab (index 6 after ImpeccableTab removal; tabCount=7).
-// TODO(PR2): after Graphify removal, this expectation changes to SecurityTab.
+// last tab, SecurityTab (index 5; tabCount=6 after Impeccable+Graphify removal).
 func TestModel_Update_ShiftTabWrapsFromAgent(t *testing.T) {
 	m := NewModel(&config.Config{}, "")
 
@@ -119,8 +118,8 @@ func TestModel_Update_ShiftTabWrapsFromAgent(t *testing.T) {
 	newModel, _ := m.Update(msg)
 	model := newModel.(Model)
 
-	if model.activeTab != GraphifyTab {
-		t.Errorf("activeTab after Shift+Tab from AgentTab = %d, want %d", model.activeTab, GraphifyTab)
+	if model.activeTab != SecurityTab {
+		t.Errorf("activeTab after Shift+Tab from AgentTab = %d, want %d", model.activeTab, SecurityTab)
 	}
 }
 
@@ -220,7 +219,7 @@ func TestModel_renderTabs_Order(t *testing.T) {
 	m.width = 80
 	rendered := m.renderTabs()
 
-	labels := []string{"Agent", "Models", "Judge", "Mutation Testing", "Playwright", "Security", "Graphify"}
+	labels := []string{"Agent", "Models", "Judge", "Mutation Testing", "Playwright", "Security"}
 	lastIndex := -1
 	for _, label := range labels {
 		idx := strings.Index(rendered, label)
@@ -379,70 +378,6 @@ func TestMutationTabState_ApplyToConfig(t *testing.T) {
 	}
 }
 
-func TestGraphifyTabState_ApplyToConfig(t *testing.T) {
-	cfg := &config.Config{}
-	state := newGraphifyTabState(config.Graphify{})
-
-	// Drive bool toggles at focus 0, 1, 2.
-	state.focused = 0
-	state.update(tea.KeyMsg{Type: tea.KeyEnter})
-	if !state.enabled {
-		t.Error("enabled should be true after toggle")
-	}
-	state.focused = 1
-	state.update(tea.KeyMsg{Type: tea.KeyEnter})
-	if !state.autoInstall {
-		t.Error("autoInstall should be true after toggle")
-	}
-	state.focused = 2
-	state.update(tea.KeyMsg{Type: tea.KeyEnter})
-	if !state.semantic {
-		t.Error("semantic should be true after toggle")
-	}
-
-	// Set text inputs directly.
-	state.version.SetValue("v1.2.3")
-	state.outputDir.SetValue(".archon/out")
-
-	state.applyToConfig(cfg)
-
-	if !cfg.Graphify.Enabled {
-		t.Error("cfg.Graphify.Enabled should be true")
-	}
-	if !cfg.Graphify.AutoInstall {
-		t.Error("cfg.Graphify.AutoInstall should be true")
-	}
-	if !cfg.Graphify.Semantic {
-		t.Error("cfg.Graphify.Semantic should be true")
-	}
-	if cfg.Graphify.Version != "v1.2.3" {
-		t.Errorf("cfg.Graphify.Version = %q, want %q", cfg.Graphify.Version, "v1.2.3")
-	}
-	if cfg.Graphify.OutputDir != ".archon/out" {
-		t.Errorf("cfg.Graphify.OutputDir = %q, want %q", cfg.Graphify.OutputDir, ".archon/out")
-	}
-}
-
-// TestGraphifyTabState_ApplyToConfig_BlankCoercion asserts that blank version
-// and outputDir inputs fall back to the package defaults on save — never
-// persist "" (config.Load only re-seeds when the block is absent, not for a
-// present-but-empty key).
-func TestGraphifyTabState_ApplyToConfig_BlankCoercion(t *testing.T) {
-	cfg := &config.Config{}
-	state := newGraphifyTabState(config.Graphify{Version: "", OutputDir: ""})
-	state.version.SetValue("")
-	state.outputDir.SetValue("")
-
-	state.applyToConfig(cfg)
-
-	if cfg.Graphify.Version != config.DefaultGraphifyVersion {
-		t.Errorf("cfg.Graphify.Version = %q, want %q", cfg.Graphify.Version, config.DefaultGraphifyVersion)
-	}
-	if cfg.Graphify.OutputDir != config.DefaultGraphifyOutputDir {
-		t.Errorf("cfg.Graphify.OutputDir = %q, want %q", cfg.Graphify.OutputDir, config.DefaultGraphifyOutputDir)
-	}
-}
-
 func TestAgentTabState_Navigation(t *testing.T) {
 	state := newAgentTabState("opencode")
 
@@ -534,7 +469,7 @@ func TestSaveConfig_RegeneratesClaudeMD(t *testing.T) {
 		"SDD Session Preflight",
 		"Vague Request Guard",
 		"Human Review Gate",
-		"AskUserQuestion",
+		"standard default",
 	}
 	for _, section := range requiredSections {
 		if !strings.Contains(content, section) {

@@ -102,34 +102,6 @@ agent: claude
 			wantErr: false,
 		},
 		{
-			name: "graphify all fields",
-			fs: fstest.MapFS{
-				".archon/config.yaml": &fstest.MapFile{
-					Data: []byte(`harness_version: "1.0.0"
-agent: claude
-graphify:
-  enabled: true
-  auto_install: true
-  version: v0.9.99
-  output_dir: custom/graph
-  semantic: true
-`),
-				},
-			},
-			want: Config{
-				Version: "1.0.0",
-				Agent:   "claude",
-				Graphify: Graphify{
-					Enabled:     true,
-					AutoInstall: true,
-					Version:     "v0.9.99",
-					OutputDir:   "custom/graph",
-					Semantic:    true,
-				},
-			},
-			wantErr: false,
-		},
-		{
 			name:    "missing config",
 			fs:      fstest.MapFS{},
 			want:    Config{},
@@ -181,12 +153,6 @@ graphify:
 				}
 				if got.Models.Default != tt.want.Models.Default {
 					t.Errorf("Models.Default = %+v, want %+v", got.Models.Default, tt.want.Models.Default)
-				}
-				// Graphify round-trip is only asserted for the dedicated fixture
-				// above; every other case gets Load()'s pre-seeded Version/OutputDir
-				// defaults regardless of its zero-value `want.Graphify`.
-				if tt.name == "graphify all fields" && got.Graphify != tt.want.Graphify {
-					t.Errorf("Graphify = %+v, want %+v", got.Graphify, tt.want.Graphify)
 				}
 				if len(got.Models.Phases) != len(tt.want.Models.Phases) {
 					t.Errorf("Models.Phases length = %d, want %d", len(got.Models.Phases), len(tt.want.Models.Phases))
@@ -261,13 +227,6 @@ func TestConfig_CloneRoundtrip(t *testing.T) {
 		Security: Security{
 			Enabled: true,
 			Profile: "web",
-		},
-		Graphify: Graphify{
-			Enabled:     true,
-			AutoInstall: true,
-			Version:     "v0.9.45",
-			OutputDir:   ".archon/graphify",
-			Semantic:    true,
 		},
 		Models: ModelConfig{
 			Default: ModelRef{Provider: "anthropic", Model: "claude-sonnet-4-20250514"},
@@ -445,31 +404,6 @@ func TestSecurity_DefaultOff(t *testing.T) {
 	}
 	if cfg.Security.Profile != "" {
 		t.Errorf("Security.Profile = %q; want empty when block is absent", cfg.Security.Profile)
-	}
-}
-
-// TestGraphify_DefaultsAbsentBlock asserts that loading a config with no
-// graphify block yields Enabled:false plus the pre-seeded defaults
-// Version:"v0.9.45" and OutputDir:".archon/graphify" — the advisory gate's
-// default-off, default-pinned state (mirrors TestSecurity_DefaultOff).
-func TestGraphify_DefaultsAbsentBlock(t *testing.T) {
-	fs := fstest.MapFS{
-		".archon/config.yaml": &fstest.MapFile{
-			Data: []byte("harness_version: \"1.0.0\"\nagent: claude\n"),
-		},
-	}
-	var cfg Config
-	if err := cfg.Load(fs); err != nil {
-		t.Fatalf("Load() error = %v", err)
-	}
-	if cfg.Graphify.Enabled {
-		t.Error("Graphify.Enabled = true; want false when block is absent")
-	}
-	if cfg.Graphify.Version != DefaultGraphifyVersion {
-		t.Errorf("Graphify.Version = %q; want %q", cfg.Graphify.Version, DefaultGraphifyVersion)
-	}
-	if cfg.Graphify.OutputDir != DefaultGraphifyOutputDir {
-		t.Errorf("Graphify.OutputDir = %q; want %q", cfg.Graphify.OutputDir, DefaultGraphifyOutputDir)
 	}
 }
 

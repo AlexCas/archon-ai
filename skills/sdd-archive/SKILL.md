@@ -37,7 +37,6 @@ You are a sub-agent responsible for ARCHIVING. You merge delta specs into the ma
 
 From the orchestrator:
 - Change name
-- Artifact store mode (`engram | openspec | hybrid | none`)
 - Structured status from `skills/_shared/sdd-status-contract.md`, including artifact paths, task progress, dependency states, and actionContext
 - Any explicit intentional archive override text from the user/orchestrator
 
@@ -45,10 +44,7 @@ From the orchestrator:
 
 > Follow **Section B** (retrieval) and **Section C** (persistence) from `skills/_shared/sdd-phase-common.md`.
 
-- **engram**: Read `sdd/{change-name}/proposal`, `sdd/{change-name}/spec`, `sdd/{change-name}/design`, `sdd/{change-name}/tasks`, `sdd/{change-name}/verify-report` (all required). Record all observation IDs in the archive report for traceability. Save as `sdd/{change-name}/archive-report`.
-- **openspec**: Read and follow `skills/_shared/openspec-convention.md`. Perform merge and archive folder moves.
-- **hybrid**: Follow BOTH conventions — persist archive report to Engram (with observation IDs) AND perform filesystem merge + archive folder moves.
-- **none**: Return closure summary only. Do not perform archive file operations.
+Read and follow `skills/_shared/openspec-convention.md`. Perform merge and archive folder moves.
 
 ### Task Completion Gate
 
@@ -56,8 +52,7 @@ From the orchestrator:
 
 Before syncing specs or moving any archive folder, inspect the tasks artifact:
 
-- **engram**: read the full `sdd/{change-name}/tasks` observation.
-- **openspec/hybrid**: read `openspec/changes/{change-name}/tasks.md`.
+- Read `openspec/changes/{change-name}/tasks.md`.
 
 If any implementation task remains unchecked (`- [ ]`):
 
@@ -67,9 +62,9 @@ If any implementation task remains unchecked (`- [ ]`):
 
 The archived audit trail MUST NOT contain stale unchecked tasks for completed work. Internal todo state is not enough; the persisted SDD task artifact is the source of truth for completion visibility.
 
-### Strict-vs-OpenSpec Archive Policy
+### Archive Policy
 
-OpenSpec permits archiving with incomplete artifacts or tasks after a user confirmation. gentle-ai is stricter by default:
+The default is strict:
 
 - Incomplete implementation tasks block archive unless they are stale checkboxes and apply-progress/verify-report prove completion.
 - CRITICAL issues in `verify-report` always block archive. Do not accept an override for CRITICAL verification issues.
@@ -104,11 +99,7 @@ to this sequence.
 
 Do not start this step until the **Task Completion Gate** above passes.
 
-**IF mode is `engram`:** Skip filesystem sync — artifacts live in Engram only. The archive report (Step 5) records all observation IDs for traceability.
-
-**IF mode is `none`:** Skip — no artifacts to sync.
-
-**IF mode is `openspec` or `hybrid`:** For each delta spec in `openspec/changes/{change-name}/specs/`:
+For each delta spec in `openspec/changes/{change-name}/specs/`:
 
 #### If Main Spec Exists (`openspec/specs/{domain}/spec.md`)
 
@@ -141,11 +132,7 @@ openspec/changes/{change-name}/specs/{domain}/spec.md
 
 ### Step 3: Move to Archive
 
-**IF mode is `engram`:** Skip — there are no `openspec/` directories to move. The archive report in Engram serves as the audit trail.
-
-**IF mode is `none`:** Skip — no filesystem operations.
-
-**IF mode is `openspec` or `hybrid`:** Move the entire change folder to archive with date prefix:
+Move the entire change folder to archive with date prefix:
 
 ```
 openspec/changes/{change-name}/
@@ -156,7 +143,7 @@ Use today's date in ISO format (e.g., `2026-02-16`).
 
 ### Step 3b: Rewrite Vault Links
 
-**IF mode is `openspec` or `hybrid`:** After the folder move, run:
+After the folder move, run:
 
 1. `archon map --backfill` — rewrites boundary-crossing relative links inside
    the moved files (e.g. `../../specs/...` gains a `../` level; plain
@@ -169,16 +156,14 @@ Use today's date in ISO format (e.g., `2026-02-16`).
    orchestrator and do NOT mark the archive complete. Do not proceed to
    Step 3c or Step 4 until `--check` passes.
 
-**IF mode is `engram` or `none`:** Skip — no `openspec/` filesystem tree exists.
-
 ### Step 3c: Archive SESSION_STATUS.md
 
 The session-level resume file lives at the repository ROOT during work. Finalize it
 as part of the change's audit trail (see `session-status-contract`):
 
-**IF mode is `openspec` or `hybrid`:** MOVE `SESSION_STATUS.md` from the repo root
-into the archived change folder as part of the archive commit staging (before the
-PR is opened), then ensure it no longer exists at the root:
+MOVE `SESSION_STATUS.md` from the repo root into the archived change folder as part
+of the archive commit staging (before the PR is opened), then ensure it no longer
+exists at the root:
 
 ```
 SESSION_STATUS.md  → openspec/changes/archive/YYYY-MM-DD-{change-name}/SESSION_STATUS.md
@@ -188,16 +173,11 @@ In the Feature Branch Chain flow this move happens on the tracker branch, staged
 into the tracker archive commit (before the tracker merges to `main`), not on an
 individual child branch.
 
-**IF mode is `engram`:** Store the final `SESSION_STATUS.md` contents as the
-`sdd/{change-name}/session-status` observation, then delete the root file.
-
-**IF mode is `none`:** Delete the root file (no persisted audit trail).
-
 If `SESSION_STATUS.md` is absent at the root (e.g., already archived), note it and continue.
 
 ### Step 3d: Stage and Commit Archive Changes
 
-**IF mode is `openspec` or `hybrid`:** Stage and commit all archive changes onto the **owning branch** (change branch for single-PR; tracker branch for Feature Branch Chain) as ONE commit:
+Stage and commit all archive changes onto the **owning branch** (change branch for single-PR; tracker branch for Feature Branch Chain) as ONE commit:
 
 1. `git add` the merged main spec(s) (Step 2), the moved change folder (Step 3),
    the regenerated `openspec/map.md` (Step 3b), and the moved `SESSION_STATUS.md`
@@ -214,12 +194,9 @@ If `SESSION_STATUS.md` is absent at the root (e.g., already archived), note it a
    branch before the PR is opened (single-PR flow), or on the tracker branch
    before the tracker PR merges to `main` (Feature Branch Chain flow).
 
-**IF mode is `engram` or `none`:** Skip — there is no branch commit in these
-modes; the archive report (Step 5) is the audit trail.
-
 ### Step 4: Verify Archive
 
-**IF mode is `openspec` or `hybrid`:** Confirm:
+Confirm:
 - [ ] Main specs updated correctly
 - [ ] Change folder moved to archive
 - [ ] `archon map --check` passed after the move (Step 3b)
@@ -234,9 +211,6 @@ modes; the archive report (Step 5) is the audit trail.
   the archive commit is staged on the tracker branch**; the integrated judge
   passed on the tracker before archive ran.
 
-**IF mode is `engram`:** Confirm all artifact observation IDs are recorded in the archive report and the tasks observation has no unchecked implementation tasks unless the orchestrator explicitly approved archive-time stale-checkbox reconciliation backed by apply-progress/verify-report proof.
-
-**IF mode is `none`:** Skip verification — no persisted artifacts.
 
 ### Step 5: Persist Archive Report
 
@@ -244,8 +218,6 @@ modes; the archive report (Step 5) is the audit trail.
 
 Follow **Section C** from `skills/_shared/sdd-phase-common.md`.
 - artifact: `archive-report`
-- topic_key: `sdd/{change-name}/archive-report`
-- type: `architecture`
 
 ### Step 6: Return Summary
 
@@ -255,7 +227,7 @@ Return to the orchestrator:
 ## Change Archived
 
 **Change**: {change-name}
-**Archived to**: `openspec/changes/archive/{YYYY-MM-DD}-{change-name}/` (openspec/hybrid) | Engram archive report (engram) | inline (none)
+**Archived to**: `openspec/changes/archive/{YYYY-MM-DD}-{change-name}/`
 
 ### Specs Synced
 | Domain | Action | Details |
@@ -282,7 +254,7 @@ Ready for the next change.
 
 - NEVER archive a change that has CRITICAL issues in its verification report
 - If the user explicitly approves a non-critical partial archive or stale-checkbox reconciliation, record the exact reason in the archive report and mark the archive as intentional-with-warnings
-- NEVER archive completed work while `tasks.md` / the tasks observation still shows stale unchecked implementation tasks
+- NEVER archive completed work while `tasks.md` still shows stale unchecked implementation tasks
 - ALWAYS sync delta specs BEFORE moving to archive
 - When merging into existing specs, PRESERVE requirements not mentioned in the delta
 - Use ISO date format (YYYY-MM-DD) for archive folder prefix

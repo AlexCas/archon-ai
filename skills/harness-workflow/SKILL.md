@@ -14,9 +14,12 @@ Gate every SDD phase transition. Read `openspec/changes/{name}/state.yaml`, enfo
 
 ## Phase Sequence
 
-```
-explore → propose → spec → design → tasks → apply → verify → judge → archive
-```
+The phase sequence is determined by the change's `track` field in `state.yaml`:
+
+- **`full`** (default; `track` absent or `full`):
+  `explore → propose → spec → design → tasks → apply → verify → judge → archive`
+- **`bugfix`**: `explore → spec → apply → verify → archive`
+  (phases `propose`, `design`, `tasks`, and `judge` are not part of this sequence)
 
 Each phase has two statuses: `in_progress` | `completed`.
 
@@ -59,8 +62,10 @@ history:
 
 ## Hard Rules
 
-- NEVER allow a transition that skips a mandatory phase. The only valid transition from phase N is to phase N+1.
+- NEVER allow a transition that skips a mandatory phase. The only valid transition from phase N is to phase N+1 within the selected track's sequence.
 - ALWAYS read `state.yaml` before evaluating any transition. If the file does not exist, report `blocked` with reason: `state.yaml not found — run sdd-explore first`.
+- `judge.enabled` governs the full track only; the bugfix track never runs judge.
+- A phase that does not belong to the selected track is treated as unreachable — return `blocked` with a message naming both the phase and the track (e.g. `propose is not part of the bugfix track`).
 - On valid transition: update `state.yaml` with the new phase, set status to `in_progress`, and append a history entry with the current timestamp.
 - On phase completion (reported by the sub-agent): update status to `completed` and record the timestamp.
 - Idempotent re-entry: if the requested phase matches the current phase and status is `in_progress`, return `allowed` with status `resuming`.
@@ -83,14 +88,24 @@ history:
 
 ### Step 1: Read State
 
-Read `openspec/changes/{change-name}/state.yaml`. Parse `phase` and `status` fields. If the file is missing or corrupt, return `blocked`.
+Read `openspec/changes/{change-name}/state.yaml`. Parse `phase`, `status`, and `track` fields. If the file is missing or corrupt, return `blocked`.
+
+- `track` absent → resolve as `full` (back-compat; all existing in-flight changes behave as full track).
+- `track: full` or `track: bugfix` → honored as-is.
+- Any other value → return `blocked` with reason: `unknown track: {v} (supported: full, bugfix)`. MUST NOT silently coerce to `full`.
 
 ### Step 2: Evaluate Transition
 
-Compare the requested phase against the current phase using the linear sequence:
+Select the phase sequence based on the resolved `track` from Step 1, then compare the requested phase against the current phase:
 
 ```
-PHASE_ORDER = [explore, propose, spec, design, tasks, apply, verify, judge, archive]
+PHASE_ORDER = track == "bugfix"
+    ? [explore, spec, apply, verify, archive]
+    : [explore, propose, spec, design, tasks, apply, verify, judge, archive]
+
+If the requested phase is not in PHASE_ORDER, return blocked:
+    "{phase} is not part of the {track} track"
+
 current_index = PHASE_ORDER.index(current_phase)
 requested_index = PHASE_ORDER.index(requested_phase)
 ```
