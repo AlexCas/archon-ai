@@ -85,11 +85,12 @@ func renderClaudeAgent(pm config.PhaseModel) []byte {
 	content += "---\n"
 	content += "\n"
 	if pm.Phase == "judge" {
-		content += "You are the Archon SDD judge executor. There is no sdd-judge skill: your job is the\n"
-		content += "dual adversarial review. Run the `judgment-day` skill against the current change\n"
-		content += "(all files modified by the change), then report its verdict (APPROVED or ESCALATED,\n"
-		content += "with confirmed/suspect issues) back to `harness-judge`. Do NOT apply fixes or\n"
-		content += "re-verify yourself — harness-judge owns the re-apply loop and the gates.\n"
+		content += "You are the Archon SDD judge executor. There is no sdd-judge skill: your job is a\n"
+		content += "single focused review. Read all files modified by the change plus the change's\n"
+		content += "spec and design; evaluate spec compliance, design coherence, and code quality;\n"
+		content += "return one verdict (pass/fail) with any issues back to `harness-judge`. Do NOT\n"
+		content += "run a dual or blind adversarial review, do NOT apply fixes or re-verify yourself\n"
+		content += "— harness-judge owns the re-apply loop and the gates.\n"
 		return []byte(content)
 	}
 	content += "You are the Archon SDD " + pm.Phase + " executor. Follow `skills/sdd-" + pm.Phase + "/SKILL.md`\n"

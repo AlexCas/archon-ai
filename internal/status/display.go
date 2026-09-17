@@ -50,30 +50,6 @@ func DisplayWithUpdate(w io.Writer, cfg *config.Config, n int) {
 	}
 	fmt.Fprintln(w)
 
-	fmt.Fprintln(w, "  Impeccable (Design Language)")
-	fmt.Fprintln(w, "  -----------------------------")
-	fmt.Fprintf(w, "    Enabled:   %t\n", cfg.Impeccable.Enabled)
-	if cfg.Impeccable.Enabled {
-		fmt.Fprintf(w, "    Severity:  %s\n", cfg.Impeccable.Severity)
-		if cfg.Impeccable.ProductPath != "" {
-			fmt.Fprintf(w, "    Product Path: %s\n", cfg.Impeccable.ProductPath)
-		}
-		if cfg.Impeccable.DesignPath != "" {
-			fmt.Fprintf(w, "    Design Path:  %s\n", cfg.Impeccable.DesignPath)
-		}
-	}
-	fmt.Fprintln(w)
-
-	fmt.Fprintln(w, "  Graphify (Code Graph)")
-	fmt.Fprintln(w, "  ---------------------")
-	fmt.Fprintf(w, "    Enabled:   %t\n", cfg.Graphify.Enabled)
-	if cfg.Graphify.Enabled {
-		fmt.Fprintf(w, "    Version:    %s\n", cfg.Graphify.Version)
-		fmt.Fprintf(w, "    Output Dir: %s\n", cfg.Graphify.OutputDir)
-		fmt.Fprintf(w, "    Semantic:   %t\n", cfg.Graphify.Semantic)
-	}
-	fmt.Fprintln(w)
-
 	fmt.Fprintln(w, "  Models")
 	fmt.Fprintln(w, "  ------")
 	if !cfg.Models.HasAny() {

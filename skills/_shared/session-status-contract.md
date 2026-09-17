@@ -6,8 +6,8 @@ if the previous agent was closed mid-phase.
 
 ## Why this exists
 
-`state.yaml` (per change) and Engram observations track phase state, but they are
-machine-oriented and scoped per change. `SESSION_STATUS.md` is the fast,
+`state.yaml` (per change) tracks phase state but is machine-oriented and scoped per
+change. `SESSION_STATUS.md` is the fast,
 at-a-glance resume point for the WHOLE session, kept at the repository ROOT while
 work is in progress.
 
@@ -24,8 +24,7 @@ work is in progress.
   the staged archive commit — before the PR is opened in the single-PR flow, or on
   the **tracker branch** before the tracker PR merges to `main` in the Feature
   Branch Chain flow — then delete it from the root. It stays root-resident through
-  the integrated judge in the chain flow. In Engram-only mode, store its final
-  contents as an observation and remove the root file.
+  the integrated judge in the chain flow.
 - **One file per session**: if a new change starts in the same session, the file
   is updated to reflect the active change. The header always names the current
   change.
@@ -45,7 +44,7 @@ Write Markdown with this exact top-level structure:
 
 ## Preflight
 - Execution mode: <interactive | auto>
-- Artifact store: <openspec | engram | both>
+- Artifact store: openspec
 - Chained PR strategy: <ask-always | single-pr-default | force-chained | auto-forecast>
 - Review budget: <N> lines
 - Web project (Playwright): <yes | no | unknown>
