@@ -469,7 +469,7 @@ func TestSaveConfig_RegeneratesClaudeMD(t *testing.T) {
 		"SDD Session Preflight",
 		"Vague Request Guard",
 		"Human Review Gate",
-		"AskUserQuestion",
+		"standard default",
 	}
 	for _, section := range requiredSections {
 		if !strings.Contains(content, section) {
