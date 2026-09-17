@@ -251,7 +251,7 @@ func TestWriteClaudeAgents_JudgeExemptFromSkillRef(t *testing.T) {
 	}
 }
 
-// 5.6: Judge body is a wrapper — references judgment-day and harness-judge, not sdd-judge.
+// 5.6: Judge body is a single-review brief — references harness-judge, not sdd-judge, not judgment-day.
 func TestWriteClaudeAgents_JudgeBodyIsWrapper(t *testing.T) {
 	dir := t.TempDir()
 
@@ -272,12 +272,19 @@ func TestWriteClaudeAgents_JudgeBodyIsWrapper(t *testing.T) {
 		t.Errorf("archon-judge.md frontmatter model = %q, want %q", fm["model"], "claude-opus-4-8")
 	}
 
-	// Body must reference judgment-day and harness-judge.
-	if !strings.Contains(content, "judgment-day") {
-		t.Errorf("archon-judge.md body missing %q", "judgment-day")
-	}
+	// Body must reference harness-judge (still the owner of the re-apply loop).
 	if !strings.Contains(content, "harness-judge") {
 		t.Errorf("archon-judge.md body missing %q", "harness-judge")
+	}
+
+	// Body must describe a single focused review (not a dual/blind review).
+	if !strings.Contains(content, "single focused review") {
+		t.Errorf("archon-judge.md body missing %q", "single focused review")
+	}
+
+	// Body must NOT invoke judgment-day (single-judge model; judgment-day is standalone opt-in).
+	if strings.Contains(content, "judgment-day") {
+		t.Errorf("archon-judge.md body must not reference %q (judgment-day is standalone, not invoked by SDD judge)", "judgment-day")
 	}
 
 	// Body must NOT reference skills/sdd-judge/SKILL.md.

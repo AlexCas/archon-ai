@@ -63,6 +63,8 @@ Before launching ANY SDD phase (even `sdd-explore`), if the user's request is va
 - "Quiero agregar login con JWT para usuarios admin, con refresh tokens rotados y logout en todas las sesiones"
 - "Refactorizar el paquete `internal/billing` para usar el patrón repository y separar la lógica de Stripe"
 
+**Bug vs feature routing:** When the user's request describes a bug (unexpected behavior, regression, or broken output), ask "¿Es un bug o una nueva funcionalidad?" if unclear. On "bug", initialize the change with `track: bugfix` via `sdd-init` — this selects the 5-phase sequence (explore → spec → apply → verify → archive) with a scoped 3-section spec and no judge phase.
+
 ## Human Review Gate (MANDATORY)
 
 After EVERY phase that produces an editable artifact (propose, spec, design, tasks), the orchestrator MUST:
