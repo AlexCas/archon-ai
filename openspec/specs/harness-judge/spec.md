@@ -11,6 +11,13 @@ A later delta (native-review-delegation) changes what the single judge's code-qu
 half checks: instead of ad hoc criteria, `archon-judge` delegates to the native
 `code-review` skill and gates only on its `correctness`-category findings.
 
+A further later delta (code-backed-workflow) makes the retry count itself durable:
+`harness-judge` calls `archon workflow retry increment|reset` (backed by
+`state.yaml`'s new `retry_count` field) instead of tracking the count only in the
+orchestrating model's in-conversation reasoning. The cap (3), the accumulated-feedback
+behavior, and the `blocked`/`max_retries_exceeded: true` contract on the 4th failure are
+unchanged — only where the count lives changes.
+
 ## MODIFIED Requirements
 
 ### Requirement: Single Focused Judge in the SDD Path

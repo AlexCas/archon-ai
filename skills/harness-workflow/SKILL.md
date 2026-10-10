@@ -12,6 +12,8 @@ metadata:
 
 Gate every SDD phase transition. Read `openspec/changes/{name}/state.yaml`, enforce the linear phase sequence, and block any attempt to skip mandatory phases.
 
+**This logic is implemented in code** (`internal/workflow`, covered by its own Go tests) and exposed as `archon workflow status|advance|complete|retry`. Call those commands — do not reimplement the Decision Gates table or the state.yaml write by hand. For claude projects, a `PreToolUse` hook additionally blocks any direct `Edit`/`Write` call on `openspec/changes/*/state.yaml`, so hand-editing it isn't just discouraged, it's refused.
+
 ## Phase Sequence
 
 The phase sequence is determined by the change's `track` field in `state.yaml`:
@@ -53,12 +55,15 @@ Location: `openspec/changes/{change-name}/state.yaml`
 ```yaml
 phase: design
 status: completed
+retry_count: 0
 history:
   - {phase: explore, status: completed, ts: "2026-06-10T10:00:00Z"}
   - {phase: propose, status: completed, ts: "2026-06-10T10:05:00Z"}
   - {phase: spec, status: completed, ts: "2026-06-10T10:15:00Z"}
   - {phase: design, status: completed, ts: "2026-06-10T10:30:00Z"}
 ```
+
+`retry_count` persists harness-judge's auto-re-apply attempt count (see `harness-judge`'s retry loop) so it survives a context compaction or a closed-and-reopened session instead of living only in the orchestrating model's own count-as-you-go reasoning. It defaults to 0 and is managed exclusively via `archon workflow retry increment|reset`.
 
 ## Hard Rules
 
@@ -71,6 +76,7 @@ history:
 - Idempotent re-entry: if the requested phase matches the current phase and status is `in_progress`, return `allowed` with status `resuming`.
 - NEVER modify `state.yaml` for a blocked transition.
 - Use atomic write (temp file + rename) when updating `state.yaml`.
+- Mutate `state.yaml` ONLY via `archon workflow advance`/`archon workflow complete`/`archon workflow retry` — never hand-edit the YAML with the Edit or Write tool. For claude projects this is not just a convention: a `PreToolUse` hook blocks any direct `Edit`/`Write` call on `openspec/changes/*/state.yaml`.
 
 ## Decision Gates
 
@@ -96,38 +102,34 @@ Read `openspec/changes/{change-name}/state.yaml`. Parse `phase`, `status`, and `
 
 ### Step 2: Evaluate Transition
 
-Select the phase sequence based on the resolved `track` from Step 1, then compare the requested phase against the current phase:
+Run `archon workflow advance --change {name} --to {requested-phase}`. It resolves the
+track from Step 1, applies the exact Decision Gates table below, and reports
+`allowed`/`blocked` — it is the canonical implementation (`internal/workflow.CheckTransition`),
+not a restatement of it:
 
-```
-PHASE_ORDER = track == "bugfix"
-    ? [explore, spec, apply, verify, archive]
-    : [explore, propose, spec, design, tasks, apply, verify, judge, archive]
+| Condition | Action |
+|---|---|
+| `state.yaml` missing | `blocked` — report: `state.yaml not found — run sdd-explore first` |
+| Requested phase == current phase, status `in_progress` | `allowed` — status: `resuming` |
+| Requested phase == current phase, status `completed` | `blocked` — report: phase already completed |
+| Requested phase == next sequential phase | `allowed` — update state to `in_progress` |
+| Requested phase is >1 step ahead | `blocked` — report all missing phases in order |
+| Requested phase is before current phase | `blocked` — report: backward transitions not allowed |
+| `archive` requested with any phase incomplete | `blocked` — report incomplete phases |
 
-If the requested phase is not in PHASE_ORDER, return blocked:
-    "{phase} is not part of the {track} track"
-
-current_index = PHASE_ORDER.index(current_phase)
-requested_index = PHASE_ORDER.index(requested_phase)
-```
-
-Valid transitions:
-- `requested_index == current_index` AND `status == in_progress` → `allowed` (resuming)
-- `requested_index == current_index + 1` AND `status == completed` → `allowed` (advancing)
-- Everything else → `blocked`
+Do not re-derive this table by hand from `PHASE_ORDER`/index math — call the command.
 
 ### Step 3: Update State (on allowed transition)
 
-Write updated `state.yaml` using atomic write (temp file + rename):
-- Set `phase` to the requested phase
-- Set `status` to `in_progress` (unless resuming, keep `in_progress`)
-- Append history entry: `{phase: requested, status: in_progress, ts: <now>}`
+`archon workflow advance` already performed the atomic `state.yaml` write (phase,
+status `in_progress`, appended history entry) as part of Step 2 — there is no
+separate write step to perform here. It also best-effort regenerates
+`openspec/map.md` internally; a regen failure is surfaced as a warning on stderr
+and never rolls back the `state.yaml` write.
 
-Execution order is fixed: `state.yaml` MUST be written (temp+rename complete)
-BEFORE the next sub-step runs. Immediately after, shell out to `archon map` to
-regenerate `openspec/map.md` so it reflects the new phase/status. A regen
-failure (non-zero exit) MUST be surfaced to the orchestrator as a WARNING —
-it MUST NOT roll back the `state.yaml` write or block the recorded transition;
-state is LLM-owned, the map regen is best-effort.
+When a phase completes (reported by its sub-agent), run
+`archon workflow complete --change {name}` to mark it `completed` and append the
+history entry — again, do not hand-edit the YAML.
 
 ### Step 3b: Update SESSION_STATUS.md (MANDATORY on every transition)
 
@@ -135,6 +137,11 @@ In the SAME transition, write/update `SESSION_STATUS.md` at the repository ROOT,
 following the `session-status-contract` shared module. Update it BOTH when a phase
 starts (`in_progress`) and when it completes (`completed`). This file is the
 session-level resume point if the agent is closed mid-work.
+
+Get the "Current phase" line and the "Phase History" checklist from
+`archon workflow status --change {name}` — it renders both directly from
+`state.yaml`, which is the only way those two sections can never drift from the
+machine-readable state. Paste that block verbatim; do not hand-type it.
 
 - Record: active change, current phase + status, preflight choices (including the
   web/Playwright decision), phase history with timestamps, key artifact paths,
@@ -174,6 +181,11 @@ If blocked, append:
 
 ## Rules
 
+- This skill does NOT implement any SDD phase logic, and as of the `archon workflow`
+  commands, it does not even implement the transition-legality check or the
+  state.yaml write itself — it only decides WHEN to call `archon workflow
+  advance`/`complete`/`retry` and what to do with the result. The check and the
+  write live in `internal/workflow`, tested independently of this prose.
 - This skill does NOT implement any SDD phase logic. It ONLY gates transitions.
 - Delegate actual phase work to the corresponding `sdd-*` skill (sdd-explore, sdd-propose, sdd-spec, sdd-design, sdd-tasks, sdd-apply, sdd-verify, sdd-archive).
 - The `judge` phase is handled by `harness-judge`, not by an `sdd-*` skill.

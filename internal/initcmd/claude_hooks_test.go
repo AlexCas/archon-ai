@@ -44,13 +44,10 @@ func TestWriteClaudeHooks_WritesScriptAndSettings(t *testing.T) {
 
 	doc := readSettingsJSON(t, settingsPath)
 	preToolUse, ok := doc["hooks"].(map[string]any)["PreToolUse"].([]any)
-	if !ok || len(preToolUse) != 1 {
-		t.Fatalf("hooks.PreToolUse = %v, want exactly one matcher-group", doc["hooks"])
+	if !ok || len(preToolUse) != 2 {
+		t.Fatalf("hooks.PreToolUse = %v, want exactly two matcher-groups (Bash, Edit|Write)", doc["hooks"])
 	}
-	group := preToolUse[0].(map[string]any)
-	if group["matcher"] != "Bash" {
-		t.Errorf("matcher = %v, want Bash", group["matcher"])
-	}
+	group := findMatcherGroup(t, preToolUse, "Bash")
 	handlers := group["hooks"].([]any)
 	if len(handlers) != 1 {
 		t.Fatalf("handlers = %v, want 1", handlers)
@@ -104,6 +101,43 @@ func TestWriteClaudeHooks_WritesSessionStartEntry(t *testing.T) {
 	}
 }
 
+func TestWriteClaudeHooks_WritesStateYAMLGuardEntry(t *testing.T) {
+	dir := t.TempDir()
+
+	if _, err := writeClaudeHooks(dir, io.Discard); err != nil {
+		t.Fatalf("writeClaudeHooks() error = %v", err)
+	}
+
+	scriptPath := filepath.Join(dir, ".claude", hookScriptSubdir, "state-yaml-guard.sh")
+	data, err := os.ReadFile(scriptPath)
+	if err != nil {
+		t.Fatalf("read hook script: %v", err)
+	}
+	if string(data) != stateYAMLGuardScript {
+		t.Errorf("hook script content does not match stateYAMLGuardScript")
+	}
+
+	info, err := os.Stat(scriptPath)
+	if err != nil {
+		t.Fatalf("stat hook script: %v", err)
+	}
+	if info.Mode().Perm()&0o100 == 0 {
+		t.Errorf("hook script is not executable: mode = %v", info.Mode())
+	}
+
+	doc := readSettingsJSON(t, filepath.Join(dir, ".claude", "settings.json"))
+	preToolUse := doc["hooks"].(map[string]any)["PreToolUse"].([]any)
+	group := findMatcherGroup(t, preToolUse, "Edit|Write")
+	handlers := group["hooks"].([]any)
+	if len(handlers) != 1 {
+		t.Fatalf("handlers = %v, want 1", handlers)
+	}
+	cmd := handlers[0].(map[string]any)["command"].(string)
+	if cmd == "" || filepath.Base(cmd) != "state-yaml-guard.sh" {
+		t.Errorf("command = %q, want it to reference state-yaml-guard.sh", cmd)
+	}
+}
+
 func TestWriteClaudeHooks_IdempotentReRun(t *testing.T) {
 	dir := t.TempDir()
 
@@ -130,8 +164,8 @@ func TestWriteClaudeHooks_IdempotentReRun(t *testing.T) {
 
 	doc := readSettingsJSON(t, settingsPath)
 	preToolUse := doc["hooks"].(map[string]any)["PreToolUse"].([]any)
-	if len(preToolUse) != 1 {
-		t.Fatalf("hooks.PreToolUse has %d groups after re-run, want 1 (no duplicate entries)", len(preToolUse))
+	if len(preToolUse) != 2 {
+		t.Fatalf("hooks.PreToolUse has %d groups after re-run, want 2 (no duplicate entries)", len(preToolUse))
 	}
 }
 
@@ -174,11 +208,11 @@ func TestWriteClaudeHooks_PreservesUnrelatedSettings(t *testing.T) {
 	}
 
 	preToolUse := doc["hooks"].(map[string]any)["PreToolUse"].([]any)
-	if len(preToolUse) != 2 {
-		t.Fatalf("hooks.PreToolUse has %d groups, want 2 (user's Edit group + archon's Bash group)", len(preToolUse))
+	if len(preToolUse) != 3 {
+		t.Fatalf("hooks.PreToolUse has %d groups, want 3 (user's Edit group + archon's Bash and Edit|Write groups)", len(preToolUse))
 	}
 
-	var sawUserEdit, sawArchonBash bool
+	var sawUserEdit, sawArchonBash, sawArchonEditWrite bool
 	for _, g := range preToolUse {
 		group := g.(map[string]any)
 		switch group["matcher"] {
@@ -190,6 +224,8 @@ func TestWriteClaudeHooks_PreservesUnrelatedSettings(t *testing.T) {
 			}
 		case "Bash":
 			sawArchonBash = true
+		case "Edit|Write":
+			sawArchonEditWrite = true
 		}
 	}
 	if !sawUserEdit {
@@ -197,6 +233,9 @@ func TestWriteClaudeHooks_PreservesUnrelatedSettings(t *testing.T) {
 	}
 	if !sawArchonBash {
 		t.Error("archon's Bash matcher-group was not added")
+	}
+	if !sawArchonEditWrite {
+		t.Error("archon's Edit|Write matcher-group was not added")
 	}
 }
 
@@ -232,13 +271,37 @@ func TestWriteClaudeHooks_ReplacesStaleArchonEntryOnUpdate(t *testing.T) {
 
 	doc := readSettingsJSON(t, filepath.Join(settingsDir, "settings.json"))
 	preToolUse := doc["hooks"].(map[string]any)["PreToolUse"].([]any)
-	if len(preToolUse) != 1 {
-		t.Fatalf("hooks.PreToolUse has %d groups, want 1 (stale archon entry replaced, not duplicated)", len(preToolUse))
+	// The stale Bash entry is replaced in place (not duplicated); the
+	// Edit|Write entry is simply new since the fixture had no stale
+	// equivalent for it.
+	if len(preToolUse) != 2 {
+		t.Fatalf("hooks.PreToolUse has %d groups, want 2 (stale Bash entry replaced, Edit|Write newly added)", len(preToolUse))
 	}
-	cmd := preToolUse[0].(map[string]any)["hooks"].([]any)[0].(map[string]any)["command"].(string)
+	bashGroup := findMatcherGroup(t, preToolUse, "Bash")
+	cmd := bashGroup["hooks"].([]any)[0].(map[string]any)["command"].(string)
 	if filepath.Base(cmd) != "commit-attribution.sh" {
 		t.Errorf("command = %q, want the current script name, not the stale one", cmd)
 	}
+}
+
+// findMatcherGroup returns the single matcher-group in groups whose
+// "matcher" field equals matcher, failing the test if there isn't exactly
+// one.
+func findMatcherGroup(t *testing.T, groups []any, matcher string) map[string]any {
+	t.Helper()
+	var found map[string]any
+	count := 0
+	for _, g := range groups {
+		group := g.(map[string]any)
+		if group["matcher"] == matcher {
+			found = group
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("found %d matcher-groups with matcher %q in %v, want exactly 1", count, matcher, groups)
+	}
+	return found
 }
 
 func readSettingsJSON(t *testing.T, path string) map[string]any {

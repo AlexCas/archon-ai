@@ -7,6 +7,12 @@ engram/none artifact-store scope branches (artifacts are ALWAYS OpenSpec), refle
 single-judge model in the full-track terminal ordering, and adds the preflight-as-prose
 rule (silent standard default, deviation-triggered proposal only).
 
+A later delta (code-backed-workflow) ports the Decision Gates table this spec describes
+into `internal/workflow` (Go, with its own test suite) and exposes it as `archon workflow
+status|advance|complete|retry`. Before that delta, every rule here was enforced only by
+an orchestrating LLM choosing to read and follow this prose correctly — with no code-level
+check and no automated test of the actual enforcement.
+
 ## MODIFIED Requirements
 
 ### Requirement: Phase State Machine
@@ -183,6 +189,78 @@ Scenario: No second judge is added to the SDD path
   When harness-workflow orders the terminal phases
   Then it invokes a single focused judge, not a parallel dual review
   And no additional judge phase is inserted before archive
+```
+
+### Requirement: Code-Backed Transition Validation and State Mutation
+
+The Decision Gates table (Requirements "Phase State Machine" and "Phase Skipping
+Prevention" above) MUST be implemented in code (`internal/workflow.CheckTransition`),
+not re-derived by the orchestrating model from this prose on every transition. The
+meta-skill MUST call `archon workflow advance --change {name} --to {phase}` to validate
+and perform a transition, `archon workflow complete --change {name}` to mark the current
+phase completed, and MUST NOT hand-edit `state.yaml` to perform either. For claude
+projects, a `PreToolUse` hook (`internal/initcmd`'s `state-yaml-guard.sh`) MUST block any
+direct `Edit`/`Write` tool call targeting `openspec/changes/*/state.yaml`, so this is not
+only a prose convention.
+
+`state.yaml` gains a `retry_count` field (default 0) persisting `[[harness-judge]]`'s
+auto-re-apply attempt count, managed exclusively via `archon workflow retry
+increment|reset`, so the 3-retry cap survives a context compaction or a closed-and-
+reopened session instead of living only in the orchestrating model's in-conversation
+count.
+
+`archon workflow status --change {name}` MUST render the "Current phase" line and the
+"Phase History" checklist that `[[session-status-contract]]` specifies for
+`SESSION_STATUS.md`, directly from `state.yaml`. The orchestrator MUST paste that
+rendered block verbatim rather than hand-typing those two sections, since `state.yaml`
+and `SESSION_STATUS.md` are two independent sources of truth for the same phase state
+that can otherwise drift apart.
+
+#### Scenario: Advance delegates to the code-level check
+
+```gherkin
+@happy
+Scenario: Advance delegates to the code-level check
+  Given a change whose state.yaml has phase "spec" and status "completed"
+  When the orchestrator runs "archon workflow advance --change my-feature --to design"
+  Then the command reports allowed
+  And state.yaml is updated atomically with phase "design", status "in_progress", and a new history entry
+  And the orchestrator does not reimplement the Decision Gates table inline
+```
+
+#### Scenario: Direct state.yaml edits are blocked for claude projects
+
+```gherkin
+@edge
+Scenario: Direct state.yaml edits are blocked for claude projects
+  Given a claude project with archon's hooks installed
+  When any agent attempts to Edit or Write openspec/changes/{name}/state.yaml directly
+  Then the PreToolUse hook blocks the call
+  And the hook's message names "archon workflow advance/complete/retry" as the sanctioned path
+```
+
+#### Scenario: Retry count persists across a session restart
+
+```gherkin
+@edge
+Scenario: Retry count persists across a session restart
+  Given a change's state.yaml has retry_count 2 from a prior judge failure
+  And the session that incremented it was closed and a new one started
+  When the new session runs "archon workflow retry increment --change my-feature"
+  Then the reported retry_count is 3, not 1
+  And a subsequent increment attempt reports max_retries_exceeded: true
+```
+
+#### Scenario: SESSION_STATUS.md's phase block is generated, not hand-typed
+
+```gherkin
+@happy
+Scenario: SESSION_STATUS.md's phase block is generated, not hand-typed
+  Given a change's state.yaml has phase "apply" and status "in_progress"
+  When the orchestrator runs "archon workflow status --change my-feature"
+  Then the output includes "**Current phase**: apply (in_progress)"
+  And a "## Phase History" checklist matching state.yaml's history exactly
+  And the orchestrator pastes this block into SESSION_STATUS.md instead of typing it by hand
 ```
 
 ### Requirement: Preflight is a Standard Default Expressed as Prose
