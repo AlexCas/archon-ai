@@ -10,12 +10,14 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/archon-ai/archon/internal/config"
 	"github.com/archon-ai/archon/internal/initcmd"
 	"github.com/archon-ai/archon/internal/mapgen"
 	"github.com/archon-ai/archon/internal/route"
 	"github.com/archon-ai/archon/internal/scaffold"
+	"github.com/archon-ai/archon/internal/skillregistry"
 	"github.com/archon-ai/archon/internal/status"
 	"github.com/archon-ai/archon/internal/tui"
 	"github.com/archon-ai/archon/internal/version"
@@ -52,6 +54,7 @@ func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 		newTuiCmd(stdout, stderr),
 		newMapCmd(stdout, stderr),
 		newRouteCmd(stdout, stderr),
+		newSkillRegistryCmd(stdout, stderr),
 	)
 
 	return root
@@ -477,6 +480,66 @@ func newMapCmd(stdout, stderr io.Writer) *cobra.Command {
 
 	cmd.Flags().BoolVar(&checkFlag, "check", false, "Check map.md and links for staleness without writing")
 	cmd.Flags().BoolVar(&backfillFlag, "backfill", false, "Rewrite boundary-crossing links in archived changes and regenerate map.md")
+
+	return cmd
+}
+
+// newSkillRegistryCmd groups skill-registry subcommands.
+func newSkillRegistryCmd(stdout, stderr io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "skill-registry",
+		Short: "Manage the cross-tool skill registry (.atl/skill-registry.md)",
+	}
+	cmd.AddCommand(newSkillRegistryRefreshCmd(stdout, stderr))
+	return cmd
+}
+
+// newSkillRegistryRefreshCmd rescans project and user-level skill
+// directories and rewrites .atl/skill-registry.md. This is the delegator-
+// facing index skills/_shared/skill-resolver.md and skills/judgment-day
+// depend on to hand fresh subagents exact skill paths — subagents have no
+// native visibility into a project's skills/ directory, so without this
+// index they start every delegation blind.
+func newSkillRegistryRefreshCmd(stdout, stderr io.Writer) *cobra.Command {
+	var forceFlag bool
+
+	cmd := &cobra.Command{
+		Use:   "refresh",
+		Short: "Rescan project and user skill directories and rewrite .atl/skill-registry.md",
+		Long:  "Scans <project>/skills plus the fixed user-level skill roots (~/.pi/agent/skills, ~/.agents/skills, ~/.config/opencode/skills, ~/.claude/skills, ~/.codex/skills) for */SKILL.md, deduplicates by skill name (project wins, then first-scanned user root), and rewrites .atl/skill-registry.md. Skips the rewrite when the scanned content fingerprint matches the cache, unless --force is set.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			projectDir, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("get working directory: %w", err)
+			}
+
+			home, err := os.UserHomeDir()
+			if err != nil {
+				home = ""
+			}
+
+			res, err := skillregistry.Refresh(projectDir, home)
+			if err != nil {
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return err
+			}
+
+			path, cacheHit, err := skillregistry.Write(projectDir, res, forceFlag, time.Now())
+			if err != nil {
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return err
+			}
+
+			if cacheHit {
+				fmt.Fprintf(stdout, "%s: cache hit, %d skill(s) indexed, unchanged.\n", path, len(res.Entries))
+				return nil
+			}
+			fmt.Fprintf(stdout, "%s: regenerated, %d skill(s) indexed.\n", path, len(res.Entries))
+			return nil
+		},
+	}
+
+	cmd.Flags().BoolVar(&forceFlag, "force", false, "Regenerate even if the scanned content fingerprint matches the cache")
 
 	return cmd
 }
