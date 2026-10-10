@@ -25,7 +25,6 @@ func TestFS_ContainsSkills(t *testing.T) {
 		"sdd-verify",
 		"sdd-archive",
 		"judgment-day",
-		"branch-pr",
 		"sdd-router",
 	}
 
