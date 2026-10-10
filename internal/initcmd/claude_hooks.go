@@ -66,11 +66,48 @@ esac
 exit 0
 `
 
+// sessionRecoveryScript prints SESSION_STATUS.md's content as context
+// whenever it exists at the project root, implementing CLAUDE.md's Session
+// Status contract ("On the next session, READ it FIRST to restore context")
+// deterministically instead of depending on the orchestrator model to take
+// the initiative to read the file before doing anything else. Empty matcher
+// (below) means this fires on every SessionStart sub-event — startup,
+// resume, clear, and compact — since re-printing a small status file is
+// harmless even when "too often", and CLAUDE.md's concern spans all of
+// those (a closed-and-reopened session, a /clear mid-change, a compaction
+// that might otherwise lose track of the active change). Fails open (exit 0,
+// no output) when jq is unavailable, cwd is missing from the hook's input,
+// or there is no SESSION_STATUS.md to show.
+const sessionRecoveryScript = `#!/bin/sh
+# Archon session-recovery guard (SessionStart).
+# Prints SESSION_STATUS.md's content as context when it exists at the
+# project root, per CLAUDE.md's Session Status contract: "On the next
+# session, READ it FIRST to restore context."
+set -eu
+
+command -v jq >/dev/null 2>&1 || exit 0
+
+input=$(cat)
+cwd=$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null) || exit 0
+
+[ -z "$cwd" ] && exit 0
+
+status_file="$cwd/SESSION_STATUS.md"
+[ -f "$status_file" ] || exit 0
+
+printf '## Resuming an in-progress Archon SDD session\n\n'
+printf 'SESSION_STATUS.md exists at the project root. Read it first, per the Session Status contract in CLAUDE.md, before taking any other action. Its contents:\n\n'
+cat "$status_file"
+
+exit 0
+`
+
 // claudeHookSpecs is the fixed, ordered set of hooks archon generates for
 // claude projects. Order is part of the determinism contract: re-running
 // writeClaudeHooks with the same specs yields byte-identical output.
 var claudeHookSpecs = []hookSpec{
 	{Event: "PreToolUse", Matcher: "Bash", ScriptName: "commit-attribution.sh", ScriptContent: commitAttributionScript},
+	{Event: "SessionStart", Matcher: "", ScriptName: "session-recovery.sh", ScriptContent: sessionRecoveryScript},
 }
 
 // WriteClaudeHooks is the exported integration seam, mirroring
