@@ -511,7 +511,7 @@ func TestSaveConfig_RegeneratesAgentsMD(t *testing.T) {
 	}
 }
 
-func TestSaveConfig_DoesNotCreateClaudeDir(t *testing.T) {
+func TestSaveConfig_DoesNotWriteClaudeAgentsWithoutModels(t *testing.T) {
 	tmpDir := t.TempDir()
 	cfg := &config.Config{
 		HomeDir:    tmpDir,
@@ -528,14 +528,49 @@ func TestSaveConfig_DoesNotCreateClaudeDir(t *testing.T) {
 		t.Fatalf("saveConfig() returned error: %v", err)
 	}
 
-	// Verify .claude/ directory was NOT created (regenerateTemplate writes to root)
-	claudeDir := filepath.Join(tmpDir, ".claude")
-	_, err := os.Stat(claudeDir)
-	if err == nil {
-		t.Fatal(".claude/ directory should NOT be created by regenerateTemplate")
+	// No models are configured, so WriteClaudeAgents must be a no-op: no
+	// .claude/agents/ directory at all. .claude/ itself (and .claude/hooks/)
+	// IS expected to exist — hooks are tied to the claude agent selection,
+	// not to model resolution, so WriteClaudeHooks always runs for agent
+	// "claude" regardless of whether any phase model is set.
+	agentsDir := filepath.Join(tmpDir, ".claude", "agents")
+	if _, err := os.Stat(agentsDir); !os.IsNotExist(err) {
+		t.Fatalf(".claude/agents/ should not be created when no models resolve (stat err = %v)", err)
 	}
-	if !os.IsNotExist(err) {
-		t.Fatalf("unexpected error checking .claude/: %v", err)
+}
+
+// TestSaveConfig_WritesClaudeHooks verifies the save path actually invokes
+// WriteClaudeHooks for agent "claude" — the same unconditional, tied-to-
+// agent-selection behavior as the CLI init path (internal/initcmd/init.go),
+// not a separate opt-in the TUI could forget to wire up.
+func TestSaveConfig_WritesClaudeHooks(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := &config.Config{
+		HomeDir:    tmpDir,
+		Agent:      "claude",
+		Version:    "1.0.0",
+		SkillCount: 10,
+	}
+	m := NewModel(cfg, tmpDir)
+
+	cmd := m.saveConfig()
+	result := cmd()
+
+	if err, ok := result.(error); ok {
+		t.Fatalf("saveConfig() returned error: %v", err)
+	}
+
+	scriptPath := filepath.Join(tmpDir, ".claude", "hooks", "archon", "commit-attribution.sh")
+	if _, err := os.Stat(scriptPath); err != nil {
+		t.Fatalf("hook script not written: %v", err)
+	}
+
+	settingsData, err := os.ReadFile(filepath.Join(tmpDir, ".claude", "settings.json"))
+	if err != nil {
+		t.Fatalf("settings.json not written: %v", err)
+	}
+	if !strings.Contains(string(settingsData), "commit-attribution.sh") {
+		t.Errorf("settings.json does not reference commit-attribution.sh: %s", settingsData)
 	}
 }
 

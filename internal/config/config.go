@@ -43,16 +43,6 @@ type Security struct {
 	Profile string `yaml:"profile,omitempty"` // "cli" | "web"
 }
 
-// Hooks controls generation of Claude Code hooks in .claude/settings.json
-// that enforce HARD GATE rules deterministically (e.g. commit attribution)
-// instead of relying on the orchestrator model to remember them every turn.
-// Claude-agent only — opencode and other agents have no equivalent
-// mechanism; WriteClaudeHooks is a no-op for them regardless of this flag.
-// Defaults to disabled (Enabled:false) when the section is absent.
-type Hooks struct {
-	Enabled bool `yaml:"enabled"`
-}
-
 type SkillInventory struct {
 	Name    string `yaml:"name"`
 	Version string `yaml:"version"`
@@ -68,7 +58,6 @@ type Config struct {
 	Judge           Judge            `yaml:"judge"`
 	Playwright      Playwright       `yaml:"playwright"`
 	Security        Security         `yaml:"security"`
-	Hooks           Hooks            `yaml:"hooks"`
 	Models          ModelConfig      `yaml:"models,omitempty"`
 	SkillInventory  []SkillInventory `yaml:"skill_inventory"`
 	HomeDir         string           `yaml:"-"`
@@ -115,7 +104,6 @@ func (c *Config) Clone() *Config {
 		Judge:           c.Judge,
 		Playwright:      c.Playwright,
 		Security:        c.Security,
-		Hooks:           c.Hooks,
 		Models:          ModelConfig{Default: c.Models.Default, Leader: c.Models.Leader, Phases: make(map[string]ModelRef, len(c.Models.Phases))},
 		SkillInventory:  make([]SkillInventory, len(c.SkillInventory)),
 	}

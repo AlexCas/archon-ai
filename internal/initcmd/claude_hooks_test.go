@@ -61,6 +61,49 @@ func TestWriteClaudeHooks_WritesScriptAndSettings(t *testing.T) {
 	}
 }
 
+func TestWriteClaudeHooks_WritesSessionStartEntry(t *testing.T) {
+	dir := t.TempDir()
+
+	if _, err := writeClaudeHooks(dir, io.Discard); err != nil {
+		t.Fatalf("writeClaudeHooks() error = %v", err)
+	}
+
+	scriptPath := filepath.Join(dir, ".claude", hookScriptSubdir, "session-recovery.sh")
+	data, err := os.ReadFile(scriptPath)
+	if err != nil {
+		t.Fatalf("read hook script: %v", err)
+	}
+	if string(data) != sessionRecoveryScript {
+		t.Errorf("hook script content does not match sessionRecoveryScript")
+	}
+
+	info, err := os.Stat(scriptPath)
+	if err != nil {
+		t.Fatalf("stat hook script: %v", err)
+	}
+	if info.Mode().Perm()&0o100 == 0 {
+		t.Errorf("hook script is not executable: mode = %v", info.Mode())
+	}
+
+	doc := readSettingsJSON(t, filepath.Join(dir, ".claude", "settings.json"))
+	sessionStart, ok := doc["hooks"].(map[string]any)["SessionStart"].([]any)
+	if !ok || len(sessionStart) != 1 {
+		t.Fatalf("hooks.SessionStart = %v, want exactly one matcher-group", doc["hooks"])
+	}
+	group := sessionStart[0].(map[string]any)
+	if group["matcher"] != "" {
+		t.Errorf("matcher = %v, want empty string (fires on every SessionStart sub-event)", group["matcher"])
+	}
+	handlers := group["hooks"].([]any)
+	if len(handlers) != 1 {
+		t.Fatalf("handlers = %v, want 1", handlers)
+	}
+	cmd := handlers[0].(map[string]any)["command"].(string)
+	if cmd == "" || filepath.Base(cmd) != "session-recovery.sh" {
+		t.Errorf("command = %q, want it to reference session-recovery.sh", cmd)
+	}
+}
+
 func TestWriteClaudeHooks_IdempotentReRun(t *testing.T) {
 	dir := t.TempDir()
 
