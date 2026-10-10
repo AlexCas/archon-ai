@@ -607,7 +607,7 @@ func TestBuildConfig_SecurityFlag(t *testing.T) {
 		{"security off, playwright on", false, true},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := buildConfig("opencode", nil, nil, "", "", nil, tt.playwright, tt.security)
+			cfg := buildConfig("opencode", nil, nil, "", "", nil, tt.playwright, tt.security, false)
 			if cfg.Security.Enabled != tt.security {
 				t.Errorf("Security.Enabled = %v, want %v", cfg.Security.Enabled, tt.security)
 			}
