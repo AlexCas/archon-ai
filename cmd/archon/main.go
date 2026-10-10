@@ -21,6 +21,7 @@ import (
 	"github.com/archon-ai/archon/internal/status"
 	"github.com/archon-ai/archon/internal/tui"
 	"github.com/archon-ai/archon/internal/version"
+	"github.com/archon-ai/archon/internal/workflow"
 	"github.com/archon-ai/archon/skills"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
@@ -55,6 +56,7 @@ func newRootCmd(stdout, stderr io.Writer) *cobra.Command {
 		newMapCmd(stdout, stderr),
 		newRouteCmd(stdout, stderr),
 		newSkillRegistryCmd(stdout, stderr),
+		newWorkflowCmd(stdout, stderr),
 	)
 
 	return root
@@ -599,6 +601,304 @@ func newRouteCmd(stdout, stderr io.Writer) *cobra.Command {
 	cmd.Flags().StringVar(&statusFlag, "status", "", "Override the discovered current status (testability)")
 	cmd.Flags().BoolVar(&jsonFlag, "json", true, "Emit JSON to stdout (always on; flag is a no-op kept for CLI-contract compatibility)")
 
+	return cmd
+}
+
+// newWorkflowCmd groups the state.yaml-mutating and read-only subcommands
+// that implement skills/harness-workflow/SKILL.md's Decision Gates and
+// skills/harness-judge/SKILL.md's retry cap in code (internal/workflow),
+// instead of trusting an orchestrating LLM to reimplement that algorithm
+// correctly from prose every time.
+func newWorkflowCmd(stdout, stderr io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "workflow",
+		Short: "Validate and mutate openspec/changes/{name}/state.yaml (the SDD phase state machine)",
+	}
+	cmd.AddCommand(
+		newWorkflowStatusCmd(stdout, stderr),
+		newWorkflowAdvanceCmd(stdout, stderr),
+		newWorkflowCompleteCmd(stdout, stderr),
+		newWorkflowRetryCmd(stdout, stderr),
+	)
+	return cmd
+}
+
+// resolveWorkflowChange applies the same active-change precedence as `archon
+// route` (flag > SESSION_STATUS.md > sole folder > none), so every workflow
+// subcommand resolves "which change" identically to the router.
+func resolveWorkflowChange(projectDir, changeFlag string) (string, error) {
+	activeChange := route.ActiveChange(projectDir, changeFlag)
+	if activeChange == "" || activeChange == "none" {
+		return "", fmt.Errorf("no active change found (pass --change, or set SESSION_STATUS.md's \"Active change\", or leave exactly one folder under openspec/changes/)")
+	}
+	return activeChange, nil
+}
+
+func newWorkflowStatusCmd(stdout, stderr io.Writer) *cobra.Command {
+	var (
+		changeFlag string
+		jsonFlag   bool
+	)
+
+	cmd := &cobra.Command{
+		Use:   "status",
+		Short: "Report the current phase/status/retry-count for a change, and render its Phase History block",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			projectDir, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("get working directory: %w", err)
+			}
+			changeName, err := resolveWorkflowChange(projectDir, changeFlag)
+			if err != nil {
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return err
+			}
+
+			state, err := workflow.ReadState(workflow.StatePath(projectDir, changeName))
+			if err != nil {
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return err
+			}
+
+			if jsonFlag {
+				out, err := json.Marshal(map[string]any{
+					"change":      changeName,
+					"phase":       state.Phase,
+					"status":      state.Status,
+					"track":       state.Track,
+					"retry_count": state.RetryCount,
+				})
+				if err != nil {
+					return fmt.Errorf("marshal status: %w", err)
+				}
+				fmt.Fprintln(stdout, string(out))
+				return nil
+			}
+
+			history, err := state.PhaseHistoryMarkdown()
+			if err != nil {
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return err
+			}
+
+			fmt.Fprintf(stdout, "## Workflow State\n\n")
+			fmt.Fprintf(stdout, "**Change**: %s\n", changeName)
+			fmt.Fprintf(stdout, "%s\n", state.StatusLine())
+			if state.RetryCount > 0 {
+				fmt.Fprintf(stdout, "**Judge retry count**: %d/%d\n", state.RetryCount, workflow.MaxJudgeRetries)
+			}
+			fmt.Fprintf(stdout, "\n")
+			fmt.Fprintf(stdout, "Paste the block below into SESSION_STATUS.md's \"Current phase\" line and \"Phase History\" section as-is — both are generated from state.yaml, not hand-typed:\n\n")
+			fmt.Fprintf(stdout, "%s\n%s", state.StatusLine(), history)
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&changeFlag, "change", "", "Override active-change discovery")
+	cmd.Flags().BoolVar(&jsonFlag, "json", false, "Emit JSON instead of the human report")
+
+	return cmd
+}
+
+func newWorkflowAdvanceCmd(stdout, stderr io.Writer) *cobra.Command {
+	var (
+		changeFlag string
+		toFlag     string
+		jsonFlag   bool
+	)
+
+	cmd := &cobra.Command{
+		Use:   "advance",
+		Short: "Validate and, if allowed, perform a phase transition (writes state.yaml atomically)",
+		Long:  "Implements skills/harness-workflow/SKILL.md's Decision Gates table. On an allowed transition, writes state.yaml (phase, status=in_progress, appended history entry) and best-effort regenerates openspec/map.md -- a map regen failure is a warning, never a rollback of the state.yaml write. On a blocked transition, state.yaml is left untouched and the command exits non-zero.",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if toFlag == "" {
+				return fmt.Errorf("--to is required")
+			}
+			projectDir, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("get working directory: %w", err)
+			}
+			changeName, err := resolveWorkflowChange(projectDir, changeFlag)
+			if err != nil {
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return err
+			}
+
+			statePath := workflow.StatePath(projectDir, changeName)
+			state, err := workflow.ReadState(statePath)
+			if err != nil {
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return err
+			}
+
+			result, err := state.Advance(toFlag, time.Now())
+			if err != nil {
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return err
+			}
+
+			if !result.Allowed {
+				if jsonFlag {
+					out, _ := json.Marshal(map[string]any{"allowed": false, "reason": result.Reason, "missing_phases": result.MissingPhases})
+					fmt.Fprintln(stdout, string(out))
+				}
+				fmt.Fprintf(stderr, "blocked: %s\n", result.Reason)
+				if len(result.MissingPhases) > 0 {
+					fmt.Fprintf(stderr, "missing phases: %s\n", strings.Join(result.MissingPhases, ", "))
+				}
+				return fmt.Errorf("transition blocked: %s", result.Reason)
+			}
+
+			if err := state.Write(statePath); err != nil {
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return err
+			}
+
+			if err := mapgen.Generate(projectDir); err != nil {
+				fmt.Fprintf(stderr, "Warning: openspec/map.md regen failed (state.yaml write stands): %v\n", err)
+			}
+
+			if jsonFlag {
+				out, _ := json.Marshal(map[string]any{"allowed": true, "resuming": result.Resuming, "phase": state.Phase, "status": state.Status})
+				fmt.Fprintln(stdout, string(out))
+				return nil
+			}
+			fmt.Fprintf(stdout, "%s advanced to %s (in_progress)\n", changeName, state.Phase)
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&changeFlag, "change", "", "Override active-change discovery")
+	cmd.Flags().StringVar(&toFlag, "to", "", "The requested phase")
+	cmd.Flags().BoolVar(&jsonFlag, "json", false, "Emit JSON instead of the human report")
+
+	return cmd
+}
+
+func newWorkflowCompleteCmd(stdout, stderr io.Writer) *cobra.Command {
+	var changeFlag string
+
+	cmd := &cobra.Command{
+		Use:   "complete",
+		Short: "Mark the change's current phase completed (writes state.yaml atomically)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			projectDir, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("get working directory: %w", err)
+			}
+			changeName, err := resolveWorkflowChange(projectDir, changeFlag)
+			if err != nil {
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return err
+			}
+
+			statePath := workflow.StatePath(projectDir, changeName)
+			state, err := workflow.ReadState(statePath)
+			if err != nil {
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return err
+			}
+
+			state.Complete(time.Now())
+
+			if err := state.Write(statePath); err != nil {
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return err
+			}
+
+			fmt.Fprintf(stdout, "%s: %s marked completed\n", changeName, state.Phase)
+			return nil
+		},
+	}
+
+	cmd.Flags().StringVar(&changeFlag, "change", "", "Override active-change discovery")
+
+	return cmd
+}
+
+func newWorkflowRetryCmd(stdout, stderr io.Writer) *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "retry",
+		Short: "Manage the judge phase's persisted retry count",
+	}
+
+	var incChangeFlag string
+	incCmd := &cobra.Command{
+		Use:   "increment",
+		Short: "Increment the judge retry count, or fail if the cap (3) is already reached",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			projectDir, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("get working directory: %w", err)
+			}
+			changeName, err := resolveWorkflowChange(projectDir, incChangeFlag)
+			if err != nil {
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return err
+			}
+
+			statePath := workflow.StatePath(projectDir, changeName)
+			state, err := workflow.ReadState(statePath)
+			if err != nil {
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return err
+			}
+
+			count, err := state.IncrementRetry()
+			if err != nil {
+				fmt.Fprintf(stdout, "max_retries_exceeded: true\n")
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return err
+			}
+
+			if err := state.Write(statePath); err != nil {
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return err
+			}
+
+			fmt.Fprintf(stdout, "retry_count: %d/%d\n", count, workflow.MaxJudgeRetries)
+			return nil
+		},
+	}
+	incCmd.Flags().StringVar(&incChangeFlag, "change", "", "Override active-change discovery")
+
+	var resetChangeFlag string
+	resetCmd := &cobra.Command{
+		Use:   "reset",
+		Short: "Reset the judge retry count to 0 (call once the single focused review passes)",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			projectDir, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("get working directory: %w", err)
+			}
+			changeName, err := resolveWorkflowChange(projectDir, resetChangeFlag)
+			if err != nil {
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return err
+			}
+
+			statePath := workflow.StatePath(projectDir, changeName)
+			state, err := workflow.ReadState(statePath)
+			if err != nil {
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return err
+			}
+
+			state.ResetRetry()
+
+			if err := state.Write(statePath); err != nil {
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return err
+			}
+
+			fmt.Fprintf(stdout, "retry_count: 0/%d\n", workflow.MaxJudgeRetries)
+			return nil
+		},
+	}
+	resetCmd.Flags().StringVar(&resetChangeFlag, "change", "", "Override active-change discovery")
+
+	cmd.AddCommand(incCmd, resetCmd)
 	return cmd
 }
 

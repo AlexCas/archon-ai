@@ -102,11 +102,47 @@ cat "$status_file"
 exit 0
 `
 
+// stateYAMLGuardScript blocks direct Edit/Write calls on
+// openspec/changes/*/state.yaml. All mutations must instead go through
+// `archon workflow advance|complete|retry` (internal/workflow), which
+// validate the transition against skills/harness-workflow/SKILL.md's
+// Decision Gates table and write atomically — a direct edit bypasses both
+// checks silently. Unlike the commit-attribution hook, this script never
+// needs to understand the edit's semantic effect (parsing Edit's
+// old_string/new_string to simulate the resulting YAML would be its own
+// source of bugs); it only needs to recognize the file path and forbid
+// editing it directly, full stop — the real validation logic lives entirely
+// in internal/workflow, covered by its own Go tests.
+const stateYAMLGuardScript = `#!/bin/sh
+# Archon state.yaml guard (PreToolUse / Edit|Write).
+# Blocks direct Edit/Write calls on openspec/changes/*/state.yaml. All
+# mutations must go through archon workflow advance|complete|retry, which
+# validate the transition and write atomically; a direct edit bypasses both.
+set -eu
+
+command -v jq >/dev/null 2>&1 || exit 0
+
+input=$(cat)
+path=$(printf '%s' "$input" | jq -r '.tool_input.file_path // empty' 2>/dev/null) || exit 0
+
+[ -z "$path" ] && exit 0
+
+case "$path" in
+  */openspec/changes/*/state.yaml)
+    echo "Blocked by archon's state.yaml guard: openspec/changes/*/state.yaml must be modified via 'archon workflow advance', 'archon workflow complete', or 'archon workflow retry' -- never edited directly. Those validate the transition against harness-workflow's Decision Gates and write atomically; a direct edit bypasses both." >&2
+    exit 2
+    ;;
+esac
+
+exit 0
+`
+
 // claudeHookSpecs is the fixed, ordered set of hooks archon generates for
 // claude projects. Order is part of the determinism contract: re-running
 // writeClaudeHooks with the same specs yields byte-identical output.
 var claudeHookSpecs = []hookSpec{
 	{Event: "PreToolUse", Matcher: "Bash", ScriptName: "commit-attribution.sh", ScriptContent: commitAttributionScript},
+	{Event: "PreToolUse", Matcher: "Edit|Write", ScriptName: "state-yaml-guard.sh", ScriptContent: stateYAMLGuardScript},
 	{Event: "SessionStart", Matcher: "", ScriptName: "session-recovery.sh", ScriptContent: sessionRecoveryScript},
 }
 

@@ -11,6 +11,15 @@ change. `SESSION_STATUS.md` is the fast,
 at-a-glance resume point for the WHOLE session, kept at the repository ROOT while
 work is in progress.
 
+**These two files are two different sources of truth describing the same phase
+state, so they can drift apart if `SESSION_STATUS.md`'s "Current phase" line and
+"Phase History" section are hand-typed.** Get both from
+`archon workflow status --change <name>` — it renders them directly from
+`state.yaml` (`internal/workflow.State.StatusLine`/`PhaseHistoryMarkdown`) — and
+paste the block verbatim. The rest of the file (Preflight, Artifacts, Open
+Questions, Resume Hint) genuinely needs the orchestrator's own judgment and stays
+hand-written prose.
+
 ## Location & lifecycle
 
 - **Active session**: `SESSION_STATUS.md` lives at the repository root.

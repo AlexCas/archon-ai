@@ -137,26 +137,30 @@ requires the single judge review to pass AND every enabled gate to pass.
 
 ### Step 5: On Pass
 
-1. Update `openspec/changes/{change-name}/state.yaml`: set `phase: judge, status: completed`
-2. Return success verdict
-3. Orchestrator may proceed to `archive` phase, then, after archive stages its commit on the branch, the PR is opened (single-PR flow)
+1. Run `archon workflow complete --change {change-name}` (marks `judge` phase `completed`)
+2. Run `archon workflow retry reset --change {change-name}` — zero the persisted retry
+   count now that the cycle is done, so it never leaks into an unrelated later use of
+   judge for this change.
+3. Return success verdict
+4. Orchestrator may proceed to `archive` phase, then, after archive stages its commit on the branch, the PR is opened (single-PR flow)
 
 ### Step 6: On Fail — Auto Re-Apply Loop
 
-If `retry_count < 3`:
+Run `archon workflow retry increment --change {change-name}` FIRST — it is the
+persisted source of truth for the retry count (see `internal/workflow`), not an
+in-conversation count-as-you-go variable, so it survives a context compaction or a
+closed-and-reopened session mid-loop.
 
-1. Build structured feedback block (see format below)
-2. Invoke `sdd-apply` with the feedback as input prompt
-3. After `sdd-apply` completes, invoke `sdd-verify`
-4. If `sdd-verify` passes, return to Step 2 (re-judge)
-5. If `sdd-verify` fails, include verify failures in next feedback block and return to Step 2
-6. Increment `retry_count`
-
-If `retry_count == 3` (4th failure):
-
-1. Return `blocked` with all accumulated issues
-2. Set `max_retries_exceeded: true`
-3. Do NOT attempt further retries
+- If it succeeds (reports `retry_count: N/3`):
+  1. Build structured feedback block (see format below)
+  2. Invoke `sdd-apply` with the feedback as input prompt
+  3. After `sdd-apply` completes, invoke `sdd-verify`
+  4. If `sdd-verify` passes, return to Step 2 (re-judge)
+  5. If `sdd-verify` fails, include verify failures in next feedback block and return to Step 2
+- If it fails (`max_retries_exceeded: true`, the 4th attempt):
+  1. Return `blocked` with all accumulated issues
+  2. Set `max_retries_exceeded: true`
+  3. Do NOT attempt further retries, and do NOT call `archon workflow retry increment` again
 
 ## Structured Feedback Format
 
@@ -177,7 +181,7 @@ When the single judge review fails, produce feedback that `sdd-apply` can consum
 
 ## Retry Context
 
-- Attempt: {retry_count + 1} of 3
+- Attempt: {retry_count} of 3 (the value `archon workflow retry increment` just returned)
 - Previous issues resolved: {count}
 - Remaining issues: {count}
 ```
