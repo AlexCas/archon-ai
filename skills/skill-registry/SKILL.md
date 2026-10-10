@@ -9,7 +9,7 @@ metadata:
 
 ## Activation Contract
 
-Use this skill after installing, removing, creating, moving, or renaming skills, or when a delegator needs a fresh skill index.
+Use this skill after installing, removing, creating, moving, or renaming skills, or when a delegator needs a fresh skill index. The scan, dedup, and render steps below are implemented by `archon skill-registry refresh` (`--force` to bypass the fingerprint cache) — run that command rather than reimplementing this logic inline.
 
 ## Hard Rules
 

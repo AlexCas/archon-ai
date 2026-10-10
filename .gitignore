@@ -10,6 +10,10 @@ archon-*-arm64
 .archon/
 .claude/
 
+# Machine-local skill registry cache (absolute paths, regenerate with
+# `archon skill-registry refresh`) — not meaningful shared across machines.
+.atl/
+
 # Dependency directories
 homebrew/
 

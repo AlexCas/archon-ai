@@ -7,18 +7,28 @@ judge. The `judgment-day` skill is explicitly untouched and remains a standalone
 The enabled gate, the mutation/playwright gates, the 3-retry re-apply loop, and the
 feedback contract are preserved.
 
+A later delta (native-review-delegation) changes what the single judge's code-quality
+half checks: instead of ad hoc criteria, `archon-judge` delegates to the native
+`code-review` skill and gates only on its `correctness`-category findings.
+
 ## MODIFIED Requirements
 
 ### Requirement: Single Focused Judge in the SDD Path
 
 In the SDD path, the meta-skill MUST run exactly ONE focused review by DELEGATING to the
 `archon-judge` subagent (whose frontmatter `model:` is the binding hard gate). The single
-judge MUST evaluate spec compliance, design coherence, and code quality, and MUST return
-a single verdict (`pass`/`fail`) with any issues. The meta-skill MUST NOT run a parallel
-dual/blind review, MUST NOT synthesize across two judges, and MUST NOT run any review
-inline on the orchestrator's model. The captured verdict drives the rest of the gate.
+judge MUST evaluate spec compliance and design coherence directly, and MUST evaluate code
+quality by delegating to the native `code-review` skill (effort `high`, scoped to the
+files the change modified) rather than ad hoc criteria. The judge MUST return a single
+verdict (`pass`/`fail`) with any issues. `fail` requires a `code-review` finding in the
+`correctness` category OR a spec/design compliance gap; `code-review` findings in any
+other category (simplification, efficiency, reuse) MUST be surfaced as non-blocking notes
+and MUST NOT by themselves fail the gate. The meta-skill MUST NOT run a parallel dual/blind
+review, MUST NOT synthesize across two judges, and MUST NOT run any review inline on the
+orchestrator's model. The captured verdict drives the rest of the gate.
 (Previously: `harness-judge` delegated a DUAL adversarial review — two blind judges plus
-synthesis — to `archon-judge`, which invoked `judgment-day`.)
+synthesis — to `archon-judge`, which invoked `judgment-day`. Then: the single judge
+evaluated code quality with ad hoc criteria instead of delegating to `code-review`.)
 
 #### Scenario: Single judge passes
 
@@ -39,6 +49,18 @@ Scenario: Single judge finds issues
   When harness-judge processes the verdict
   Then the verdict is "fail"
   And all issues are collected into structured feedback
+```
+
+#### Scenario: Non-correctness findings do not fail the gate
+
+```gherkin
+@edge
+Scenario: Non-correctness findings do not fail the gate
+  Given the delegated code-review run returns only "simplification" and "efficiency" findings
+  And archon-judge's own spec/design compliance check finds no gap
+  When harness-judge processes the verdict
+  Then the verdict is "pass"
+  And the non-correctness findings are surfaced as non-blocking notes in the report
 ```
 
 #### Scenario: Review runs under the pinned judge model, not a dual review

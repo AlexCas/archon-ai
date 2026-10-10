@@ -19,7 +19,7 @@ The registry is an **index** of skill names, triggers, scopes, and exact `SKILL.
 Resolution order:
 1. Use the session cache if present.
 2. Read `.atl/skill-registry.md` from the project root (filesystem).
-3. No registry found → proceed without project skills and warn the user to run `gentle-ai skill-registry refresh`.
+3. No registry found → proceed without project skills and warn the user to run `archon skill-registry refresh`.
 
 ### Step 2: Match Relevant Skills
 

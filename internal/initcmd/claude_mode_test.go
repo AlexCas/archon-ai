@@ -287,6 +287,18 @@ func TestWriteClaudeAgents_JudgeBodyIsWrapper(t *testing.T) {
 		t.Errorf("archon-judge.md body must not reference %q (judgment-day is standalone, not invoked by SDD judge)", "judgment-day")
 	}
 
+	// Body must delegate the code-quality half of the review to the native code-review
+	// skill instead of reimplementing ad hoc review criteria.
+	if !strings.Contains(content, "code-review") {
+		t.Errorf("archon-judge.md body missing %q", "code-review")
+	}
+
+	// Body must scope gate failures to correctness findings so simplification/efficiency
+	// suggestions from code-review don't trigger the re-apply loop.
+	if !strings.Contains(content, "correctness") {
+		t.Errorf("archon-judge.md body missing %q", "correctness")
+	}
+
 	// Body must NOT reference skills/sdd-judge/SKILL.md.
 	if strings.Contains(content, "skills/sdd-judge/SKILL.md") {
 		t.Errorf("archon-judge.md body must not contain %q", "skills/sdd-judge/SKILL.md")

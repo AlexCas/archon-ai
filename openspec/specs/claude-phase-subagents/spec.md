@@ -2,8 +2,13 @@
 
 This delta adds `judge` to the set of phases the claude codegen path emits, so
 `.claude/agents/archon-judge.md` becomes a frontmatter-pinned hard gate. Judge is
-NOT a generic `sdd-<phase>` executor: it has no `sdd-judge` skill and MUST delegate
-the dual review to `judgment-day`, so its emitted body is a special thin wrapper.
+NOT a generic `sdd-<phase>` executor: it has no `sdd-judge` skill, so its emitted
+body is a special thin wrapper rather than a pointer to a `skills/sdd-judge/SKILL.md`
+that doesn't exist. The body runs a single focused review with two parts: the
+native `code-review` skill for code quality, and the judge's own read of the
+change's spec and design for compliance and coherence. (Previously: the body
+instead delegated a dual review to `judgment-day`; see `harness-judge`'s
+single-focused-judge delta and its later code-review-delegation delta.)
 
 ## MODIFIED Requirements
 
@@ -42,12 +47,17 @@ Scenario: A phase with no resolvable model is omitted
 Each `archon-<phase>.md` body MUST be a functional executor system prompt. For every
 phase that HAS an `sdd-<phase>` skill, the body MUST instruct the executor to follow
 `skills/sdd-<phase>/SKILL.md` and MUST NOT delegate. For `judge`, which has NO
-`sdd-judge` skill, the body MUST instead be a thin wrapper that instructs the executor
-to run the `judgment-day` dual review and report the verdict back to `harness-judge`;
-the judge body MUST NOT reference a non-existent `skills/sdd-judge/SKILL.md` and MUST
-NOT carry the generic "do not delegate; execute yourself" instruction. No body MUST be
-an empty stub.
-(Previously: every body uniformly referenced `skills/sdd-<phase>/SKILL.md` with a "do not delegate" instruction.)
+`sdd-judge` skill, the body MUST instead be a thin wrapper describing a single focused
+review: load the native `code-review` skill for the code-quality half (gate failures
+scoped to its `correctness`-category findings), check the change's spec and design
+compliance directly for the other half, and report one combined verdict back to
+`harness-judge`. The judge body MUST NOT reference a non-existent
+`skills/sdd-judge/SKILL.md`, MUST NOT invoke `judgment-day`, and MUST NOT carry the
+generic "do not delegate; execute yourself" instruction. No body MUST be an empty stub.
+(Previously: every body uniformly referenced `skills/sdd-<phase>/SKILL.md` with a "do
+not delegate" instruction. Then: the judge body invoked `judgment-day` for a dual
+review. Then: the judge body evaluated code quality with ad hoc criteria instead of
+delegating to `code-review`.)
 
 #### Scenario: Body points the executor at the phase skill
 
@@ -59,14 +69,16 @@ Scenario: Body points the executor at the phase skill
   And the body is non-empty after the frontmatter
 ```
 
-#### Scenario: Judge body is the judgment-day wrapper
+#### Scenario: Judge body delegates code quality to code-review
 
 ```gherkin
-Scenario: Judge body is the judgment-day wrapper
+Scenario: Judge body delegates code quality to code-review
   Given a claude project with a resolvable model for the judge phase
   When init writes the claude agents
-  Then ".claude/agents/archon-judge.md" body invokes "judgment-day"
+  Then ".claude/agents/archon-judge.md" body references "code-review"
+  And the body references "correctness"
   And the body reports its verdict to "harness-judge"
+  And the body does not invoke "judgment-day"
   And the body does not reference "skills/sdd-judge/SKILL.md"
 ```
 

@@ -78,12 +78,18 @@ playwright:
 Delegate a single focused review to the `archon-judge` subagent (whose
 frontmatter `model:` is the binding hard gate):
 - Target: the current change (all files modified by the change plus the change's spec and design)
-- Criteria: spec compliance, design coherence, and code quality
+- Criteria: spec compliance and design coherence (checked directly by archon-judge)
+  plus code quality (checked by delegating to the native `code-review` skill, effort `high`,
+  scoped to the files this change modified)
 
-The archon-judge subagent performs one focused review and reports its verdict directly.
+The archon-judge subagent runs `code-review` for the code-quality half of the review and
+checks spec/design compliance itself, then reports one combined verdict directly.
 Capture the verdict from the subagent's output:
-- `pass` → the review approves with no confirmed CRITICAL or real WARNING issues
-- `fail` → one or more confirmed issues found
+- `pass` → code-review reports no `correctness`-category findings AND spec/design compliance holds
+- `fail` → one or more `correctness`-category findings from code-review, or a spec/design gap
+
+`code-review` findings outside the `correctness` category (simplification, efficiency, reuse)
+are non-blocking notes — surface them in the report but do NOT fail the gate on them.
 
 Note: `judgment-day` is NOT invoked. The SDD path uses this single focused review only.
 `judgment-day` remains a standalone opt-in the user may invoke outside the SDD pipeline.
@@ -207,7 +213,8 @@ Return `## Judge Phase Report`:
 
 ### Single Judge Result
 - Review: {APPROVED | ISSUES FOUND}
-- Confirmed issues: {count}
+- Confirmed issues: {count} (code-review `correctness` findings + spec/design gaps)
+- Non-blocking notes: {count} (code-review simplification/efficiency/reuse findings, if any)
 
 ### Mutation Gate
 - Status: {passed | failed | skipped}
