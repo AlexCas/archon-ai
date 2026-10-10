@@ -28,10 +28,6 @@ type Options struct {
 	Playwright bool
 	// Security enables the security-baseline gate across the SDD phases.
 	Security bool
-	// Hooks enables generation of Claude Code hooks (.claude/settings.json +
-	// .claude/hooks/archon/*) that enforce HARD GATE rules deterministically.
-	// Claude-agent only; ignored for other agents.
-	Hooks bool
 	// OverwriteTemplate, when true, replaces an existing orchestrator file
 	// (CLAUDE.md / AGENTS.md) without prompting. When false and the file
 	// already exists, Run aborts with ErrTemplateExists so the caller can
@@ -89,7 +85,7 @@ func Run(opts Options) (*Result, error) {
 	projectSkillsDir := res.ProjectSkillsDir
 	extracted := res.Extracted
 
-	cfg := buildConfig(agentName, extracted, res.Inventory, opts.ModelDefault, opts.ModelLeader, opts.ModelPhases, opts.Playwright, opts.Security, opts.Hooks)
+	cfg := buildConfig(agentName, extracted, res.Inventory, opts.ModelDefault, opts.ModelLeader, opts.ModelPhases, opts.Playwright, opts.Security)
 	cfg.HomeDir = opts.ProjectDir
 	if err := cfg.Save(); err != nil {
 		return nil, fmt.Errorf("save config: %w", err)
@@ -125,6 +121,12 @@ func Run(opts Options) (*Result, error) {
 		}
 		rollback.CreatedPaths = append(rollback.CreatedPaths, paths...)
 
+		// Hooks are tied to the claude agent selection itself, not a separate
+		// opt-in flag: they enforce rules CLAUDE.md already declares
+		// mandatory (e.g. commit attribution), so there is no legitimate
+		// "claude project that wants this off" case — same reasoning as
+		// archon-<phase>.md always being written for a resolvable phase.
+		//
 		// Hook scripts under .claude/hooks/archon/ are exclusively archon's
 		// and are safe to register for rollback like any other created file.
 		// .claude/settings.json is NOT registered here: it may carry the
@@ -132,15 +134,13 @@ func Run(opts Options) (*Result, error) {
 		// deletes whole paths (config.RollbackManifest.Cleanup), which would
 		// destroy that unrelated content. Settings.json merge/unmerge is left
 		// as a known follow-up rather than risking data loss today.
-		if opts.Hooks {
-			hookPaths, err := writeClaudeHooks(opts.ProjectDir, os.Stderr)
-			if err != nil {
-				return nil, fmt.Errorf("write claude hooks: %w", err)
-			}
-			for _, p := range hookPaths {
-				if strings.Contains(p, hookScriptSubdir) {
-					rollback.CreatedPaths = append(rollback.CreatedPaths, p)
-				}
+		hookPaths, err := writeClaudeHooks(opts.ProjectDir, os.Stderr)
+		if err != nil {
+			return nil, fmt.Errorf("write claude hooks: %w", err)
+		}
+		for _, p := range hookPaths {
+			if strings.Contains(p, hookScriptSubdir) {
+				rollback.CreatedPaths = append(rollback.CreatedPaths, p)
 			}
 		}
 	}
@@ -241,7 +241,7 @@ func createSymlinks(globalDir, projectDir string, skills []string) error {
 	return nil
 }
 
-func buildConfig(agentName string, extracted []string, inventory []config.SkillInventory, modelDefault string, modelLeader string, modelPhases map[string]string, playwright bool, security bool, hooks bool) *config.Config {
+func buildConfig(agentName string, extracted []string, inventory []config.SkillInventory, modelDefault string, modelLeader string, modelPhases map[string]string, playwright bool, security bool) *config.Config {
 	var phases map[string]config.ModelRef
 	for k, v := range modelPhases {
 		if v != "" {
@@ -268,9 +268,6 @@ func buildConfig(agentName string, extracted []string, inventory []config.SkillI
 		},
 		Security: config.Security{
 			Enabled: security,
-		},
-		Hooks: config.Hooks{
-			Enabled: hooks,
 		},
 		Models: config.ModelConfig{
 			Default: config.ParseModelRef(modelDefault),

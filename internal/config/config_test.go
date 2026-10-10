@@ -228,9 +228,6 @@ func TestConfig_CloneRoundtrip(t *testing.T) {
 			Enabled: true,
 			Profile: "web",
 		},
-		Hooks: Hooks{
-			Enabled: true,
-		},
 		Models: ModelConfig{
 			Default: ModelRef{Provider: "anthropic", Model: "claude-sonnet-4-20250514"},
 			Leader:  ModelRef{Provider: "anthropic", Model: "claude-opus-4-8"},

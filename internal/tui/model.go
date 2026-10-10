@@ -368,6 +368,12 @@ func (m Model) saveConfig() tea.Cmd {
 			if _, err := initcmd.WriteClaudeAgents(m.projectDir, cfg.Models, io.Discard); err != nil {
 				return fmt.Errorf("saved config but failed to write claude agents: %w", err)
 			}
+			// Hooks are tied to the claude agent selection itself (see
+			// init.go) — no separate toggle, so the TUI save path writes
+			// them unconditionally too, matching the CLI init path.
+			if _, err := initcmd.WriteClaudeHooks(m.projectDir, io.Discard); err != nil {
+				return fmt.Errorf("saved config but failed to write claude hooks: %w", err)
+			}
 		}
 
 		// Only update in-memory config after save, regenerate, and merge succeed
