@@ -12,15 +12,17 @@
 | Chained PRs recommended | No |
 | Suggested split | Single PR |
 | Delivery strategy | ask-on-risk |
-| Chain strategy | pending |
+| Chain strategy | size-exception |
 
 Decision needed before apply: No
 Chained PRs recommended: No
-Chain strategy: pending
+Chain strategy: size-exception
 800-line budget risk: Low
 
 Well under the 800-line budget (precedent `b3bb6d1`: 170 lines, narrower
-scope). Single PR, no slicing.
+scope). User confirmed single PR over the default Feature Branch Chain at
+the tasks Human Review Gate (trivially small, per CLAUDE.md's preflight
+deviation rule).
 
 ### Suggested Work Units
 
