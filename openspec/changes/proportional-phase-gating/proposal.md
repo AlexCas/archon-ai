@@ -77,8 +77,8 @@ boolean. No data migration — new fields are additive.
 - [ ] `harness-workflow` delta reviewed without weakening the guarantee for high-risk changes.
 - [ ] Go tests cover `fast` transitions like `bugfix`.
 
-## Proposal question round
+## Proposal question round — CONFIRMED by user
 
-- **Auto-select vs suggest `fast`?** Default: suggest only via the existing preflight deviation-question pattern — never silently auto-pick.
-- **Does `judge.enabled=false` become a tier special case, or get replaced?** Default: special-case override (`enabled=false` always skips) layered under the new tier, so existing configs keep working.
-- **Does `fast` skip Human Review Gate phases?** Default: no — `fast` shortens the phase list, like `bugfix`; included phases still gate on human review.
+- **Auto-select vs suggest `fast`?** Confirmed: suggest only, via the existing preflight deviation-question pattern — never silently auto-pick.
+- **Does `judge.enabled=false` become a tier special case, or get replaced?** Confirmed: special-case override (`enabled=false` always skips) layered under the new tier, so existing configs keep working.
+- **Does `fast` skip Human Review Gate phases?** Confirmed: no — `fast` shortens the phase list, like `bugfix`; included phases still gate on human review.
