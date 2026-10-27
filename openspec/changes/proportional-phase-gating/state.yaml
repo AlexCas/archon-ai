@@ -1,4 +1,4 @@
-phase: spec
+phase: design
 status: completed
 track: full
 history:
@@ -20,3 +20,9 @@ history:
     - phase: spec
       status: completed
       ts: "2026-10-27T18:13:36Z"
+    - phase: design
+      status: in_progress
+      ts: "2026-10-27T18:14:32Z"
+    - phase: design
+      status: completed
+      ts: "2026-10-27T18:19:35Z"

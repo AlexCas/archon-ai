@@ -44,7 +44,7 @@ this preamble is authored prose and is preserved across every regeneration. See
 | [ai-orchestration-harness](changes/ai-orchestration-harness/proposal.md) |  |  |
 | [issue-16-leader-personality](changes/issue-16-leader-personality/proposal.md) |  |  |
 | [opencode-phase-subagents](changes/opencode-phase-subagents/proposal.md) | design | in_progress |
-| [proportional-phase-gating](changes/proportional-phase-gating/proposal.md) | spec | in_progress |
+| [proportional-phase-gating](changes/proportional-phase-gating/proposal.md) | design | in_progress |
 
 ## Archive
 ### 2026-09-16
@@ -100,8 +100,8 @@ this preamble is authored prose and is preserved across every regeneration. See
 - [[archon-map]] ← obsidian-vault-specs
 - [[harness-bugfix-track]] ← proportional-phase-gating, streamline-harness
 - [[harness-init]] ← streamline-harness
-- [[harness-judge]] ← chained-pr-archive, streamline-harness
-- [[harness-workflow]] ← archive-before-pr, chained-pr-archive, obsidian-vault-specs, stacked-pr-archive, streamline-harness
+- [[harness-judge]] ← chained-pr-archive, proportional-phase-gating, streamline-harness
+- [[harness-workflow]] ← archive-before-pr, chained-pr-archive, obsidian-vault-specs, proportional-phase-gating, stacked-pr-archive, streamline-harness
 - [[local-model-router]] ← local-model-router
 - [[openspec-convention]] ← obsidian-vault-specs
 - [[sdd-archive]] ← obsidian-vault-specs
