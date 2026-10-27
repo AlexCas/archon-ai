@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+
+	"github.com/archon-ai/archon/internal/workflow"
 )
 
 func fakeEmbeddedFS() fstest.MapFS {
@@ -544,5 +546,92 @@ func TestMapCommand_Backfill(t *testing.T) {
 	checkRoot.SetArgs([]string{"map", "--check"})
 	if err := checkRoot.Execute(); err != nil {
 		t.Fatalf("Execute() map --check after backfill error = %v, stderr = %s", err, checkErr.String())
+	}
+}
+
+func setupOpenSpecDir(t *testing.T, tmpDir string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Join(tmpDir, "openspec", "specs"), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+}
+
+// TestWorkflowAdvance_BootstrapsNewChange covers the fix for a change that
+// never had a state.yaml: `advance --to <track's first phase>` must create
+// it instead of failing with "state.yaml not found", which previously made
+// it impossible to ever start a brand new change through this command.
+func TestWorkflowAdvance_BootstrapsNewChange(t *testing.T) {
+	origDir, _ := os.Getwd()
+	tmpDir := t.TempDir()
+	setupOpenSpecDir(t, tmpDir)
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	var stdout, stderr bytes.Buffer
+	root := newRootCmd(&stdout, &stderr)
+	root.SetArgs([]string{"workflow", "advance", "--change", "my-change", "--to", "explore", "--track", "bugfix"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v, stderr = %s", err, stderr.String())
+	}
+
+	state, err := workflow.ReadState(workflow.StatePath(tmpDir, "my-change"))
+	if err != nil {
+		t.Fatalf("ReadState() after bootstrap error = %v", err)
+	}
+	if state.Phase != "explore" || state.Status != "in_progress" || state.Track != "bugfix" {
+		t.Errorf("state = %+v, want phase=explore status=in_progress track=bugfix", state)
+	}
+	if len(state.History) != 1 || state.History[0].Phase != "explore" {
+		t.Errorf("History = %+v, want a single explore entry", state.History)
+	}
+}
+
+// TestWorkflowAdvance_BootstrapDefaultsToFullTrack mirrors state.yaml's
+// documented "" == "full" back-compat rule for a fresh change too.
+func TestWorkflowAdvance_BootstrapDefaultsToFullTrack(t *testing.T) {
+	origDir, _ := os.Getwd()
+	tmpDir := t.TempDir()
+	setupOpenSpecDir(t, tmpDir)
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	var stdout, stderr bytes.Buffer
+	root := newRootCmd(&stdout, &stderr)
+	root.SetArgs([]string{"workflow", "advance", "--change", "my-change", "--to", "explore"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v, stderr = %s", err, stderr.String())
+	}
+
+	state, err := workflow.ReadState(workflow.StatePath(tmpDir, "my-change"))
+	if err != nil {
+		t.Fatalf("ReadState() after bootstrap error = %v", err)
+	}
+	if state.Track != "" {
+		t.Errorf("Track = %q, want empty (back-compat default to full)", state.Track)
+	}
+}
+
+// TestWorkflowAdvance_BootstrapRejectsNonFirstPhase ensures the bootstrap
+// path cannot be used to skip phases on a brand new change, and leaves no
+// state.yaml behind on a blocked attempt.
+func TestWorkflowAdvance_BootstrapRejectsNonFirstPhase(t *testing.T) {
+	origDir, _ := os.Getwd()
+	tmpDir := t.TempDir()
+	setupOpenSpecDir(t, tmpDir)
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	var stdout, stderr bytes.Buffer
+	root := newRootCmd(&stdout, &stderr)
+	root.SetArgs([]string{"workflow", "advance", "--change", "my-change", "--to", "design"})
+	if err := root.Execute(); err == nil {
+		t.Fatal("Execute() should fail when bootstrapping directly into design")
+	}
+	if !strings.Contains(stderr.String(), "new change must start at explore") {
+		t.Errorf("stderr = %q, want contains the bootstrap-order message", stderr.String())
+	}
+
+	if _, err := os.Stat(workflow.StatePath(tmpDir, "my-change")); !os.IsNotExist(err) {
+		t.Errorf("state.yaml should not be created on a blocked bootstrap, stat err = %v", err)
 	}
 }

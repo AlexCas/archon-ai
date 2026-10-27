@@ -101,6 +101,58 @@ func TestCheckTransition_EmptyTrackDefaultsToFull(t *testing.T) {
 	}
 }
 
+func TestCheckTransition_BootstrapNewChange(t *testing.T) {
+	// No state.yaml existed yet (currentPhase == ""): the only valid first
+	// move is the track's first phase.
+	result, err := CheckTransition("full", "", "", "explore")
+	if err != nil {
+		t.Fatalf("CheckTransition() error = %v", err)
+	}
+	if !result.Allowed {
+		t.Fatalf("bootstrapping a new full-track change at explore should be allowed, got blocked: %s", result.Reason)
+	}
+	if result.Resuming {
+		t.Error("a fresh bootstrap is not a resume")
+	}
+}
+
+func TestCheckTransition_BootstrapBugfixTrack(t *testing.T) {
+	// The bugfix track's first phase is also "explore".
+	result, err := CheckTransition("bugfix", "", "", "explore")
+	if err != nil {
+		t.Fatalf("CheckTransition() error = %v", err)
+	}
+	if !result.Allowed {
+		t.Fatalf("bootstrapping a new bugfix-track change at explore should be allowed, got blocked: %s", result.Reason)
+	}
+}
+
+func TestCheckTransition_BootstrapRejectsNonFirstPhase(t *testing.T) {
+	// A brand new change cannot start anywhere but the track's first phase.
+	result, err := CheckTransition("full", "", "", "design")
+	if err != nil {
+		t.Fatalf("CheckTransition() error = %v", err)
+	}
+	if result.Allowed {
+		t.Fatal("bootstrapping directly into design should not be allowed")
+	}
+	if result.Reason != "new change must start at explore, not design" {
+		t.Errorf("Reason = %q, want the exact bootstrap message", result.Reason)
+	}
+	wantMissing := []string{"explore", "propose", "spec"}
+	if !equalStrings(result.MissingPhases, wantMissing) {
+		t.Errorf("MissingPhases = %v, want %v", result.MissingPhases, wantMissing)
+	}
+}
+
+func TestCheckTransition_BootstrapUnknownTrackStillErrors(t *testing.T) {
+	// Bootstrap must not bypass track validation.
+	_, err := CheckTransition("nonsense", "", "", "explore")
+	if err == nil {
+		t.Fatal("CheckTransition() with unknown track should error even when bootstrapping, got nil")
+	}
+}
+
 func TestState_ReadWriteRoundtrip(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "state.yaml")

@@ -130,6 +130,9 @@ type TransitionResult struct {
 // CheckTransition implements skills/harness-workflow/SKILL.md's "Decision
 // Gates" table verbatim:
 //
+//	current phase is "" (new change, no state.yaml yet) and requested ==
+//	  the track's first phase                   -> allowed (bootstrap)
+//	current phase is "" and requested != first   -> blocked (must start at first phase)
 //	requested == current, status in_progress   -> allowed (resuming)
 //	requested == current, status completed     -> blocked (already completed)
 //	requested == next sequential phase          -> allowed (advancing)
@@ -154,6 +157,21 @@ func CheckTransition(track, currentPhase, currentStatus, requestedPhase string) 
 		return TransitionResult{
 			Allowed: false,
 			Reason:  fmt.Sprintf("%s is not part of the %s track", requestedPhase, resolvedTrack),
+		}, nil
+	}
+
+	if currentPhase == "" {
+		// Bootstrap case: no state.yaml existed yet for this change, so
+		// there is no current phase to compare against. The only valid
+		// first move is the track's first phase; anything else would skip
+		// phases before the change even starts.
+		if requestedIdx == 0 {
+			return TransitionResult{Allowed: true}, nil
+		}
+		return TransitionResult{
+			Allowed:       false,
+			Reason:        fmt.Sprintf("new change must start at %s, not %s", order[0], requestedPhase),
+			MissingPhases: order[0:requestedIdx],
 		}, nil
 	}
 

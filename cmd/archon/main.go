@@ -704,13 +704,14 @@ func newWorkflowAdvanceCmd(stdout, stderr io.Writer) *cobra.Command {
 	var (
 		changeFlag string
 		toFlag     string
+		trackFlag  string
 		jsonFlag   bool
 	)
 
 	cmd := &cobra.Command{
 		Use:   "advance",
 		Short: "Validate and, if allowed, perform a phase transition (writes state.yaml atomically)",
-		Long:  "Implements skills/harness-workflow/SKILL.md's Decision Gates table. On an allowed transition, writes state.yaml (phase, status=in_progress, appended history entry) and best-effort regenerates openspec/map.md -- a map regen failure is a warning, never a rollback of the state.yaml write. On a blocked transition, state.yaml is left untouched and the command exits non-zero.",
+		Long:  "Implements skills/harness-workflow/SKILL.md's Decision Gates table. On an allowed transition, writes state.yaml (phase, status=in_progress, appended history entry) and best-effort regenerates openspec/map.md -- a map regen failure is a warning, never a rollback of the state.yaml write. On a blocked transition, state.yaml is left untouched and the command exits non-zero. If state.yaml does not exist yet for this change, --to must name the selected track's first phase; a fresh state.yaml is bootstrapped with --track (default \"full\") instead of erroring.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if toFlag == "" {
 				return fmt.Errorf("--to is required")
@@ -728,8 +729,14 @@ func newWorkflowAdvanceCmd(stdout, stderr io.Writer) *cobra.Command {
 			statePath := workflow.StatePath(projectDir, changeName)
 			state, err := workflow.ReadState(statePath)
 			if err != nil {
-				fmt.Fprintf(stderr, "Error: %v\n", err)
-				return err
+				if !errors.Is(err, workflow.ErrStateNotFound) {
+					fmt.Fprintf(stderr, "Error: %v\n", err)
+					return err
+				}
+				// No state.yaml yet for this change: bootstrap a fresh one
+				// on the selected track. CheckTransition only allows this
+				// when --to names that track's first phase.
+				state = &workflow.State{Track: trackFlag}
 			}
 
 			result, err := state.Advance(toFlag, time.Now())
@@ -771,6 +778,7 @@ func newWorkflowAdvanceCmd(stdout, stderr io.Writer) *cobra.Command {
 
 	cmd.Flags().StringVar(&changeFlag, "change", "", "Override active-change discovery")
 	cmd.Flags().StringVar(&toFlag, "to", "", "The requested phase")
+	cmd.Flags().StringVar(&trackFlag, "track", "", "Track to bootstrap a new change on (full|bugfix; default full). Ignored once state.yaml exists.")
 	cmd.Flags().BoolVar(&jsonFlag, "json", false, "Emit JSON instead of the human report")
 
 	return cmd
