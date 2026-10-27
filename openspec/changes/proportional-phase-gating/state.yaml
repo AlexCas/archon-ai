@@ -1,4 +1,4 @@
-phase: explore
+phase: propose
 status: completed
 track: full
 history:
@@ -8,3 +8,9 @@ history:
     - phase: explore
       status: completed
       ts: "2026-10-27T17:54:42Z"
+    - phase: propose
+      status: in_progress
+      ts: "2026-10-27T18:01:06Z"
+    - phase: propose
+      status: completed
+      ts: "2026-10-27T18:03:50Z"
