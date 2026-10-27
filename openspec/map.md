@@ -44,9 +44,11 @@ this preamble is authored prose and is preserved across every regeneration. See
 | [ai-orchestration-harness](changes/ai-orchestration-harness/proposal.md) |  |  |
 | [issue-16-leader-personality](changes/issue-16-leader-personality/proposal.md) |  |  |
 | [opencode-phase-subagents](changes/opencode-phase-subagents/proposal.md) | design | in_progress |
-| [streamline-harness](changes/streamline-harness/proposal.md) | design | completed |
+| [proportional-phase-gating](changes/proportional-phase-gating/proposal.md) | explore | in_progress |
 
 ## Archive
+### 2026-09-16
+- [streamline-harness](changes/archive/2026-09-16-streamline-harness/proposal.md)
 ### 2026-08-26
 - [graphify-tui-tab](changes/archive/2026-08-26-graphify-tui-tab/proposal.md)
 ### 2026-08-22
