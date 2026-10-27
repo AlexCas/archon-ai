@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -633,5 +634,113 @@ func TestWorkflowAdvance_BootstrapRejectsNonFirstPhase(t *testing.T) {
 
 	if _, err := os.Stat(workflow.StatePath(tmpDir, "my-change")); !os.IsNotExist(err) {
 		t.Errorf("state.yaml should not be created on a blocked bootstrap, stat err = %v", err)
+	}
+}
+
+// TestWorkflowComplete_SizeFlag covers --size on `workflow complete`: a
+// valid value is persisted onto state.yaml's new Size field.
+func TestWorkflowComplete_SizeFlag(t *testing.T) {
+	origDir, _ := os.Getwd()
+	tmpDir := t.TempDir()
+	setupOpenSpecDir(t, tmpDir)
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	bootstrap := newRootCmd(new(bytes.Buffer), new(bytes.Buffer))
+	bootstrap.SetArgs([]string{"workflow", "advance", "--change", "my-change", "--to", "explore"})
+	if err := bootstrap.Execute(); err != nil {
+		t.Fatalf("bootstrap Execute() error = %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	root := newRootCmd(&stdout, &stderr)
+	root.SetArgs([]string{"workflow", "complete", "--change", "my-change", "--size", "small"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v, stderr = %s", err, stderr.String())
+	}
+
+	state, err := workflow.ReadState(workflow.StatePath(tmpDir, "my-change"))
+	if err != nil {
+		t.Fatalf("ReadState() error = %v", err)
+	}
+	if state.Size != "small" {
+		t.Errorf("Size = %q, want %q", state.Size, "small")
+	}
+}
+
+// TestWorkflowComplete_RejectsInvalidSize ensures an invalid --size value is
+// rejected with a non-zero exit and leaves state.yaml completely untouched
+// (not even the phase-completion write happens).
+func TestWorkflowComplete_RejectsInvalidSize(t *testing.T) {
+	origDir, _ := os.Getwd()
+	tmpDir := t.TempDir()
+	setupOpenSpecDir(t, tmpDir)
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	bootstrap := newRootCmd(new(bytes.Buffer), new(bytes.Buffer))
+	bootstrap.SetArgs([]string{"workflow", "advance", "--change", "my-change", "--to", "explore"})
+	if err := bootstrap.Execute(); err != nil {
+		t.Fatalf("bootstrap Execute() error = %v", err)
+	}
+
+	before, err := workflow.ReadState(workflow.StatePath(tmpDir, "my-change"))
+	if err != nil {
+		t.Fatalf("ReadState() before error = %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	root := newRootCmd(&stdout, &stderr)
+	root.SetArgs([]string{"workflow", "complete", "--change", "my-change", "--size", "bogus"})
+	if err := root.Execute(); err == nil {
+		t.Fatal("Execute() should fail on an invalid --size value")
+	}
+	if !strings.Contains(stderr.String(), "invalid --size") {
+		t.Errorf("stderr = %q, want contains %q", stderr.String(), "invalid --size")
+	}
+
+	after, err := workflow.ReadState(workflow.StatePath(tmpDir, "my-change"))
+	if err != nil {
+		t.Fatalf("ReadState() after error = %v", err)
+	}
+	if after.Status != before.Status || after.Size != before.Size {
+		t.Errorf("state.yaml was modified on a rejected --size: before = %+v, after = %+v", before, after)
+	}
+}
+
+// TestWorkflowStatus_JSONIncludesSize roundtrips --size through `workflow
+// complete` and confirms `status --json` reports it under the "size" key.
+func TestWorkflowStatus_JSONIncludesSize(t *testing.T) {
+	origDir, _ := os.Getwd()
+	tmpDir := t.TempDir()
+	setupOpenSpecDir(t, tmpDir)
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	bootstrap := newRootCmd(new(bytes.Buffer), new(bytes.Buffer))
+	bootstrap.SetArgs([]string{"workflow", "advance", "--change", "my-change", "--to", "explore"})
+	if err := bootstrap.Execute(); err != nil {
+		t.Fatalf("bootstrap Execute() error = %v", err)
+	}
+
+	complete := newRootCmd(new(bytes.Buffer), new(bytes.Buffer))
+	complete.SetArgs([]string{"workflow", "complete", "--change", "my-change", "--size", "substantial"})
+	if err := complete.Execute(); err != nil {
+		t.Fatalf("complete Execute() error = %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	root := newRootCmd(&stdout, &stderr)
+	root.SetArgs([]string{"workflow", "status", "--change", "my-change", "--json"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v, stderr = %s", err, stderr.String())
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v, stdout = %s", err, stdout.String())
+	}
+	if result["size"] != "substantial" {
+		t.Errorf("status --json \"size\" = %v, want %q", result["size"], "substantial")
 	}
 }

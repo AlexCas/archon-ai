@@ -1,4 +1,4 @@
-phase: tasks
+phase: apply
 status: completed
 track: full
 history:
@@ -32,3 +32,9 @@ history:
     - phase: tasks
       status: completed
       ts: "2026-10-27T18:24:06Z"
+    - phase: apply
+      status: in_progress
+      ts: "2026-10-27T18:29:54Z"
+    - phase: apply
+      status: completed
+      ts: "2026-10-27T18:38:18Z"

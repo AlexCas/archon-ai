@@ -666,6 +666,7 @@ func newWorkflowStatusCmd(stdout, stderr io.Writer) *cobra.Command {
 					"phase":       state.Phase,
 					"status":      state.Status,
 					"track":       state.Track,
+					"size":        state.Size,
 					"retry_count": state.RetryCount,
 				})
 				if err != nil {
@@ -778,19 +779,38 @@ func newWorkflowAdvanceCmd(stdout, stderr io.Writer) *cobra.Command {
 
 	cmd.Flags().StringVar(&changeFlag, "change", "", "Override active-change discovery")
 	cmd.Flags().StringVar(&toFlag, "to", "", "The requested phase")
-	cmd.Flags().StringVar(&trackFlag, "track", "", "Track to bootstrap a new change on (full|bugfix; default full). Ignored once state.yaml exists.")
+	cmd.Flags().StringVar(&trackFlag, "track", "", "Track to bootstrap a new change on (full|bugfix|fast; default full). Ignored once state.yaml exists.")
 	cmd.Flags().BoolVar(&jsonFlag, "json", false, "Emit JSON instead of the human report")
 
 	return cmd
 }
 
+// validWorkflowSizes are the only values accepted by --size on `workflow
+// complete`, per harness-fast-track's sizing classification (sdd-explore
+// Step 3c): small|substantial|unknown.
+var validWorkflowSizes = map[string]bool{
+	"small":       true,
+	"substantial": true,
+	"unknown":     true,
+}
+
 func newWorkflowCompleteCmd(stdout, stderr io.Writer) *cobra.Command {
-	var changeFlag string
+	var (
+		changeFlag string
+		sizeFlag   string
+	)
 
 	cmd := &cobra.Command{
 		Use:   "complete",
 		Short: "Mark the change's current phase completed (writes state.yaml atomically)",
+		Long:  "Marks the current phase completed and appends a history entry. --size optionally persists sdd-explore's size classification (small|substantial|unknown) onto state.yaml; an empty/absent flag leaves any existing Size untouched. An invalid --size value is rejected before any write, leaving state.yaml unchanged.",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if sizeFlag != "" && !validWorkflowSizes[sizeFlag] {
+				err := fmt.Errorf("invalid --size: %s (supported: small, substantial, unknown)", sizeFlag)
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return err
+			}
+
 			projectDir, err := os.Getwd()
 			if err != nil {
 				return fmt.Errorf("get working directory: %w", err)
@@ -809,6 +829,9 @@ func newWorkflowCompleteCmd(stdout, stderr io.Writer) *cobra.Command {
 			}
 
 			state.Complete(time.Now())
+			if sizeFlag != "" {
+				state.Size = sizeFlag
+			}
 
 			if err := state.Write(statePath); err != nil {
 				fmt.Fprintf(stderr, "Error: %v\n", err)
@@ -821,6 +844,7 @@ func newWorkflowCompleteCmd(stdout, stderr io.Writer) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&changeFlag, "change", "", "Override active-change discovery")
+	cmd.Flags().StringVar(&sizeFlag, "size", "", "Persist sdd-explore's size classification (small|substantial|unknown); omit to leave Size untouched")
 
 	return cmd
 }

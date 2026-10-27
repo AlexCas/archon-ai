@@ -16,11 +16,12 @@ Orchestrate the judge phase: delegate a single focused review to `archon-judge`,
 
 Load when the orchestrator reaches the `judge` phase after `sdd-verify` passes. This skill wraps existing skills — it does NOT reimplement review or apply logic.
 
-The FIRST action on activation is to read the judge flag (Step 0). If the judge phase is disabled, this skill returns `skipped` immediately and the orchestrator advances to `archive`, then, after archive stages its commit on the branch, the PR is opened (single-PR flow).
+The FIRST action on activation is Step 0: compute the full-track risk tier, then read the judge flag. If the judge phase is disabled, or the computed tier is skip-eligible and not lightened, this skill returns `skipped` immediately and the orchestrator advances to `archive`, then, after archive stages its commit on the branch, the PR is opened (single-PR flow).
 
 ## Hard Rules
 
-- The judge phase is configurable. ALWAYS read `.archon/config.yaml` → `judge.enabled` BEFORE doing anything else. Default: `true` (run when the section is absent). When `judge.enabled: false`, SKIP the entire judge phase — do NOT invoke `archon-judge`, mutation testing, or Playwright — and return `skipped` so the orchestrator advances from verify straight to archive.
+- The judge phase is configurable. ALWAYS read `.archon/config.yaml` → `judge.enabled` as part of Step 0, before delegating any review. Default: `true` (run when the section is absent). When `judge.enabled: false`, SKIP the entire judge phase regardless of the computed risk tier — do NOT invoke `archon-judge`, mutation testing, or Playwright — and return `skipped` so the orchestrator advances from verify straight to archive.
+- The judge phase only runs on the `full` track; a computed risk tier that is skip-eligible (full track, size small) MAY also skip or lighten it even when `judge.enabled` is not explicitly false. `bugfix` and `fast` never run judge regardless of tier.
 - ALWAYS delegate a single focused review to the archon-judge subagent. Do NOT invoke judgment-day inline on the orchestrator's model. Do NOT run a dual or blind review.
 - ALWAYS invoke `sdd-apply` for re-fixes. Do NOT apply fixes inline.
 - ALWAYS invoke `sdd-verify` after each re-apply before re-judging.
@@ -35,23 +36,63 @@ The FIRST action on activation is to read the judge flag (Step 0). If the judge 
 
 ### Step 0: Judge Flag Gate (HARD GATE)
 
-Read `.archon/config.yaml` → `judge.enabled` BEFORE any other action:
+#### Step 0a: Compute the Risk Tier (full track only)
+
+Before reading the `judge.enabled` flag, compute the per-change risk tier so the
+flag check below has it available. This tiering applies to the `full` track only —
+[[harness-fast-track]] and `[[harness-bugfix-track]]` never run judge regardless of
+tier, which in practice means the orchestrator never invokes this skill for them at
+all (neither track has a judge phase in its sequence — see [[harness-workflow]]).
+
+1. Run `archon workflow status --change {change-name} --json` and read its `track`
+   and `size` keys.
+2. Compute the tier:
+   - `track` != `full` → tiering does not apply; judge is not run for this track at
+     all (governed by that track's own spec, not this gate).
+   - `track: full` and `size` is `substantial` or `unknown` (including absent/empty,
+     which reads as `unknown`) → tier **requires judge**.
+   - `track: full` and `size: small` → tier is **skip-eligible**.
+
+#### Step 0b: Judge Flag Gate
+
+Read `.archon/config.yaml` → `judge.enabled`:
 
 ```yaml
 judge:
   enabled: true
 ```
 
-- `judge.enabled: true` (or the `judge` section is absent → default `true`): proceed to Step 1.
-- `judge.enabled: false`: STOP. Do NOT invoke `archon-judge` or any gate. Return the report below with **Verdict: `skipped`**, leave `state.yaml` for the orchestrator to advance to `archive`, and exit — then, after archive stages its commit on the branch, the PR is opened (single-PR flow).
+`judge.enabled: false` ALWAYS wins and short-circuits everything else, regardless of
+the tier computed in Step 0a — this override is unchanged from before tiering
+existed:
 
-```markdown
-## Judge Phase Report
+- `judge.enabled: false`: STOP. Do NOT invoke `archon-judge` or any gate — not even
+  when the Step 0a tier would have required judge. Return the report below with
+  **Verdict: `skipped`**, leave `state.yaml` for the orchestrator to advance to
+  `archive`, and exit — then, after archive stages its commit on the branch, the PR
+  is opened (single-PR flow).
 
-**Change**: {change-name}
-**Verdict**: skipped
-**Reason**: judge phase disabled via `.archon/config.yaml` → `judge.enabled: false`
-```
+  ```markdown
+  ## Judge Phase Report
+
+  **Change**: {change-name}
+  **Verdict**: skipped
+  **Reason**: judge phase disabled via `.archon/config.yaml` → `judge.enabled: false`
+  ```
+
+- `judge.enabled: true` (or the `judge` section is absent → default `true`): the
+  Step 0a tier now decides, for the `full` track (the only track that reaches this
+  skill at all — `bugfix` and `fast` have no judge phase in their sequence, so the
+  orchestrator never invokes `harness-judge` for them; if you somehow got here on a
+  non-full track, treat it as an orchestrator routing bug and report `blocked`
+  rather than guessing a tier):
+  - Tier **requires judge** (full + substantial/unknown) → proceed to Step 1.
+  - Tier **skip-eligible** (full + small) → the single judge review MAY be skipped or
+    lightened; report `skipped` (mirroring the format above, with Reason:
+    `skip-eligible risk tier (track: full, size: small)`) and let the orchestrator
+    advance to `archive`, OR proceed to Step 1 with a lightened review — either is
+    acceptable, but do NOT silently fall through without recording which path was
+    taken in the report.
 
 ### Step 1: Read Configuration
 

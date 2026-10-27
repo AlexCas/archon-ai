@@ -53,7 +53,7 @@ Follow **Section A** from `skills/_shared/sdd-phase-common.md`.
 
 Read `openspec/changes/{change-name}/state.yaml` and parse the `track` field:
 - `track: bugfix` (or `track` is `"bugfix"`) → follow the **Bugfix Scoped Spec** path below. STOP — do NOT continue to Step 2.
-- `track: full` or `track` absent → continue to Step 2 (full spec flow, unchanged).
+- `track: full`, `track: fast`, or `track` absent → continue to Step 2 (full spec flow, unchanged). `fast`'s spec phase produces a full Gherkin spec, never the bugfix 3-section scoped format.
 
 #### Bugfix Scoped Spec Path (ONLY for `track: bugfix`)
 

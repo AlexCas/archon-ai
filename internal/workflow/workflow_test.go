@@ -90,6 +90,48 @@ func TestCheckTransition_BugfixTrackHappyPath(t *testing.T) {
 	}
 }
 
+func TestCheckTransition_PhaseNotInFastTrack(t *testing.T) {
+	// "propose" is not part of the fast track (explore, spec, apply, verify, archive).
+	result, err := CheckTransition("fast", "explore", "completed", "propose")
+	if err != nil {
+		t.Fatalf("CheckTransition() error = %v", err)
+	}
+	if result.Allowed {
+		t.Fatal("propose should not be allowed in the fast track")
+	}
+	if result.Reason != "propose is not part of the fast track" {
+		t.Errorf("Reason = %q, want the exact harness-workflow message", result.Reason)
+	}
+}
+
+func TestCheckTransition_FastTrackHappyPath(t *testing.T) {
+	// explore -> spec -> apply -> verify -> archive, skipping propose/design/tasks/judge.
+	steps := []string{"spec", "apply", "verify", "archive"}
+	current := "explore"
+	for _, next := range steps {
+		result, err := CheckTransition("fast", current, "completed", next)
+		if err != nil {
+			t.Fatalf("CheckTransition(%q -> %q) error = %v", current, next, err)
+		}
+		if !result.Allowed {
+			t.Fatalf("CheckTransition(%q -> %q) blocked: %s", current, next, result.Reason)
+		}
+		current = next
+	}
+}
+
+func TestCheckTransition_FastTrackVerifyToArchive(t *testing.T) {
+	// Verify transitions straight to archive regardless of a computed risk tier
+	// that would require judge on the full track — fast never runs judge.
+	result, err := CheckTransition("fast", "verify", "completed", "archive")
+	if err != nil {
+		t.Fatalf("CheckTransition() error = %v", err)
+	}
+	if !result.Allowed {
+		t.Fatalf("verify -> archive should be allowed on the fast track, got blocked: %s", result.Reason)
+	}
+}
+
 func TestCheckTransition_EmptyTrackDefaultsToFull(t *testing.T) {
 	// Back-compat: track absent ("") behaves as "full".
 	result, err := CheckTransition("", "explore", "completed", "propose")
@@ -124,6 +166,19 @@ func TestCheckTransition_BootstrapBugfixTrack(t *testing.T) {
 	}
 	if !result.Allowed {
 		t.Fatalf("bootstrapping a new bugfix-track change at explore should be allowed, got blocked: %s", result.Reason)
+	}
+}
+
+func TestCheckTransition_BootstrapFastTrack(t *testing.T) {
+	// The fast track's first phase is also "explore". The bootstrap branch
+	// (added for the "" current-phase case) is track-agnostic, so it should
+	// honor "fast" with zero changes — this test verifies that.
+	result, err := CheckTransition("fast", "", "", "explore")
+	if err != nil {
+		t.Fatalf("CheckTransition() error = %v", err)
+	}
+	if !result.Allowed {
+		t.Fatalf("bootstrapping a new fast-track change at explore should be allowed, got blocked: %s", result.Reason)
 	}
 }
 
@@ -179,6 +234,32 @@ func TestState_ReadWriteRoundtrip(t *testing.T) {
 	}
 	if len(got.History) != 2 {
 		t.Fatalf("History length = %d, want 2", len(got.History))
+	}
+}
+
+func TestState_SizeReadWriteRoundtrip(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "state.yaml")
+
+	original := &State{
+		Phase:  "explore",
+		Status: "completed",
+		Track:  "full",
+		Size:   "small",
+		History: []HistoryEntry{
+			{Phase: "explore", Status: "completed", TS: "2026-06-10T10:00:00Z"},
+		},
+	}
+	if err := original.Write(path); err != nil {
+		t.Fatalf("Write() error = %v", err)
+	}
+
+	got, err := ReadState(path)
+	if err != nil {
+		t.Fatalf("ReadState() error = %v", err)
+	}
+	if got.Size != original.Size {
+		t.Errorf("Size roundtrip mismatch: got %q, want %q", got.Size, original.Size)
 	}
 }
 

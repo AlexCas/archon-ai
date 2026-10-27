@@ -29,6 +29,15 @@ import (
 // feature routing").
 var BugfixTrack = []string{"explore", "spec", "apply", "verify", "archive"}
 
+// FastTrack is the fixed phase sequence for track "fast": a sized track for
+// small, well-understood feature work (see harness-fast-track). Its phase
+// names coincide with BugfixTrack's today, but it is kept as its own named
+// slice rather than a shared reference: fast's "spec" phase produces a full
+// Gherkin spec, while bugfix's produces the scoped 3-section format
+// (sdd-spec branches on track, not slice identity) — sharing the slice
+// would make a future divergence a surprising shared-reference edit.
+var FastTrack = []string{"explore", "spec", "apply", "verify", "archive"}
+
 // trackOrder resolves track to its fixed phase sequence. "" resolves to
 // "full" for backward compatibility with state.yaml files written before
 // the track field existed (CLAUDE.md / harness-workflow's documented
@@ -39,8 +48,10 @@ func trackOrder(track string) ([]string, error) {
 		return config.PhaseOrder, nil
 	case "bugfix":
 		return BugfixTrack, nil
+	case "fast":
+		return FastTrack, nil
 	default:
-		return nil, fmt.Errorf("unknown track: %s (supported: full, bugfix)", track)
+		return nil, fmt.Errorf("unknown track: %s (supported: full, bugfix, fast)", track)
 	}
 }
 
@@ -59,6 +70,7 @@ type State struct {
 	Phase      string         `yaml:"phase"`
 	Status     string         `yaml:"status"`
 	Track      string         `yaml:"track,omitempty"`
+	Size       string         `yaml:"size,omitempty"` // small|substantial|unknown
 	RetryCount int            `yaml:"retry_count,omitempty"`
 	History    []HistoryEntry `yaml:"history,omitempty"`
 }
