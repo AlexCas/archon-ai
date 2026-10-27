@@ -81,7 +81,11 @@ Scenario: Verify transitions straight to archive regardless of tier
 `sdd-explore` MUST classify a change's size as `small`, `substantial`, or `unknown`. For
 `small`, the orchestrator MAY suggest `track: fast` via the existing preflight
 deviation-question pattern (one scoped question) — the orchestrator MUST NOT silently
-auto-select `fast`. On `unknown`, the track MUST default to `full`.
+auto-select `fast`. On `unknown`, the track MUST default to `full`. On confirmation, the
+orchestrator MUST persist the switch via `archon workflow complete --change {name}
+--track fast` at the moment `explore` completes — the only CLI call and the only phase
+boundary that may change an existing change's track; `advance --to {phase}`'s `--track`
+flag bootstraps a brand-new change only and has no effect once `state.yaml` exists.
 
 #### Scenario: Small classification suggests fast via one scoped question
 

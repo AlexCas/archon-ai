@@ -744,3 +744,121 @@ func TestWorkflowStatus_JSONIncludesSize(t *testing.T) {
 		t.Errorf("status --json \"size\" = %v, want %q", result["size"], "substantial")
 	}
 }
+
+// TestWorkflowComplete_TrackSwitchAtExplore covers the fix for judge finding
+// #1: --track on `workflow complete` is the only sanctioned way to switch an
+// existing change onto track:fast (or back), and it is only accepted while
+// completing the explore phase.
+func TestWorkflowComplete_TrackSwitchAtExplore(t *testing.T) {
+	origDir, _ := os.Getwd()
+	tmpDir := t.TempDir()
+	setupOpenSpecDir(t, tmpDir)
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	bootstrap := newRootCmd(new(bytes.Buffer), new(bytes.Buffer))
+	bootstrap.SetArgs([]string{"workflow", "advance", "--change", "my-change", "--to", "explore"})
+	if err := bootstrap.Execute(); err != nil {
+		t.Fatalf("bootstrap Execute() error = %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	root := newRootCmd(&stdout, &stderr)
+	root.SetArgs([]string{"workflow", "complete", "--change", "my-change", "--size", "small", "--track", "fast"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("Execute() error = %v, stderr = %s", err, stderr.String())
+	}
+
+	state, err := workflow.ReadState(workflow.StatePath(tmpDir, "my-change"))
+	if err != nil {
+		t.Fatalf("ReadState() error = %v", err)
+	}
+	if state.Track != "fast" || state.Size != "small" {
+		t.Errorf("state = %+v, want track=fast size=small", state)
+	}
+
+	// The track switch must actually take effect for the NEXT transition:
+	// fast's second phase is "spec" (not "propose", as full would require).
+	advance := newRootCmd(new(bytes.Buffer), new(bytes.Buffer))
+	advance.SetArgs([]string{"workflow", "advance", "--change", "my-change", "--to", "spec"})
+	if err := advance.Execute(); err != nil {
+		t.Fatalf("advance to spec after track:fast switch should succeed, error = %v", err)
+	}
+}
+
+// TestWorkflowComplete_TrackRejectedAfterExplore ensures --track cannot be
+// used to switch tracks past the explore phase, where it would leave the
+// state machine in a nonsensical position (e.g. switching to bugfix after
+// design, a phase bugfix doesn't have).
+func TestWorkflowComplete_TrackRejectedAfterExplore(t *testing.T) {
+	origDir, _ := os.Getwd()
+	tmpDir := t.TempDir()
+	setupOpenSpecDir(t, tmpDir)
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	bootstrap := newRootCmd(new(bytes.Buffer), new(bytes.Buffer))
+	bootstrap.SetArgs([]string{"workflow", "advance", "--change", "my-change", "--to", "explore"})
+	if err := bootstrap.Execute(); err != nil {
+		t.Fatalf("bootstrap Execute() error = %v", err)
+	}
+	completeExplore := newRootCmd(new(bytes.Buffer), new(bytes.Buffer))
+	completeExplore.SetArgs([]string{"workflow", "complete", "--change", "my-change"})
+	if err := completeExplore.Execute(); err != nil {
+		t.Fatalf("complete explore error = %v", err)
+	}
+	advancePropose := newRootCmd(new(bytes.Buffer), new(bytes.Buffer))
+	advancePropose.SetArgs([]string{"workflow", "advance", "--change", "my-change", "--to", "propose"})
+	if err := advancePropose.Execute(); err != nil {
+		t.Fatalf("advance to propose error = %v", err)
+	}
+
+	before, err := workflow.ReadState(workflow.StatePath(tmpDir, "my-change"))
+	if err != nil {
+		t.Fatalf("ReadState() before error = %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	root := newRootCmd(&stdout, &stderr)
+	root.SetArgs([]string{"workflow", "complete", "--change", "my-change", "--track", "fast"})
+	if err := root.Execute(); err == nil {
+		t.Fatal("Execute() should reject --track on a non-explore phase")
+	}
+	if !strings.Contains(stderr.String(), "only accepted while completing the explore phase") {
+		t.Errorf("stderr = %q, want contains the explore-only message", stderr.String())
+	}
+
+	after, err := workflow.ReadState(workflow.StatePath(tmpDir, "my-change"))
+	if err != nil {
+		t.Fatalf("ReadState() after error = %v", err)
+	}
+	if after.Status != before.Status || after.Track != before.Track {
+		t.Errorf("state.yaml was modified on a rejected --track: before = %+v, after = %+v", before, after)
+	}
+}
+
+// TestWorkflowComplete_RejectsInvalidTrack mirrors the invalid-size test for
+// the new --track flag.
+func TestWorkflowComplete_RejectsInvalidTrack(t *testing.T) {
+	origDir, _ := os.Getwd()
+	tmpDir := t.TempDir()
+	setupOpenSpecDir(t, tmpDir)
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	bootstrap := newRootCmd(new(bytes.Buffer), new(bytes.Buffer))
+	bootstrap.SetArgs([]string{"workflow", "advance", "--change", "my-change", "--to", "explore"})
+	if err := bootstrap.Execute(); err != nil {
+		t.Fatalf("bootstrap Execute() error = %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+	root := newRootCmd(&stdout, &stderr)
+	root.SetArgs([]string{"workflow", "complete", "--change", "my-change", "--track", "bogus"})
+	if err := root.Execute(); err == nil {
+		t.Fatal("Execute() should fail on an invalid --track value")
+	}
+	if !strings.Contains(stderr.String(), "invalid --track") {
+		t.Errorf("stderr = %q, want contains %q", stderr.String(), "invalid --track")
+	}
+}

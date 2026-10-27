@@ -46,12 +46,20 @@ all (neither track has a judge phase in its sequence — see [[harness-workflow]
 
 1. Run `archon workflow status --change {change-name} --json` and read its `track`
    and `size` keys.
-2. Compute the tier:
-   - `track` != `full` → tiering does not apply; judge is not run for this track at
-     all (governed by that track's own spec, not this gate).
-   - `track: full` and `size` is `substantial` or `unknown` (including absent/empty,
-     which reads as `unknown`) → tier **requires judge**.
-   - `track: full` and `size: small` → tier is **skip-eligible**.
+2. Resolve `track` using the SAME back-compat rule as `trackOrder()`
+   (`internal/workflow/workflow.go`) and `harness-workflow/SKILL.md`'s Step 1:
+   absent or empty `track` resolves as `full`. Do NOT compare the raw string to
+   `"full"` literally — an empty string is `full`, not "some other track".
+3. With the resolved track:
+   - Resolved track != `full` (i.e. `bugfix` or `fast`) → this skill should never
+     have been invoked for it at all (neither track has a judge phase in its
+     sequence). Do not silently skip and do not guess a tier: STOP and report
+     `blocked` with reason `harness-judge invoked on a non-full track — orchestrator
+     routing bug` (same handling as Step 0b's parenthetical below; there is only
+     one rule for this case, stated once here).
+   - Resolved track == `full` and `size` is `substantial` or `unknown` (including
+     absent/empty, which reads as `unknown`) → tier **requires judge**.
+   - Resolved track == `full` and `size: small` → tier is **skip-eligible**.
 
 #### Step 0b: Judge Flag Gate
 
@@ -82,12 +90,9 @@ existed:
   **Reason**: judge phase disabled via `.archon/config.yaml` → `judge.enabled: false`
   ```
 
-- `judge.enabled: true` (or the `judge` section is absent → default `true`): the
-  Step 0a tier now decides, for the `full` track (the only track that reaches this
-  skill at all — `bugfix` and `fast` have no judge phase in their sequence, so the
-  orchestrator never invokes `harness-judge` for them; if you somehow got here on a
-  non-full track, treat it as an orchestrator routing bug and report `blocked`
-  rather than guessing a tier):
+- `judge.enabled: true` (or the `judge` section is absent → default `true`): Step 0a
+  already routed a non-full track to `blocked` before computing a tier, so by this
+  point the resolved track is always `full`. The tier now decides:
   - Tier **requires judge** (full + substantial/unknown) → proceed to Step 1.
   - Tier **skip-eligible** (full + small) → the single judge review MAY be skipped or
     lightened; report `skipped` (mirroring the format above, with Reason:

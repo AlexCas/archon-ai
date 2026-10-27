@@ -63,16 +63,37 @@ would be scope the spec doesn't call for.
 
 ## Data Flow
 
-    sdd-explore (Step 3c, classifies size)
+    sdd-explore (Step 3c, classifies size) — reports Size to orchestrator,
+    does NOT call `archon workflow complete` itself (executor boundary)
               │
               ▼
-    archon workflow complete --size {s}  →  state.yaml: size: {s}
+    orchestrator: preflight Deviation rule (bullet d) — size:small → suggest
+    track:fast via ONE scoped question (never auto-selected)
               │
-              ├──→ preflight Deviation rule (bullet d): reads status --json
-              │     .size → suggests track:fast (small only, one question)
+              ├─ confirmed ──→ archon workflow complete --size {s} --track fast
+              │                 (single call, ONLY accepted while completing
+              │                 explore — see judge finding #1's fix)
+              │
+              └─ declined/substantial/unknown ──→ archon workflow complete
+                                                     --size {s}  (track untouched)
+              │
+              ▼
+    state.yaml: size: {s}[, track: fast]
+              │
+              ├──→ next `advance --to {phase}` call now resolves against the
+              │     (possibly switched) track
               │
               └──→ harness-judge Step 0: reads status --json .track + .size
                     → computes risk tier
+
+**Fix for judge finding #1** (fast was structurally unreachable: `--track` on
+`advance` only applied at bootstrap, `complete` had no `--track` at all): added
+`--track` to `newWorkflowCompleteCmd`, accepted ONLY while `state.Phase ==
+"explore"` (rejected otherwise, before any write) — the one point the spec
+allows a track switch. This closes the gap without allowing a track switch at
+any other phase boundary, which would leave the state machine on a
+nonsensical sequence (e.g. switching to `bugfix` after `design`, a phase
+`bugfix` doesn't have).
 
 ## File Changes
 
@@ -102,8 +123,9 @@ type State struct {
 }
 ```
 
-`archon workflow complete --change {name} --size {small|substantial|unknown}`;
-invalid value → non-zero exit, state.yaml untouched. `status --json` gains
+`archon workflow complete --change {name} --size {small|substantial|unknown} [--track {full|bugfix|fast}]`;
+invalid `--size`/`--track` value, or `--track` on any phase other than
+`explore`, → non-zero exit, state.yaml untouched. `status --json` gains
 `"size"` alongside existing keys.
 
 ## Testing Strategy

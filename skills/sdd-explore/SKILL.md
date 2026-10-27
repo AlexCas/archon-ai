@@ -122,10 +122,16 @@ Report one of: `small`, `substantial`, or `unknown`.
   investigation, or genuinely ambiguous scope) → `unknown`. The track defaults to
   `full`; `fast` is never suggested on `unknown`.
 
-Persist this classification via `archon workflow complete --change {name} --size
-{small|substantial|unknown}` when explore completes, so it survives into a later,
-possibly-fresh session (read back by the preflight deviation check and by
-`harness-judge` Step 0's computed risk tier).
+Report this classification to the orchestrator in your return envelope (e.g. `Size:
+small`) — do NOT run `archon workflow complete` yourself; per
+`skills/_shared/sdd-phase-common.md`'s executor boundary, mutating `state.yaml` on
+phase completion is the orchestrator's action, run once you report back, not the
+executor's. The orchestrator persists it with a SINGLE call —
+`archon workflow complete --change {name} --size {small|substantial|unknown}` —
+combining size persistence with the ordinary phase-completion call from
+`harness-workflow/SKILL.md` Step 3. There is exactly one completion call per phase;
+never a second, size-only one, since `State.Complete()` has no guard against being
+called twice and would append a duplicate history entry.
 
 ### Step 4: Analyze Options
 

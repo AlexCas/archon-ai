@@ -794,19 +794,33 @@ var validWorkflowSizes = map[string]bool{
 	"unknown":     true,
 }
 
+// validWorkflowTracks are the only values accepted by --track on `workflow
+// complete`'s post-explore switch (see newWorkflowCompleteCmd's --track flag).
+var validWorkflowTracks = map[string]bool{
+	"full":   true,
+	"bugfix": true,
+	"fast":   true,
+}
+
 func newWorkflowCompleteCmd(stdout, stderr io.Writer) *cobra.Command {
 	var (
 		changeFlag string
 		sizeFlag   string
+		trackFlag  string
 	)
 
 	cmd := &cobra.Command{
 		Use:   "complete",
 		Short: "Mark the change's current phase completed (writes state.yaml atomically)",
-		Long:  "Marks the current phase completed and appends a history entry. --size optionally persists sdd-explore's size classification (small|substantial|unknown) onto state.yaml; an empty/absent flag leaves any existing Size untouched. An invalid --size value is rejected before any write, leaving state.yaml unchanged.",
+		Long:  "Marks the current phase completed and appends a history entry. --size optionally persists sdd-explore's size classification (small|substantial|unknown) onto state.yaml; an empty/absent flag leaves any existing Size untouched. --track optionally switches the change's track (full|bugfix|fast) -- the only point this is accepted is while completing the explore phase (the suggestion-only track-selection moment per harness-fast-track's spec); completing any other phase with --track is rejected. Invalid --size or --track values, or --track on a non-explore phase, are rejected before any write, leaving state.yaml unchanged.",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			if sizeFlag != "" && !validWorkflowSizes[sizeFlag] {
 				err := fmt.Errorf("invalid --size: %s (supported: small, substantial, unknown)", sizeFlag)
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return err
+			}
+			if trackFlag != "" && !validWorkflowTracks[trackFlag] {
+				err := fmt.Errorf("invalid --track: %s (supported: full, bugfix, fast)", trackFlag)
 				fmt.Fprintf(stderr, "Error: %v\n", err)
 				return err
 			}
@@ -827,10 +841,18 @@ func newWorkflowCompleteCmd(stdout, stderr io.Writer) *cobra.Command {
 				fmt.Fprintf(stderr, "Error: %v\n", err)
 				return err
 			}
+			if trackFlag != "" && state.Phase != "explore" {
+				err := fmt.Errorf("--track is only accepted while completing the explore phase (current phase: %s)", state.Phase)
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return err
+			}
 
 			state.Complete(time.Now())
 			if sizeFlag != "" {
 				state.Size = sizeFlag
+			}
+			if trackFlag != "" {
+				state.Track = trackFlag
 			}
 
 			if err := state.Write(statePath); err != nil {
@@ -845,6 +867,7 @@ func newWorkflowCompleteCmd(stdout, stderr io.Writer) *cobra.Command {
 
 	cmd.Flags().StringVar(&changeFlag, "change", "", "Override active-change discovery")
 	cmd.Flags().StringVar(&sizeFlag, "size", "", "Persist sdd-explore's size classification (small|substantial|unknown); omit to leave Size untouched")
+	cmd.Flags().StringVar(&trackFlag, "track", "", "Switch the change's track (full|bugfix|fast); only accepted while completing the explore phase")
 
 	return cmd
 }
