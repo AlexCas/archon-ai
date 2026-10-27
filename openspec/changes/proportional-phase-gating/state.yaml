@@ -1,4 +1,4 @@
-phase: apply
+phase: verify
 status: completed
 track: full
 history:
@@ -38,3 +38,9 @@ history:
     - phase: apply
       status: completed
       ts: "2026-10-27T18:38:18Z"
+    - phase: verify
+      status: in_progress
+      ts: "2026-10-27T18:55:25Z"
+    - phase: verify
+      status: completed
+      ts: "2026-10-27T19:05:18Z"

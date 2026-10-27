@@ -68,9 +68,11 @@ existed:
 
 - `judge.enabled: false`: STOP. Do NOT invoke `archon-judge` or any gate — not even
   when the Step 0a tier would have required judge. Return the report below with
-  **Verdict: `skipped`**, leave `state.yaml` for the orchestrator to advance to
-  `archive`, and exit — then, after archive stages its commit on the branch, the PR
-  is opened (single-PR flow).
+  **Verdict: `skipped`**, and exit — the orchestrator then runs
+  `archon workflow complete --change {name}` to mark this `judge` phase completed
+  (skipped, not reviewed) BEFORE `archon workflow advance --to archive`, exactly
+  like any other phase's completion; then, after archive stages its commit on the
+  branch, the PR is opened (single-PR flow).
 
   ```markdown
   ## Judge Phase Report
@@ -89,10 +91,12 @@ existed:
   - Tier **requires judge** (full + substantial/unknown) → proceed to Step 1.
   - Tier **skip-eligible** (full + small) → the single judge review MAY be skipped or
     lightened; report `skipped` (mirroring the format above, with Reason:
-    `skip-eligible risk tier (track: full, size: small)`) and let the orchestrator
-    advance to `archive`, OR proceed to Step 1 with a lightened review — either is
-    acceptable, but do NOT silently fall through without recording which path was
-    taken in the report.
+    `skip-eligible risk tier (track: full, size: small)`) — the orchestrator then
+    runs `archon workflow complete --change {name}` to mark `judge` completed before
+    `archon workflow advance --to archive`, same as the `judge.enabled: false` path
+    above — OR proceed to Step 1 with a lightened review — either is acceptable, but
+    do NOT silently fall through without recording which path was taken in the
+    report.
 
 ### Step 1: Read Configuration
 
