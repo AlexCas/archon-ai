@@ -126,12 +126,17 @@ Report this classification to the orchestrator in your return envelope (e.g. `Si
 small`) — do NOT run `archon workflow complete` yourself; per
 `skills/_shared/sdd-phase-common.md`'s executor boundary, mutating `state.yaml` on
 phase completion is the orchestrator's action, run once you report back, not the
-executor's. The orchestrator persists it with a SINGLE call —
-`archon workflow complete --change {name} --size {small|substantial|unknown}` —
-combining size persistence with the ordinary phase-completion call from
-`harness-workflow/SKILL.md` Step 3. There is exactly one completion call per phase;
-never a second, size-only one, since `State.Complete()` has no guard against being
-called twice and would append a duplicate history entry.
+executor's. There is exactly ONE completion call per phase — `workflow complete`
+now rejects a second call on an already-completed phase, so a separate size-only
+or track-only follow-up call is not just redundant, it is a hard error. The
+orchestrator makes that single call as follows:
+
+- `size: substantial` or `unknown`, or `size: small` without a confirmed `fast`
+  suggestion: `archon workflow complete --change {name} --size {small|substantial|unknown}`.
+- `size: small` AND the user confirmed the `fast` suggestion at the preflight
+  deviation question (see [[harness-fast-track]] "Suggestion-only entry via sizing
+  classification"): `archon workflow complete --change {name} --size small --track
+  fast` — `--size` and `--track` together, in the SAME call, not two calls.
 
 ### Step 4: Analyze Options
 

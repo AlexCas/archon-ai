@@ -862,3 +862,53 @@ func TestWorkflowComplete_RejectsInvalidTrack(t *testing.T) {
 		t.Errorf("stderr = %q, want contains %q", stderr.String(), "invalid --track")
 	}
 }
+
+// TestWorkflowComplete_RejectsDoubleComplete covers judge attempt 2's finding
+// #2: completing an already-completed phase a second time (e.g. a stray
+// `--size` call followed by a separate `--track` call, instead of combining
+// them in one call as sdd-explore/SKILL.md now documents) must be rejected,
+// not silently re-applied and duplicated into state.yaml's history.
+func TestWorkflowComplete_RejectsDoubleComplete(t *testing.T) {
+	origDir, _ := os.Getwd()
+	tmpDir := t.TempDir()
+	setupOpenSpecDir(t, tmpDir)
+	os.Chdir(tmpDir)
+	defer os.Chdir(origDir)
+
+	bootstrap := newRootCmd(new(bytes.Buffer), new(bytes.Buffer))
+	bootstrap.SetArgs([]string{"workflow", "advance", "--change", "my-change", "--to", "explore"})
+	if err := bootstrap.Execute(); err != nil {
+		t.Fatalf("bootstrap Execute() error = %v", err)
+	}
+	firstComplete := newRootCmd(new(bytes.Buffer), new(bytes.Buffer))
+	firstComplete.SetArgs([]string{"workflow", "complete", "--change", "my-change", "--size", "small"})
+	if err := firstComplete.Execute(); err != nil {
+		t.Fatalf("first complete error = %v", err)
+	}
+
+	before, err := workflow.ReadState(workflow.StatePath(tmpDir, "my-change"))
+	if err != nil {
+		t.Fatalf("ReadState() before error = %v", err)
+	}
+	if len(before.History) != 2 {
+		t.Fatalf("History = %+v, want exactly 2 entries (explore in_progress + completed) before the second call", before.History)
+	}
+
+	var stdout, stderr bytes.Buffer
+	root := newRootCmd(&stdout, &stderr)
+	root.SetArgs([]string{"workflow", "complete", "--change", "my-change", "--track", "fast"})
+	if err := root.Execute(); err == nil {
+		t.Fatal("Execute() should reject completing an already-completed phase a second time")
+	}
+	if !strings.Contains(stderr.String(), "already completed") {
+		t.Errorf("stderr = %q, want contains %q", stderr.String(), "already completed")
+	}
+
+	after, err := workflow.ReadState(workflow.StatePath(tmpDir, "my-change"))
+	if err != nil {
+		t.Fatalf("ReadState() after error = %v", err)
+	}
+	if len(after.History) != 2 || after.Track != "" {
+		t.Errorf("state.yaml was modified by the rejected double-complete: before = %+v, after = %+v", before, after)
+	}
+}

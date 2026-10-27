@@ -841,6 +841,11 @@ func newWorkflowCompleteCmd(stdout, stderr io.Writer) *cobra.Command {
 				fmt.Fprintf(stderr, "Error: %v\n", err)
 				return err
 			}
+			if state.Status == "completed" {
+				err := fmt.Errorf("%s is already completed — run archon workflow advance to start the next phase, not complete again", state.Phase)
+				fmt.Fprintf(stderr, "Error: %v\n", err)
+				return err
+			}
 			if trackFlag != "" && state.Phase != "explore" {
 				err := fmt.Errorf("--track is only accepted while completing the explore phase (current phase: %s)", state.Phase)
 				fmt.Fprintf(stderr, "Error: %v\n", err)

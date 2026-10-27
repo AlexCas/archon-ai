@@ -70,6 +70,8 @@ judge:
   enabled: true
 ```
 
+By this point Step 0a has already exited (`blocked`) for any non-full track, so
+everything below is scoped to the `full` track only. On the `full` track,
 `judge.enabled: false` ALWAYS wins and short-circuits everything else, regardless of
 the tier computed in Step 0a — this override is unchanged from before tiering
 existed:

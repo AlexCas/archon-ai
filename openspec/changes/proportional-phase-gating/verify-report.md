@@ -269,3 +269,189 @@ than current mechanics guarantee. Not CRITICAL — it does not block any task, b
 test, and the underlying mechanism to satisfy it already exists (`workflow complete` on
 `judge`); it is a documentation/clarity gap in orchestrator prose, worth a follow-up but
 not a reason to fail this change's own deliverable.
+
+---
+
+## Re-Verification Report (2026-10-27) — post-judge-fix retry cycle
+
+**Context**: the first `archon-judge` review (of commit `6dc3af3`'s implementation)
+failed with 4 confirmed issues. Commit `11c19f5` fixed all 4. This section
+independently re-verifies those fixes — it does not repeat the full original verify
+pass above, which already passed and is unaffected by this commit's changes. Commit
+`11c19f5` touched exactly: `cmd/archon/main.go`, `cmd/archon/main_test.go`,
+`openspec/changes/proportional-phase-gating/{design.md,state.yaml}`,
+`openspec/changes/proportional-phase-gating/specs/harness-fast-track/spec.md`,
+`openspec/map.md`, `skills/harness-judge/SKILL.md`, `skills/harness-workflow/SKILL.md`,
+and `skills/sdd-explore/SKILL.md` — nothing else in the original
+compliance/correctness/coherence tables above is affected).
+
+### Fix #1 — `track:fast` reachability (CRITICAL in original judge review)
+
+**Code inspection** (`cmd/archon/main.go`, current `newWorkflowCompleteCmd`):
+confirmed `--track` flag exists; validated against a `validWorkflowTracks` map of
+exactly `full|bugfix|fast`, rejected with `"invalid --track: %s (supported: full,
+bugfix, fast)"` before `state.yaml` is even read; once `state` is loaded, a second
+guard rejects `trackFlag != "" && state.Phase != "explore"` with `"--track is only
+accepted while completing the explore phase (current phase: %s)"` — both rejections
+happen strictly before `state.Write()`. When valid, `state.Track = trackFlag` is
+applied in the same call that also applies `--size` and `state.Complete()`.
+
+**New tests run directly** (not trusted from the commit message):
+```text
+$ go test -count=1 -v ./cmd/archon/... -run 'TestWorkflowComplete_TrackSwitchAtExplore|TestWorkflowComplete_TrackRejectedAfterExplore|TestWorkflowComplete_RejectsInvalidTrack'
+=== RUN   TestWorkflowComplete_TrackSwitchAtExplore
+--- PASS: TestWorkflowComplete_TrackSwitchAtExplore (0.00s)
+=== RUN   TestWorkflowComplete_TrackRejectedAfterExplore
+--- PASS: TestWorkflowComplete_TrackRejectedAfterExplore (0.00s)
+=== RUN   TestWorkflowComplete_RejectsInvalidTrack
+--- PASS: TestWorkflowComplete_RejectsInvalidTrack (0.00s)
+PASS
+ok  	github.com/archon-ai/archon/cmd/archon	0.008s
+```
+All three pass. `TestWorkflowComplete_TrackSwitchAtExplore` additionally asserts the
+switch takes effect for the *next* transition (`advance --to spec` succeeds, fast's
+second phase, not `propose`). `TestWorkflowComplete_TrackRejectedAfterExplore` asserts
+`state.yaml` is byte-equivalent (`Status`/`Track` unchanged) after a rejected call.
+
+**Independent empirical check with the built binary** (`go install ./cmd/archon`,
+exercised in a scratch temp dir, not the test suite):
+```text
+$ archon workflow advance --change my-change --to explore
+my-change advanced to explore (in_progress)
+$ archon workflow complete --change my-change --size small --track fast
+my-change: explore marked completed
+# state.yaml now: phase: explore, status: completed, track: fast, size: small
+$ archon workflow advance --change my-change --to spec
+my-change advanced to spec (in_progress)   # exit=0 — fast's 2nd phase, not propose
+$ archon workflow advance --change my-change --to propose
+blocked: propose is not part of the fast track   # exit=1 — confirms fast is truly active, not just labeled
+```
+This proves the full suggestion-to-execution flow end-to-end: a change bootstrapped on
+`full` (the only way `explore` can be entered, since `state.yaml` must pre-exist for
+anything but bootstrap) can now actually land on `fast` and have that track govern the
+very next transition. This was the exact mechanism the original judge review found
+broken — confirmed genuinely fixed, not just re-worded.
+
+**Docs re-read**: `design.md`'s Data Flow section now names the real mechanism
+explicitly (orchestrator branches on the preflight confirmation, calling either
+`archon workflow complete --size {s} --track fast` as a single combined call, or
+`--size {s}` alone) and includes a dedicated "Fix for judge finding #1" paragraph
+describing the explore-only guard and why it's scoped that way (avoiding a nonsensical
+mid-sequence track switch, e.g. onto `bugfix` after `design`). `specs/harness-fast-track/
+spec.md`'s "Suggestion-only entry" requirement now states the same CLI call and
+explicitly clarifies `advance --to {phase}`'s `--track` only bootstraps a brand-new
+change and has no effect once `state.yaml` exists — consistent with the code and with
+`harness-workflow/SKILL.md`'s Phase Sequence section, which gained the identical
+clarification. **Verdict: FIXED, confirmed by code, tests, live binary, and docs.**
+
+### Fix #2+3 — `harness-judge` Step 0a/0b contradiction (CRITICAL)
+
+Re-read current `skills/harness-judge/SKILL.md` Step 0a and 0b in full (not the diff
+alone). Step 0a is now the single decision point: it resolves `track` with "the SAME
+back-compat rule as `trackOrder()`... absent or empty `track` resolves as `full`," then
+branches three ways — non-full → `blocked` (orchestrator routing bug, stated once,
+here); full+substantial/unknown → requires judge; full+small → skip-eligible. Step 0b's
+`judge.enabled: true` branch no longer re-decides anything: it now reads "Step 0a
+already routed a non-full track to `blocked` before computing a tier, so by this point
+the resolved track is always `full`. The tier now decides..." — it purely consumes Step
+0a's output. There is exactly ONE place (Step 0a) deciding non-full-track behavior now;
+Step 0b's old independent "report blocked" framing was deleted, not duplicated.
+
+Cross-checked the back-compat resolution against both references it claims to match:
+`internal/workflow/workflow.go`'s `trackOrder()` — `case "", "full": return
+config.PhaseOrder` — and `harness-workflow/SKILL.md`'s Step 1 Phase Sequence list —
+"`full` (default; `track` absent or `full`)". Both agree: empty/absent `track` is
+`full`, not a distinct unresolved state. Step 0a's wording ("Do NOT compare the raw
+string to `"full"` literally — an empty string is `full`, not 'some other track'")
+is explicit and matches. **Verdict: FIXED** — no remaining contradiction, and the
+back-compat rule is now explicit and triple-consistent (Go, harness-workflow,
+harness-judge).
+
+### Fix #4 — `sdd-explore` Step 3c ownership (CRITICAL — duplicate-history-entry risk)
+
+Re-read current `skills/sdd-explore/SKILL.md` Step 3c in full. It now reads: "Report
+this classification to the orchestrator in your return envelope... — do NOT run `archon
+workflow complete` yourself; per `skills/_shared/sdd-phase-common.md`'s executor
+boundary, mutating `state.yaml` on phase completion is the orchestrator's action... The
+orchestrator persists it with a SINGLE call — `archon workflow complete --change {name}
+--size {small|substantial|unknown}` — combining size persistence with the ordinary
+phase-completion call from `harness-workflow/SKILL.md` Step 3. There is exactly one
+completion call per phase; never a second, size-only one, since `State.Complete()` has
+no guard against being called twice and would append a duplicate history entry."
+
+This correctly reassigns the actor (executor reports, orchestrator persists) and
+explicitly names the single-call invariant and the reason it matters (no double-call
+guard in `State.Complete()` — confirmed true by reading `internal/workflow/workflow.go`:
+`Complete()` just appends a history entry and sets status, unconditionally, on every
+call). The `--track` combination for the fast-track case is spelled out one layer up, in
+`design.md`'s Data Flow (`archon workflow complete --size {s} --track fast (single
+call...)`) and in `harness-fast-track/spec.md`'s requirement text — both already
+confirmed above — so the "only completion call for the transition" invariant is
+consistently described across all three documents, not just asserted in one and
+silently assumed elsewhere. **Verdict: FIXED.**
+
+### General regression check
+
+```text
+$ go build ./...
+(clean, no output)
+$ go vet ./...
+(clean, no output)
+$ go test -count=1 ./...
+ok  	github.com/archon-ai/archon/cmd/archon
+ok  	github.com/archon-ai/archon/internal/agent
+ok  	github.com/archon-ai/archon/internal/config
+ok  	github.com/archon-ai/archon/internal/initcmd
+ok  	github.com/archon-ai/archon/internal/mapgen
+ok  	github.com/archon-ai/archon/internal/models
+ok  	github.com/archon-ai/archon/internal/opencode
+ok  	github.com/archon-ai/archon/internal/route
+ok  	github.com/archon-ai/archon/internal/scaffold
+ok  	github.com/archon-ai/archon/internal/skillregistry
+ok  	github.com/archon-ai/archon/internal/status
+ok  	github.com/archon-ai/archon/internal/tui
+ok  	github.com/archon-ai/archon/internal/version
+ok  	github.com/archon-ai/archon/internal/workflow
+ok  	github.com/archon-ai/archon/skills
+```
+All 15 packages pass, same set as the original verify pass — no new failures, no
+newly-skipped packages.
+
+Re-checked design coherence was not broken elsewhere by these fixes:
+- `internal/config/config.go`'s `Judge` struct: confirmed zero diff since commit
+  `b3bb6d1` (predates this whole change) — `git diff b3bb6d1 HEAD --
+  internal/config/config.go` is empty. Untouched by both the original implementation
+  and this fix commit.
+- `FastTrack` is still its own named slice (`var FastTrack = []string{"explore",
+  "spec", "apply", "verify", "archive"}`), not a `BugfixTrack` alias — unchanged by
+  this commit.
+- `trackOrder()` itself was not modified by `11c19f5` (confirmed: the commit's Go
+  diff touches only `cmd/archon/main.go` and `cmd/archon/main_test.go`) — the fix is
+  entirely at the CLI-flag layer, exactly matching design.md's stated scope ("the
+  one point the spec allows a switch").
+
+### Final Verdict
+
+**PASS**
+
+All 4 judge-identified issues are independently confirmed fixed — by source
+inspection, by running the 3 new unit tests directly (not trusted from the commit
+message), and by an independent empirical end-to-end run with the built binary
+proving the previously-broken suggestion-to-execution flow now genuinely works
+(bootstrap full → complete explore with `--size small --track fast` → `advance --to
+spec` succeeds → `advance --to propose` is correctly blocked). The harness-judge
+Step 0a/0b contradiction is resolved to a single decision point with an explicit,
+triple-consistent back-compat rule. The sdd-explore ownership fix correctly
+reassigns the `archon workflow complete` call to the orchestrator and documents the
+single-call invariant consistently across `sdd-explore/SKILL.md`, `design.md`, and
+`harness-fast-track/spec.md`. Full regression check (build, vet, full test suite)
+is clean — same 15 packages passing as the original verify pass, no new failures.
+Design coherence (`config.Judge` untouched, `FastTrack` still its own slice,
+`trackOrder()` unmodified) holds.
+
+Nothing outstanding from this re-verify. The one pre-existing WARNING (W1) from the
+original pass was already resolved by the orchestrator (documented in that section
+above, commit `3b2a1ca`) before this fix cycle began, and is unaffected by `11c19f5`.
+No new issues found. This re-verify upgrades the change's status from the original
+**PASS WITH WARNINGS** to a clean **PASS** for the specific defects this retry cycle
+targeted; the change is ready to proceed to the next judge attempt.
