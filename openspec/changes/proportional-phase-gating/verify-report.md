@@ -617,3 +617,223 @@ drops the size classification for any fast-track entry that follows
 after the fact given this same fix round's new hard rejection of double-completes.
 Must re-apply to sync these two documents to the combined-call form before this can
 pass.
+
+---
+
+## Verification Round 4 — 2026-10-27 (post fix round 3, commit `6a5b730`, judge retry 3/3, LAST allowed attempt)
+
+**Scope of this pass**: adversarial, not confirmatory. Given the pattern (every prior
+round missed something the next round caught), this pass re-derives every claim from
+source rather than trusting the fix-round-3 commit message's "exhaustive sweep found
+none" assertion.
+
+### 1. Side-by-side read of the 5 canonical mechanism documents
+
+Read in full, word-for-word, not skimmed:
+- `skills/sdd-explore/SKILL.md` Step 3c (lines 101-139)
+- `skills/harness-workflow/SKILL.md` "Phase Sequence" `fast` bullet (lines 25-36) and
+  Step 1 (lines 107-113)
+- `skills/harness-judge/SKILL.md` Step 0 end-to-end (lines 37-106)
+- `openspec/changes/proportional-phase-gating/design.md` Data Flow (lines 64-96)
+- `openspec/changes/proportional-phase-gating/specs/harness-fast-track/spec.md`
+  "Suggestion-only entry" requirement (lines 79-112)
+
+**Result: no drift between any pair.** Specifically cross-checked and confirmed
+identical on every point that previously drifted:
+- The combined-call form `archon workflow complete --change {name} --size small
+  --track fast` (both flags, one call) is stated identically in all 5 (sdd-explore
+  L138-139, harness-workflow L31, design.md L73, spec.md L86, and spec.md's own
+  scenario at L92-101 exercises it in substance).
+- `--track` on `advance` bootstraps only, ignored once `state.yaml` exists, and is
+  rejected by `complete` on every phase except `explore` — stated identically in
+  harness-workflow L33-36, design.md L89-96/126-128, spec.md L88-90.
+- `judge.enabled: false` "ALWAYS wins" is explicitly scoped to "On the full track"
+  in harness-judge L75 (attempt 2's finding #3 fix held).
+- Fast's 5-phase sequence (`explore → spec → apply → verify → archive`, no judge)
+  and its full-Gherkin (not bugfix-scoped) spec phase are stated identically in
+  harness-workflow L25-28/L36, design.md L1-9 header comment + "Decision: fast gets
+  its own named slice" (L41-52), and spec.md Requirements 1-2.
+- Literal grep of every occurrence of `--track fast` with the `--` prefix across the
+  whole repo (`grep -rn -- "--track fast"`) confirms every current, operative hit is
+  immediately preceded by `--size small ` / `--size {s} ` on the same line in
+  design.md:73, spec.md:86, and harness-workflow/SKILL.md:31 — no bare-form survivor
+  anywhere in the 5 documents, re-confirming (not just trusting) fix round 3's claim.
+
+No drift found among the 5 documents themselves.
+
+### 2. Build / vet / full test suite
+
+```text
+$ go build ./...        → clean, exit 0
+$ go vet ./...           → clean, exit 0
+$ go test -count=1 ./... → all 15 packages ok, 0 failures
+```
+
+### 3. Empirical re-run of the full flow with the built binary (`go install ./cmd/archon`)
+
+Fresh scratch dir, real binary, no mocking:
+
+1. `archon workflow advance --change demo-change --to explore` → bootstrapped, `allowed`.
+2. `archon workflow complete --change demo-change --size small --track fast` (single
+   combined call) → `demo-change: explore marked completed`. `state.yaml` afterward:
+   `phase: explore, status: completed, track: fast, size: small` — confirmed by
+   reading the file directly.
+3. `archon workflow advance --change demo-change --to spec` → `{"allowed":true,...}`.
+4. `archon workflow advance --change demo-change --to propose` → blocked:
+   `"propose is not part of the fast track"` — exact match to spec.md's scenario
+   "Propose is not reachable in fast track".
+5. Double-complete guard: completed `spec` once (succeeded), then called `complete`
+   again twice — once with no flags, once with `--size substantial --track full`.
+   Both rejected: `Error: spec is already completed — run archon workflow advance to
+   start the next phase, not complete again`. `md5sum`/`diff` of `state.yaml` before
+   and after both rejected attempts: **identical, zero mutation**, confirmed for both
+   the flagless and the flagged repro.
+6. `--track` scoping: advanced to `apply`, then ran `advance --to apply --track
+   bugfix` on the already-existing change → succeeded as a no-op resume
+   (`resuming:true`) with `track:` unchanged at `fast` in `state.yaml` (confirms
+   "`--track` on `advance` ... ignored once `state.yaml` exists"). Then ran `complete
+   --change demo-change --track full` while on `apply` (non-explore phase) →
+   rejected: `"--track is only accepted while completing the explore phase (current
+   phase: apply)"`, `state.yaml`'s `track:` field unchanged.
+7. Invalid-flag rejection: `complete --size huge` and `complete --track stacked` both
+   rejected before any write (`diff` against a pre-call snapshot: no change).
+   `advance --to explore --track bogus` on a brand-new change: rejected
+   (`"unknown track: bogus ..."`), and no `state.yaml` was ever created for that
+   change — confirming the bootstrap path is equally guarded.
+
+Every scenario the spec and design documents claim, reproduced exactly as claimed,
+with no deviation.
+
+### 4. Fresh skeptical read of `newWorkflowCompleteCmd` and `CheckTransition`/`trackOrder`
+
+Read both in full as if never seen. `newWorkflowCompleteCmd` (`cmd/archon/main.go`
+805-878): validates `--size`/`--track` against fixed allow-lists before touching
+`state.yaml` (817-826); rejects a second `complete` on an already-`completed` phase
+by checking **`state.Status`**, not `state.Phase` (844-848 — this is attempt 2's
+fix, re-confirmed still correct: a `Phase`-only check would have let a second
+`complete --track ...` land on the completed `explore` phase before advancing, which
+is exactly the double-complete hazard fix round 2 closed); rejects `--track` on any
+phase other than `explore` (849-853), checked *after* the completed-guard so a
+double-complete attempt with `--track` hits the right error message first (confirmed
+empirically in run 5 above: the error returned was the already-completed one, not
+the track-scoping one, because `spec` was already completed — order of checks is
+correct for that case; separately confirmed the track-scoping check in isolation at
+`apply`, an `in_progress`, not-yet-completed phase). No ordering bug found: the two
+guards are independent preconditions (one on `Status`, one on `Phase`) and their
+checked order doesn't change which calls are accepted — only which message a
+rejected call receives.
+
+`CheckTransition`/`trackOrder` (`internal/workflow/workflow.go` 41-231): `trackOrder`
+only recognizes `"", "full", "bugfix", "fast"`, anything else errors — never silently
+coerces (36-54 in the same file's exported constant, `MaxJudgeRetries` unrelated).
+`CheckTransition`'s bootstrap branch (`currentPhase == ""`) only allows
+`requestedIdx == 0`; its steady-state `switch` (206-230) is a clean, exhaustive
+partition over `{==, +1, >+1, <=current}` with no gap — re-verified by hand against
+the Decision Gates table in `harness-workflow/SKILL.md` line by line, no mismatch.
+
+### 5. Repo-wide stale-reference sweep (redone independently, not trusting the prior commit's claim)
+
+Reran the sweep with a different method than fix round 3 presumably used (grep for
+the literal `--` prefixed form specifically, across the whole repo, no file-type
+filter) — see section 1's grep result. No bare `--track fast` survivor in any
+currently-operative instruction file. The only hits without `--size` on the same
+line are either plain-English Gherkin prose ("suggests track fast" /
+"sets track fast") in `spec.md`/`harness-workflow/spec.md`, which are not CLI
+invocations, or `verify-report.md`'s own historical narrative of **past** findings
+(expected — a changelog, not current guidance).
+
+**However, this sweep surfaced a genuine NEW (previously uncaught) drift, outside
+the 5 canonical documents the brief named, but squarely an "other stale reference to
+the fast-track mechanism"**:
+
+#### Finding: this repo's own rendered `CLAUDE.md` and `AGENTS.md` were never regenerated from `internal/initcmd/templates.go` after this change
+
+`internal/initcmd/templates.go` is the template source `RenderClaudeMD`/
+`RenderAgentsMD` render into a project's root `CLAUDE.md`/`AGENTS.md` (via `archon
+init`, confirmed at `internal/initcmd/init.go:297-324`, `writeTemplate` — a full
+overwrite, not a merge, so re-rendering is safe and requires no hand-reconciliation).
+This repo is itself an archon-managed project (it has its own `SESSION_STATUS.md`,
+`openspec/changes/`, and both `CLAUDE.md` and `AGENTS.md` at its root) and both files
+were last touched at commit `56eb262` — which predates `6dc3af3` (this change's
+original `feat` commit) and all three fix rounds (`11c19f5`, `50b249f`, `6a5b730`).
+
+Concretely, comparing `templates.go`'s current source against the two rendered
+files:
+
+- `templates.go:57-63` (`orchestratorSections`, shared by both renderers): the
+  Deviation rule has a 4th bullet, `(d) sdd-explore classifies the change size as
+  small (suggest track: fast via one scoped question — never auto-selected)`.
+  **`CLAUDE.md:54-56` and `AGENTS.md`'s equivalent Deviation rule stop at bullet
+  (c)** — bullet (d) is entirely absent from both rendered files.
+- `templates.go:156` / `templates.go:172` (`orchestratorRulesClaude` Rule 6 /
+  `orchestratorRulesOpencode` Rule 6): "After verify, invoke harness-judge, which
+  gates the `full` track's judge phase on its own computed per-change risk tier
+  (track + size), not an unconditional pass — an explicit `judge.enabled: false`
+  always wins over the tier; `bugfix` and `fast` never run judge". **`CLAUDE.md:134`
+  and `AGENTS.md:110` both still read the old, pre-tiering text: "6. After verify,
+  invoke harness-judge"** — no mention of the computed tier, `size`, or `fast` at
+  all.
+- Confirmed this is specific to this change, not a pre-existing gap: `track: bugfix`
+  content (from the earlier `f60dcb9` bugfix-track feature) **is** present in both
+  rendered files (`CLAUDE.md:91`, `AGENTS.md:66`), proving the render-and-commit step
+  was done for that earlier feature. It was simply never done for this one, across
+  the original apply and all three subsequent fix rounds — `tasks.md`'s tasks 3.5/
+  3.6 and `apply-progress.md`'s matching entries scope the deliverable to
+  `internal/initcmd/templates.go` only; regenerating this repo's own root files was
+  never a task, so no fix round had a checklist item that would have caught it.
+
+**Why this matters, not just as a documentation nit**: `specs/harness-fast-track/
+spec.md`'s "Suggestion-only entry" requirement depends on the orchestrator's
+Deviation rule actually containing bullet (d) in order to ever surface the one
+scoped question. In this repo, right now, an orchestrator session operates on
+`CLAUDE.md` (confirmed: this is literally the file injected as this session's
+"project instructions... checked into the codebase" and stated to "OVERRIDE any
+default behavior"). Its Deviation rule has no bullet (d) and its Rule 6 says nothing
+about tiering — so a real orchestrator session in this repo, today, would never
+suggest `track: fast` no matter what `sdd-explore` classifies, and would treat
+`harness-judge` as an unconditional gate rather than a tier-computed one. The feature
+this entire change exists to add is implemented correctly in the Go binary and the
+skills, but is unreachable through this repo's own live orchestrator prompt.
+
+**Fix required**: re-render `CLAUDE.md` and `AGENTS.md` from the current
+`templates.go` (a full overwrite via the existing `writeTemplate`/`RenderClaudeMD`/
+`RenderAgentsMD` path, or equivalent) so both pick up Deviation-rule bullet (d) and
+the reworded Rule 6. No other content in either file needs to change — both are
+fully template-generated with no hand-added sections layered on top (verified by
+reading each file in full against `templates.go`'s concatenated constants).
+
+### 6. `tasks.md` coherence
+
+23/23 checked, matching `apply-progress.md`'s own status line. The 3 fix rounds since
+original apply were not added as new tasks — confirmed this is expected/correct
+(judge-driven corrections, not new scope) per the brief, and consistent with how
+`harness-judge`'s retry loop is documented to work (re-apply with feedback, not a
+tasks.md edit). No incoherence found. (Separately, task 3.5/3.6's scoping to
+`templates.go` only, rather than to this repo's own rendered files, is the root cause
+of section 5's finding — noted there, not a `tasks.md` defect in itself: the tasks
+accurately describe what they scoped, they just didn't scope widely enough.)
+
+### Verdict
+
+**FAIL**
+
+All mechanism-level claims across the 5 canonical documents are now mutually
+consistent, the Go implementation matches every one of them exactly, the full test
+suite is clean, and seven independent empirical CLI scenarios (combined-call entry,
+blocked propose, double-complete guard with confirmed zero mutation under two flag
+variants, post-bootstrap `--track` no-op on `advance`, phase-scoped `--track`
+rejection on `complete`, and invalid-flag rejection with zero mutation including at
+bootstrap) all reproduced exactly as the documents claim. No new defect was found in
+`internal/workflow/workflow.go`, `cmd/archon/main.go`, or any of the 5 canonical
+documents themselves.
+
+However, this pass found a 5th-round defect of a new kind (not "two prose documents
+disagree with each other," like rounds 1-3, but "the live, deployed orchestrator
+prompt for this very project was never updated to match the documents it's supposed
+to summarize"): this repo's own root `CLAUDE.md` and `AGENTS.md` are stale relative
+to `internal/initcmd/templates.go`, missing both the Deviation rule's `fast`-suggestion
+bullet and the tier-computed `harness-judge` wording for Rule 6. This makes the
+`track: fast` entry path the whole change exists to add practically unreachable from
+this repo's own orchestrator session, despite being correctly implemented everywhere
+else. Must re-render (or hand-edit to match) `CLAUDE.md` and `AGENTS.md` from the
+current `templates.go` before this can pass.
