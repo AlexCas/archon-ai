@@ -83,9 +83,11 @@ Scenario: Verify transitions straight to archive regardless of tier
 deviation-question pattern (one scoped question) — the orchestrator MUST NOT silently
 auto-select `fast`. On `unknown`, the track MUST default to `full`. On confirmation, the
 orchestrator MUST persist the switch via `archon workflow complete --change {name}
---track fast` at the moment `explore` completes — the only CLI call and the only phase
-boundary that may change an existing change's track; `advance --to {phase}`'s `--track`
-flag bootstraps a brand-new change only and has no effect once `state.yaml` exists.
+--size small --track fast` (both flags in the SAME call — `complete` rejects a second
+call on an already-completed phase, so `--size` cannot be attached afterward) at the
+moment `explore` completes — the only CLI call and the only phase boundary that may
+change an existing change's track; `advance --to {phase}`'s `--track` flag bootstraps a
+brand-new change only and has no effect once `state.yaml` exists.
 
 #### Scenario: Small classification suggests fast via one scoped question
 

@@ -28,7 +28,9 @@ The phase sequence is determined by the change's `track` field in `state.yaml`:
   3-section format — see [[harness-fast-track]]. Entered only via `sdd-explore`'s
   sizing suggestion plus a confirmed preflight deviation question, never
   auto-selected. Mechanically, the ONLY way to switch an existing change onto
-  `fast` is `archon workflow complete --change {name} --track fast` at the
+  `fast` is `archon workflow complete --change {name} --size small --track fast`
+  (both flags in the SAME call — `complete` now rejects a second call on an
+  already-completed phase, so `--size` cannot be added afterward) at the
   moment `explore` completes — `--track` on `advance` only bootstraps a
   brand-new change and is ignored once `state.yaml` exists; `complete` rejects
   `--track` on every phase except `explore`.)

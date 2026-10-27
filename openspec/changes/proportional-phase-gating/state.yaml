@@ -1,7 +1,7 @@
 phase: judge
 status: in_progress
 track: full
-retry_count: 2
+retry_count: 3
 history:
     - phase: explore
       status: in_progress

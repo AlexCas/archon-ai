@@ -455,3 +455,165 @@ above, commit `3b2a1ca`) before this fix cycle began, and is unaffected by `11c1
 No new issues found. This re-verify upgrades the change's status from the original
 **PASS WITH WARNINGS** to a clean **PASS** for the specific defects this retry cycle
 targeted; the change is ready to proceed to the next judge attempt.
+
+---
+
+## Re-Verification — 2026-10-27 (Judge Attempt 2 Fix, commit `50b249f`)
+
+**Scope**: Independently confirm the 3 NEW issues judge attempt 2 found (introduced
+by the attempt-1 fix, `11c19f5`) are genuinely fixed in `50b249f`, plus a fresh-eyes
+pass hunting for a 4th round of the same contradiction class, since this exact
+pattern (two sections disagreeing) has now recurred across two prior rounds.
+
+### Issue 1 — `sdd-explore/SKILL.md` Step 3c never actually included `--track`
+
+**Confirmed fixed.** Current Step 3c (lines ~132-139) now explicitly branches:
+- `size: substantial`/`unknown`, or `small` without a confirmed `fast` suggestion →
+  `archon workflow complete --change {name} --size {small|substantial|unknown}`.
+- `size: small` AND confirmed `fast` suggestion →
+  `archon workflow complete --change {name} --size small --track fast` — explicitly
+  "`--size` and `--track` together, in the SAME call, not two calls."
+
+This matches `design.md` line 73's documented call shape exactly
+(`archon workflow complete --size {s} --track fast`). `track:fast` is now reachable
+through the literal operative instruction, not just through the CLI's capability.
+
+### Issue 2 — double-complete hazard (`--track` guard checked `state.Phase` only)
+
+**Confirmed fixed**, by four independent checks:
+
+1. **Source reading** (`cmd/archon/main.go` `newWorkflowCompleteCmd`, lines ~844-853):
+   the `state.Status == "completed"` rejection fires immediately after `ReadState`
+   and strictly before `state.Complete()`, `state.Size =`, `state.Track =`, and
+   `state.Write()` — i.e. before any mutation, and unconditional on whether `--track`
+   or `--size` was passed. The pre-existing phase-scoped `--track` guard
+   (`trackFlag != "" && state.Phase != "explore"`) remains, now layered under the new
+   check.
+2. **Ran the new test**: `go test -count=1 -v ./cmd/archon/... -run
+   TestWorkflowComplete_RejectsDoubleComplete` → `PASS`.
+3. **Read the test body** (`cmd/archon/main_test.go:871-914`): it bootstraps a change
+   to `explore`, completes it once with `--size small`, captures `state.yaml`
+   (asserts exactly 2 history entries), then attempts a second `complete --track
+   fast` and asserts (a) non-zero exit, (b) stderr contains "already completed", and
+   (c) `state.yaml` afterward is byte-for-byte unchanged (same history length,
+   `Track` still empty). This genuinely proves the claim — it's not just asserting
+   an error string, it independently re-reads state off disk to prove no mutation
+   occurred.
+4. **Independent empirical check**, built binary in a fresh scratch dir (not reusing
+   the test harness): bootstrap → `advance --to explore` → `complete --size small
+   --track fast` (combined call succeeds, `state.yaml` shows `track: fast, size:
+   small`) → `complete` again with no flags (rejected, "already completed",
+   `state.yaml` unchanged) → `complete --size substantial --track bugfix` (also
+   rejected, `state.yaml` still unchanged). All three matched expectations exactly.
+
+### Issue 3 — `harness-judge/SKILL.md` Step 0b's unscoped "ALWAYS wins" claim
+
+**Confirmed fixed.** Step 0b now opens with: "By this point Step 0a has already
+exited (`blocked`) for any non-full track, so everything below is scoped to the
+`full` track only. On the `full` track, `judge.enabled: false` ALWAYS wins..." The
+"ALWAYS"/"regardless" language is no longer presented as a standalone global claim —
+it is explicitly prefaced with the full-track scoping that makes it true. Read Step
+0a and Step 0b together end-to-end: no remaining contradiction between the two
+sections on this point.
+
+### Fresh-eyes hunt for a 4th-round issue — FOUND ONE
+
+Re-reading `cmd/archon/main.go`'s `newWorkflowCompleteCmd`, `sdd-explore/SKILL.md`
+Step 3c, and `harness-judge/SKILL.md` Step 0 end-to-end surfaced no further
+contradiction *within* those three artifacts. But the fix to issue 1 above changed
+what the "correct" fast-track entry call looks like (now `--size small --track
+fast`, combined) without propagating that shape to the other two documents that
+describe the exact same call:
+
+- **`skills/harness-workflow/SKILL.md` line 31**: "Mechanically, the ONLY way to
+  switch an existing change onto `fast` is `archon workflow complete --change {name}
+  --track fast` at the moment `explore` completes" — **omits `--size`**, and phrases
+  it as "the ONLY way", i.e. exhaustively.
+- **`openspec/changes/proportional-phase-gating/specs/harness-fast-track/spec.md`
+  lines 85-86** (the normative spec, Requirement: "Suggestion-only entry via sizing
+  classification"): "the orchestrator MUST persist the switch via `archon workflow
+  complete --change {name} --track fast` at the moment `explore` completes — **the
+  only CLI call** and the only phase boundary that may change an existing change's
+  track" — same omission, same exhaustive phrasing.
+
+Both of these predate `50b249f` (last touched in `11c19f5`, confirmed via `git log`)
+and were never updated when issue 1's fix changed the call shape in
+`sdd-explore/SKILL.md`. By contrast, `design.md` line 73 already shows the correct
+combined form (`archon workflow complete --size {s} --track fast`), and
+`sdd-explore/SKILL.md` now matches it — so there is a live 3-way split: 2 artifacts
+say "`--track fast` alone, and that's the *only* form", 2 artifacts say "`--size` and
+`--track` combined, in the same call."
+
+This is not cosmetic. It is the exact same "two sections disagree" defect class
+flagged in round 1 (original) and round-2 issue 3 (`harness-judge`), now recurring a
+third time — and it has a real consequence given round 2's own issue-2 fix: because
+`workflow complete` now hard-rejects any second `complete` call on an
+already-completed phase, there is no way to patch in `--size` after the fact if an
+orchestrator follows `harness-workflow/SKILL.md`'s or the spec's literal
+documented call (`--track fast` alone) first. Following either of those two
+documents as written means the size classification that justified suggesting `fast`
+in the first place (`sdd-explore`'s whole reason for offering the deviation question)
+is silently and permanently dropped from `state.yaml` — not recoverable, by design,
+as of this very fix round. Functionally this doesn't corrupt the `fast` track's
+phase sequence (judge is skipped unconditionally on `fast` regardless of tier/size),
+but it breaks traceability (`archon workflow status --json`'s `size` key, and
+anything reading `state.yaml` later, would show an empty size for every fast-track
+change entered by the book per these two docs) and leaves a live, citable
+contradiction in the normative spec itself.
+
+**Recommended fix**: update `skills/harness-workflow/SKILL.md` line 31 and
+`openspec/changes/proportional-phase-gating/specs/harness-fast-track/spec.md` lines
+85-86 to show the same combined call `archon workflow complete --change {name}
+--size small --track fast`, matching `design.md` and `sdd-explore/SKILL.md` exactly,
+and drop the "ONLY"/"only CLI call" phrasing's implication that `--size` is absent
+from it (or adjust the phrasing to say "the only call, which combines `--size` and
+`--track`" to avoid re-introducing this exact ambiguity a 4th time).
+
+### Regression Check
+
+```
+$ go build ./...
+(clean, no output)
+$ go vet ./...
+(clean, no output)
+$ go test -count=1 ./...
+ok  	github.com/archon-ai/archon/cmd/archon
+ok  	github.com/archon-ai/archon/internal/agent
+ok  	github.com/archon-ai/archon/internal/config
+ok  	github.com/archon-ai/archon/internal/initcmd
+ok  	github.com/archon-ai/archon/internal/mapgen
+ok  	github.com/archon-ai/archon/internal/models
+ok  	github.com/archon-ai/archon/internal/opencode
+ok  	github.com/archon-ai/archon/internal/route
+ok  	github.com/archon-ai/archon/internal/scaffold
+ok  	github.com/archon-ai/archon/internal/skillregistry
+ok  	github.com/archon-ai/archon/internal/status
+ok  	github.com/archon-ai/archon/internal/tui
+ok  	github.com/archon-ai/archon/internal/version
+ok  	github.com/archon-ai/archon/internal/workflow
+ok  	github.com/archon-ai/archon/skills
+```
+
+Same 15 packages passing, no regressions from `11c19f5` or `50b249f`.
+
+### Final Verdict
+
+**FAIL**
+
+All 3 issues judge attempt 2 raised are independently confirmed genuinely fixed in
+`50b249f` (not rubber-stamped — each verified by source reading, and issue 2
+additionally by running the new test, reading the test body for what it actually
+proves, and a from-scratch empirical binary run). Full regression suite is clean.
+
+However, the mandated fresh-eyes pass found a 4th issue of the same recurring
+"two sections disagree" defect class: `skills/harness-workflow/SKILL.md` (line 31)
+and the normative `specs/harness-fast-track/spec.md` (lines 85-86) still document
+the fast-track entry call as `--track fast` alone (explicitly "the ONLY way" /
+"the only CLI call"), while `design.md` and the just-fixed `sdd-explore/SKILL.md`
+correctly show it as the combined `--size small --track fast` call. Left as-is,
+this both contradicts the normative spec against its own design doc and silently
+drops the size classification for any fast-track entry that follows
+`harness-workflow`'s or the spec's literal instruction, with no way to repair it
+after the fact given this same fix round's new hard rejection of double-completes.
+Must re-apply to sync these two documents to the combined-call form before this can
+pass.
