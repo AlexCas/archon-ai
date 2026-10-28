@@ -1,4 +1,4 @@
-phase: judge
+phase: archive
 status: completed
 track: full
 history:
@@ -50,3 +50,9 @@ history:
     - phase: judge
       status: completed
       ts: "2026-10-28T17:10:06Z"
+    - phase: archive
+      status: in_progress
+      ts: "2026-10-28T18:33:17Z"
+    - phase: archive
+      status: completed
+      ts: "2026-10-28T18:33:17Z"
