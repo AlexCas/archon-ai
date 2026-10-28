@@ -1,7 +1,6 @@
 phase: judge
-status: in_progress
+status: completed
 track: full
-retry_count: 3
 history:
     - phase: explore
       status: in_progress
@@ -48,3 +47,6 @@ history:
     - phase: judge
       status: in_progress
       ts: "2026-10-27T19:07:58Z"
+    - phase: judge
+      status: completed
+      ts: "2026-10-28T17:10:06Z"

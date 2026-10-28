@@ -837,3 +837,161 @@ bullet and the tier-computed `harness-judge` wording for Rule 6. This makes the
 this repo's own orchestrator session, despite being correctly implemented everywhere
 else. Must re-render (or hand-edit to match) `CLAUDE.md` and `AGENTS.md` from the
 current `templates.go` before this can pass.
+
+---
+
+## Round 6 Re-Verify (2026-10-27) — Targeted Re-Check of Commit `108322a`
+
+Scope: a narrow re-verify of `108322a` ("docs(sdd): sync this repo's own
+CLAUDE.md/AGENTS.md with templates.go"), the fix for round 5's finding above, plus a
+mandated full-file drift sweep (not limited to the two sections the commit targeted)
+and a sanity check for other committed, templates.go-rendered output elsewhere in the
+repo.
+
+### 1. Targeted fix verified byte-for-byte
+
+Confirmed programmatically, not by eye: wrote a temporary Go test
+(`internal/initcmd/zzdump_test.go`, deleted after use — `git status --short` showed
+no leftover files) that calls `RenderClaudeMD`/`RenderAgentsMD` directly from the
+`initcmd` package with `TemplateData` matching this repo's actual installed state
+(`SkillCount: 23`, the 9 Claude phase models and 8 opencode phase models exactly as
+listed in the committed files), wrote the output to the scratchpad, and ran
+`diff -u` against the real root `CLAUDE.md`/`AGENTS.md`. Both diffs show **zero
+difference** for the Deviation-rule bullet (d) and Rule 6 text in both files — the
+`§sdd-explore§ classifies the change size as §small§...` bullet and the
+`...gates the §full§ track's judge phase on its own computed per-change risk
+tier...` Rule 6 wording are present verbatim (post `§`→backtick substitution) in
+both `CLAUDE.md` and `AGENTS.md`. Round 5's specific finding is fully closed.
+
+Also confirmed via `git show 108322a -- CLAUDE.md AGENTS.md`: the commit made
+exactly the two surgical hand-edits it claims (deviation bullet + Rule 6 in both
+files) and touched nothing else — consistent with its commit message's claim of a
+"surgical" sync rather than a full regeneration.
+
+### 2. Full-file drift sweep — found 3 additional, PRE-EXISTING drift spots unrelated to this change
+
+Per the brief's instruction to cross-check every section `templates.go` defines (not
+just the two this commit targeted), the same diff-the-real-render approach surfaced
+three more drift spots. All three predate `proportional-phase-gating` entirely (confirmed
+via `git log -p --follow` on each file) and are **not** caused by, and were never in
+scope for, this change's apply/fix rounds. Reporting them here because the brief
+explicitly asked for this sweep and because they are the same meta-failure-mode
+(committed copy vs. generator going stale) that this whole verify thread exists to
+catch:
+
+- **`CLAUDE.md` "## Phase Order" section has ~11 lines of hand-added content with no
+  counterpart in `templates.go`**: the "In the single-PR flow the archive commit is
+  staged BEFORE the PR is opened..." / "In the Feature Branch Chain flow..." /
+  "Stacked-to-Main is unsupported..." paragraphs. `git log` traces these to commits
+  `ff2ace5`, `fac3e5f`, `3f0f24d`, `b38ce88`, `bfcf203` (all predating this change,
+  explicitly described as hand-edits, e.g. `549955e` "feat(docs): hand-edit CLAUDE.md
+  and AGENTS.md..."). `internal/initcmd/templates.go` has **no** "Terminal Phase
+  Ordering" / "Stacked-to-Main Archive Convergence" text anywhere
+  (`grep -rn "Terminal Phase Ordering\|Stacked-to-Main Archive Convergence"
+  internal/initcmd/` returns nothing). `AGENTS.md` does **not** have this extra
+  content in its own Phase Order section — it matches `templates.go` exactly there.
+  So this is CLAUDE.md-only hand-added content that was never backported into the
+  shared generator.
+- **`CLAUDE.md`'s Session Status archive bullet also carries extra wording** not in
+  `templates.go` ("...as part of the staged archive commit, before the PR is opened
+  (single-PR flow) or on the tracker branch before the tracker PR merges to `main`
+  (Feature Branch Chain flow)..." vs. the template's plain "...into the archived
+  change folder alongside the feature artifacts..."). Same root cause as above.
+  `AGENTS.md` matches `templates.go` verbatim on this bullet.
+- **`AGENTS.md` is missing the entire "## Concise Chat Output" section** (14 lines)
+  that `templates.go`'s shared `orchestratorSections` constant defines for *both*
+  renderers, and that `CLAUDE.md` does have. Traced to `d096c77` (Jul 2026, "feat:
+  add concise-output skill..."), whose own commit message says: "CLAUDE.md: surgical
+  additive insertion of the same pointer (no regen)" — `AGENTS.md` was never touched.
+- **`AGENTS.md`'s "## Phase Models" section header text contradicts
+  `templates.go`'s `phaseModelsOpencode` constant**: the committed file reads
+  "Advisory: when delegating an SDD phase, request the model below... This is a
+  preference, not a hard gate..." while `templates.go` (confirmed consistent with
+  its own test `TestTemplates_AgentsPhaseModelsPointsAtOpencodeJSON`) says "...The
+  binding lives in `opencode.json` under `agent.archon-<phase>.model`" — an opposite
+  framing (advisory vs. binding). Traced to `d714180`, the original commit that
+  added `AGENTS.md`, which predates the "binding" wording being written into
+  `templates.go`.
+
+None of these four lines of drift touch the Deviation rule or Rule 6 text this
+change's fix rounds were scoped to — confirmed by diff: the only hunks the
+`CLAUDE.md`/`AGENTS.md` vs. rendered-template diff produces are the four items
+above, nothing else. No new drift was introduced by `108322a` itself; `108322a`'s
+own two edits match the template exactly.
+
+**Disposition**: flagging as a warning, not a blocker for this change. These four
+items are pre-existing technical debt from earlier, unrelated features
+(chained-pr/archive-before-PR hand-edits, the concise-output skill rollout, and
+`AGENTS.md`'s original authoring) — none were introduced or worsened by
+`proportional-phase-gating` or by `108322a`. Recommend a separate follow-up change to
+either (a) backport the Feature-Branch-Chain Phase-Order content and the hard-gate
+Phase-Models wording into `templates.go` so `archon init` on new projects doesn't
+ship an incomplete/inconsistent file, and add the missing Concise Chat Output section
+and matching Phase-Models wording to this repo's own `AGENTS.md`, or (b) accept the
+CLAUDE.md-only additions as intentionally out-of-template and document that
+exception explicitly in `templates.go`'s comments so future sweeps don't re-flag it
+every round.
+
+### 3. Build / vet / full test suite
+
+```
+go build ./...      → clean, no output
+go vet ./...         → clean, no output
+go test -count=1 ./... → ok, all 15 packages (cmd/archon, internal/agent,
+                          internal/config, internal/initcmd, internal/mapgen,
+                          internal/models, internal/opencode, internal/route,
+                          internal/scaffold, internal/skillregistry,
+                          internal/status, internal/tui, internal/version,
+                          internal/workflow, skills)
+```
+
+As expected — `108322a` touched no `.go` files, so this is a formality. Confirmed
+clean nonetheless.
+
+### 4. Sanity check — any other committed, templates.go-rendered output elsewhere in the repo?
+
+Checked:
+- `find . -iname "CLAUDE.md" -o -iname "AGENTS.md"` → exactly one of each, both at
+  the repo root. No duplicate/secondary rendered copies anywhere else (e.g. no
+  per-package or per-doc copies).
+- `.opencode/skills/*` (`git ls-files .opencode/` confirms these ARE git-tracked):
+  all entries are **symlinks** (`lrwxrwxrwx`) pointing to
+  `/home/alexcasdev/.config/opencode/skills/<name>` — a different machine/user's
+  home directory, so they resolve as broken links in this environment. These are
+  machine-local skill-registry links materialized by `archon init`/`update`
+  (`internal/initcmd/refresh.go`, `internal/initcmd/update.go`), not rendered text
+  content, and not derived from `templates.go` at all (`templates.go` only renders
+  `CLAUDE.md`/`AGENTS.md`). This is a separate, pre-existing symlink-portability
+  quirk, out of scope for this check, noted only for completeness — it is not a
+  "stale rendering of `templates.go`" issue.
+- `skills/` (the actual skill source directory): grepped for text unique to the
+  orchestrator-prompt sections (`"Deviation rule"`, `"Vague Request Guard"`,
+  `"Human Review Gate"`, `"Leader Persona"`) — the only hit outside
+  `CLAUDE.md`/`AGENTS.md`/`openspec/changes/**` is `skills/concise-output/SKILL.md`,
+  which quotes the Human Review Gate string as a cross-reference (expected — it's
+  the skill `templates.go`'s pointer line names), not a duplicated full rendering.
+
+**Conclusion**: no other committed, generated rendering of `templates.go` exists in
+this repo besides the root `CLAUDE.md`/`AGENTS.md` themselves.
+
+### Round 6 Verdict
+
+**PASS WITH WARNINGS**
+
+The specific defect this re-verify was scoped to — `108322a`'s sync of the
+Deviation-rule bullet (d) and Rule 6 wording into `CLAUDE.md`/`AGENTS.md` — is
+confirmed correct and complete by direct programmatic diff against the actual
+`templates.go` renderer, not a visual skim. Build, vet, and the full test suite are
+clean. No other committed `templates.go` rendering exists elsewhere in the repo.
+
+The warning: the mandated full-file sweep found four lines of **pre-existing**
+drift between `templates.go` and the committed `CLAUDE.md`/`AGENTS.md`, unrelated
+to and not introduced by `proportional-phase-gating` or `108322a` — (1) CLAUDE.md's
+Phase Order section carries ~11 lines of Feature-Branch-Chain content with no
+`templates.go` counterpart, (2) CLAUDE.md's Session Status archive bullet has
+matching extra wording, (3) AGENTS.md is missing the entire "Concise Chat Output"
+section, and (4) AGENTS.md's Phase Models section text contradicts `templates.go`'s
+current "hard gate" wording with stale "advisory" framing. These do not block this
+change's archive — they are orthogonal, older technical debt — but should be tracked
+as a separate follow-up so the next unrelated feature's sync doesn't get blamed for
+them.
