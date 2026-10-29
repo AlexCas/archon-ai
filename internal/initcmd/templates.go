@@ -57,8 +57,10 @@ per-session questionnaire. The standard default is:
 **Deviation rule:** the standard default is applied without asking. The orchestrator
 surfaces a single scoped one-line decision ONLY when a genuine deviation is detected:
 (a) the estimate exceeds the 800-line budget (suggest slicing or a budget bump),
-(b) the change is trivially small (suggest a single PR), or (c) the user explicitly
-asks to adjust. Absent a deviation, no preflight question is asked.
+(b) the change is trivially small (suggest a single PR), (c) the user explicitly
+asks to adjust, or (d) §sdd-explore§ classifies the change size as §small§ (suggest
+§track: fast§ via one scoped question — never auto-selected). Absent a deviation, no
+preflight question is asked.
 
 **Playwright (web projects):**
 §playwright.enabled§ in §.archon/config.yaml§ controls Playwright web E2E generation.
@@ -152,7 +154,7 @@ const orchestratorRulesClaude = `## Rules
 3. You MUST delegate each phase by invoking its §archon-<phase>§ subagent via your delegation tool — never execute the phase inline on your own model; do not pass a per-call model parameter (the subagent's frontmatter model is the gate)
 4. Write/update SESSION_STATUS.md at the root on every phase transition
 5. After every phase that produces an editable artifact, run the Human Review Gate
-6. After verify, invoke harness-judge
+6. After verify, invoke harness-judge, which gates the §full§ track's judge phase on its own computed per-change risk tier (track + size), not an unconditional pass — an explicit §judge.enabled: false§ always wins over the tier; §bugfix§ and §fast§ never run judge
 7. When playwright.enabled, run the generated Playwright tests after verify and judge pass
 8. On judge fail: re-apply with feedback (max 3 retries; in a Feature Branch Chain the integrated judge on the tracker uses the same cap)
 9. In the single-PR flow, run archive (spec merge, folder move, §archon map§, SESSION_STATUS.md move) as one commit AFTER judge passes and BEFORE opening the PR
@@ -167,7 +169,7 @@ const orchestratorRulesOpencode = `## Rules
 3. You MUST delegate each phase by invoking its §archon-<phase>§ subagent via your delegation tool — never execute the phase inline on your own model (the subagent's configured model in opencode.json is the gate)
 4. Write/update SESSION_STATUS.md at the root on every phase transition
 5. After every phase that produces an editable artifact, run the Human Review Gate
-6. After verify, invoke harness-judge
+6. After verify, invoke harness-judge, which gates the §full§ track's judge phase on its own computed per-change risk tier (track + size), not an unconditional pass — an explicit §judge.enabled: false§ always wins over the tier; §bugfix§ and §fast§ never run judge
 7. When playwright.enabled, run the generated Playwright tests after verify and judge pass
 8. On judge fail: re-apply with feedback (max 3 retries; in a Feature Branch Chain the integrated judge on the tracker uses the same cap)
 9. In the single-PR flow, run archive (spec merge, folder move, §archon map§, SESSION_STATUS.md move) as one commit AFTER judge passes and BEFORE opening the PR

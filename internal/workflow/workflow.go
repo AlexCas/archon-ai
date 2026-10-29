@@ -29,6 +29,15 @@ import (
 // feature routing").
 var BugfixTrack = []string{"explore", "spec", "apply", "verify", "archive"}
 
+// FastTrack is the fixed phase sequence for track "fast": a sized track for
+// small, well-understood feature work (see harness-fast-track). Its phase
+// names coincide with BugfixTrack's today, but it is kept as its own named
+// slice rather than a shared reference: fast's "spec" phase produces a full
+// Gherkin spec, while bugfix's produces the scoped 3-section format
+// (sdd-spec branches on track, not slice identity) — sharing the slice
+// would make a future divergence a surprising shared-reference edit.
+var FastTrack = []string{"explore", "spec", "apply", "verify", "archive"}
+
 // trackOrder resolves track to its fixed phase sequence. "" resolves to
 // "full" for backward compatibility with state.yaml files written before
 // the track field existed (CLAUDE.md / harness-workflow's documented
@@ -39,8 +48,10 @@ func trackOrder(track string) ([]string, error) {
 		return config.PhaseOrder, nil
 	case "bugfix":
 		return BugfixTrack, nil
+	case "fast":
+		return FastTrack, nil
 	default:
-		return nil, fmt.Errorf("unknown track: %s (supported: full, bugfix)", track)
+		return nil, fmt.Errorf("unknown track: %s (supported: full, bugfix, fast)", track)
 	}
 }
 
@@ -59,6 +70,7 @@ type State struct {
 	Phase      string         `yaml:"phase"`
 	Status     string         `yaml:"status"`
 	Track      string         `yaml:"track,omitempty"`
+	Size       string         `yaml:"size,omitempty"` // small|substantial|unknown
 	RetryCount int            `yaml:"retry_count,omitempty"`
 	History    []HistoryEntry `yaml:"history,omitempty"`
 }
@@ -130,6 +142,9 @@ type TransitionResult struct {
 // CheckTransition implements skills/harness-workflow/SKILL.md's "Decision
 // Gates" table verbatim:
 //
+//	current phase is "" (new change, no state.yaml yet) and requested ==
+//	  the track's first phase                   -> allowed (bootstrap)
+//	current phase is "" and requested != first   -> blocked (must start at first phase)
 //	requested == current, status in_progress   -> allowed (resuming)
 //	requested == current, status completed     -> blocked (already completed)
 //	requested == next sequential phase          -> allowed (advancing)
@@ -154,6 +169,21 @@ func CheckTransition(track, currentPhase, currentStatus, requestedPhase string) 
 		return TransitionResult{
 			Allowed: false,
 			Reason:  fmt.Sprintf("%s is not part of the %s track", requestedPhase, resolvedTrack),
+		}, nil
+	}
+
+	if currentPhase == "" {
+		// Bootstrap case: no state.yaml existed yet for this change, so
+		// there is no current phase to compare against. The only valid
+		// first move is the track's first phase; anything else would skip
+		// phases before the change even starts.
+		if requestedIdx == 0 {
+			return TransitionResult{Allowed: true}, nil
+		}
+		return TransitionResult{
+			Allowed:       false,
+			Reason:        fmt.Sprintf("new change must start at %s, not %s", order[0], requestedPhase),
+			MissingPhases: order[0:requestedIdx],
 		}, nil
 	}
 

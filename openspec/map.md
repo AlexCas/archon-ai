@@ -13,6 +13,7 @@ this preamble is authored prose and is preserved across every regeneration. See
 - [[cli-installer]] — The `archon` CLI bootstraps the SDD harness into any project by extracting 21 embedded gentle-ai skills and scaffolding per-project config, agent instructions, and rollback tracking.
 - [[harness-bugfix-track]] — Defines an abbreviated SDD track for bug fixes. A change may declare `track: bugfix` in its `state.yaml`, selecting a 5-phase sequence (explore → spec → apply → verify → archive) with no judge phase and a minimal three-section scoped spec, instead of the full 9-phase track. The `track` field is back-compatible: absent means `full`.
 - [[harness-commits]] — Ensure commits created through the harness are attributed only to the user.
+- [[harness-fast-track]] — Abbreviated SDD track for small, well-understood feature work: `track: fast` selects explore → spec → apply → verify → archive, no judge — sibling to [[harness-bugfix-track]], but for features, so `spec` stays a full Gherkin spec. Entry is suggestion-only: `sdd-explore` classifies size and the orchestrator asks one scoped question; `fast` is never auto-selected silently. Scenarios live in `harness-fast-track.feature` beside this file.
 - [[harness-init]]
 - [[harness-judge]]
 - [[harness-session-status]] — Provide a single per-session resume point so an SDD session can continue without losing context after the agent is closed.
@@ -44,9 +45,12 @@ this preamble is authored prose and is preserved across every regeneration. See
 | [ai-orchestration-harness](changes/ai-orchestration-harness/proposal.md) |  |  |
 | [issue-16-leader-personality](changes/issue-16-leader-personality/proposal.md) |  |  |
 | [opencode-phase-subagents](changes/opencode-phase-subagents/proposal.md) | design | in_progress |
-| [streamline-harness](changes/streamline-harness/proposal.md) | design | completed |
 
 ## Archive
+### 2026-10-28
+- [proportional-phase-gating](changes/archive/2026-10-28-proportional-phase-gating/proposal.md)
+### 2026-09-16
+- [streamline-harness](changes/archive/2026-09-16-streamline-harness/proposal.md)
 ### 2026-08-26
 - [graphify-tui-tab](changes/archive/2026-08-26-graphify-tui-tab/proposal.md)
 ### 2026-08-22
@@ -96,10 +100,11 @@ this preamble is authored prose and is preserved across every regeneration. See
 
 ## Backlinks
 - [[archon-map]] ← obsidian-vault-specs
-- [[harness-bugfix-track]] ← streamline-harness
+- [[harness-bugfix-track]] ← proportional-phase-gating, streamline-harness
+- [[harness-fast-track]] ← proportional-phase-gating
 - [[harness-init]] ← streamline-harness
-- [[harness-judge]] ← chained-pr-archive, streamline-harness
-- [[harness-workflow]] ← archive-before-pr, chained-pr-archive, obsidian-vault-specs, stacked-pr-archive, streamline-harness
+- [[harness-judge]] ← chained-pr-archive, proportional-phase-gating, streamline-harness
+- [[harness-workflow]] ← archive-before-pr, chained-pr-archive, obsidian-vault-specs, proportional-phase-gating, stacked-pr-archive, streamline-harness
 - [[local-model-router]] ← local-model-router
 - [[openspec-convention]] ← obsidian-vault-specs
 - [[sdd-archive]] ← obsidian-vault-specs

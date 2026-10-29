@@ -98,6 +98,46 @@ Report one of: `web`, `not-web`, or `unknown`.
 This determination informs `playwright.enabled` in `.archon/config.yaml`. Never
 enable Playwright for a `not-web` project.
 
+### Step 3c: Classify Change Size
+
+Decide how big and well-understood this change is, because that drives whether the
+orchestrator suggests the sized `fast` track ([[harness-fast-track]]) at the preflight
+deviation question. Look for signals:
+
+- Scope touches a single file/module with a well-understood, mechanical fix or
+  small addition, no new capability, no cross-cutting concern.
+- Estimated changed lines are small (comparable to a `bugfix`-sized change) and the
+  approach is obvious — no open design questions.
+- Contrast with a change spanning multiple modules, introducing a new capability,
+  or carrying non-trivial risk/ambiguity.
+
+Report one of: `small`, `substantial`, or `unknown`.
+
+- `small` → the change is scoped, mechanical, and low-risk. This MAY lead the
+  orchestrator to suggest `track: fast` via the existing preflight deviation-question
+  pattern (one scoped question) — never auto-selected silently.
+- `substantial` → the change has real scope, risk, or design ambiguity. The track
+  stays `full`; no `fast` suggestion is made.
+- If the size cannot be determined confidently (e.g. too early, insufficient
+  investigation, or genuinely ambiguous scope) → `unknown`. The track defaults to
+  `full`; `fast` is never suggested on `unknown`.
+
+Report this classification to the orchestrator in your return envelope (e.g. `Size:
+small`) — do NOT run `archon workflow complete` yourself; per
+`skills/_shared/sdd-phase-common.md`'s executor boundary, mutating `state.yaml` on
+phase completion is the orchestrator's action, run once you report back, not the
+executor's. There is exactly ONE completion call per phase — `workflow complete`
+now rejects a second call on an already-completed phase, so a separate size-only
+or track-only follow-up call is not just redundant, it is a hard error. The
+orchestrator makes that single call as follows:
+
+- `size: substantial` or `unknown`, or `size: small` without a confirmed `fast`
+  suggestion: `archon workflow complete --change {name} --size {small|substantial|unknown}`.
+- `size: small` AND the user confirmed the `fast` suggestion at the preflight
+  deviation question (see [[harness-fast-track]] "Suggestion-only entry via sizing
+  classification"): `archon workflow complete --change {name} --size small --track
+  fast` — `--size` and `--track` together, in the SAME call, not two calls.
+
 ### Step 4: Analyze Options
 
 If there are multiple approaches, compare them:
